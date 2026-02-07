@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { api, DashboardStats } from '../api';
+import { api } from '../api';
+import type { DashboardStats } from '../api';
 import { Play, AlertTriangle, Info, AlertOctagon } from 'lucide-react';
 
 export default function ProjectDashboard() {

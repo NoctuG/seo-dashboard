@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, Project } from '../api';
+import { api } from '../api';
+import type { Project } from '../api';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 
