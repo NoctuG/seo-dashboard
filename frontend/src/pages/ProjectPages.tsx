@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, Page, Crawl } from '../api';
+import { api } from '../api';
+import type { Page, Crawl } from '../api';
 
 export default function ProjectPages() {
     const { id } = useParams<{ id: string }>();

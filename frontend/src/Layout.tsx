@@ -1,5 +1,5 @@
 import { Outlet, Link } from 'react-router-dom';
-import { Home } from 'lucide-react';
+import { Home, Sparkles } from 'lucide-react';
 
 export default function Layout() {
     return (
@@ -12,6 +12,9 @@ export default function Layout() {
                 <nav className="px-4 space-y-2">
                     <Link to="/" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
                         <Home size={20} /> Projects
+                    </Link>
+                    <Link to="/ai" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                        <Sparkles size={20} /> AI Assistant
                     </Link>
                 </nav>
             </div>

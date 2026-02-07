@@ -1,10 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.api import api_router
 from app.db import init_db
+from app.api.deps import verify_basic_auth
 
-app = FastAPI(title=settings.PROJECT_NAME)
+app = FastAPI(title=settings.PROJECT_NAME, dependencies=[Depends(verify_basic_auth)])
 
 # Set all CORS enabled origins
 app.add_middleware(
