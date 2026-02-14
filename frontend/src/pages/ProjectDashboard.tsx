@@ -8,6 +8,8 @@ export default function ProjectDashboard() {
     const { id } = useParams<{ id: string }>();
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
+    const [maxPages, setMaxPages] = useState(50);
+    const [sitemapUrl, setSitemapUrl] = useState('');
 
     useEffect(() => {
         if (id) fetchDashboard();
@@ -26,8 +28,12 @@ export default function ProjectDashboard() {
 
     const startCrawl = async () => {
         try {
-            await api.post(`/projects/${id}/crawl`);
-            // Poll or refresh
+            await api.post(`/projects/${id}/crawl`, null, {
+                params: {
+                    max_pages: maxPages,
+                    sitemap_url: sitemapUrl || undefined,
+                },
+            });
             fetchDashboard();
             alert('Crawl started!');
         } catch (error) {
@@ -37,12 +43,33 @@ export default function ProjectDashboard() {
 
     if (loading) return <div>Loading...</div>;
 
-    // If stats is null or empty object (handled by API returning "stats": None)
     if (!stats || !stats.last_crawl) return (
         <div>
             <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
             <p>No crawl data yet.</p>
-            <button onClick={startCrawl} className="bg-blue-600 text-white px-4 py-2 rounded mt-4 flex items-center gap-2">
+            <div className="mt-4 mb-4 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                <label className="flex flex-col gap-2 text-sm">
+                    <span className="text-gray-700">Max pages</span>
+                    <input
+                        type="number"
+                        min={1}
+                        value={maxPages}
+                        onChange={(e) => setMaxPages(Number(e.target.value) || 1)}
+                        className="border rounded px-3 py-2"
+                    />
+                </label>
+                <label className="flex flex-col gap-2 text-sm">
+                    <span className="text-gray-700">Sitemap URL (optional)</span>
+                    <input
+                        type="url"
+                        placeholder="https://example.com/sitemap.xml"
+                        value={sitemapUrl}
+                        onChange={(e) => setSitemapUrl(e.target.value)}
+                        className="border rounded px-3 py-2"
+                    />
+                </label>
+            </div>
+            <button onClick={startCrawl} className="bg-blue-600 text-white px-4 py-2 rounded mt-2 flex items-center gap-2">
                 <Play size={18} /> Start Crawl
             </button>
         </div>
@@ -57,6 +84,29 @@ export default function ProjectDashboard() {
                 <button onClick={startCrawl} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700">
                     <Play size={18} /> Start New Crawl
                 </button>
+            </div>
+
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                <label className="flex flex-col gap-2 text-sm">
+                    <span className="text-gray-700">Max pages</span>
+                    <input
+                        type="number"
+                        min={1}
+                        value={maxPages}
+                        onChange={(e) => setMaxPages(Number(e.target.value) || 1)}
+                        className="border rounded px-3 py-2"
+                    />
+                </label>
+                <label className="flex flex-col gap-2 text-sm">
+                    <span className="text-gray-700">Sitemap URL (optional)</span>
+                    <input
+                        type="url"
+                        placeholder="https://example.com/sitemap.xml"
+                        value={sitemapUrl}
+                        onChange={(e) => setSitemapUrl(e.target.value)}
+                        className="border rounded px-3 py-2"
+                    />
+                </label>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

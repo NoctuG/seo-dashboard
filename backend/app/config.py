@@ -22,4 +22,7 @@ class Settings:
     AI_API_KEY: str = os.getenv("AI_API_KEY", "")
     AI_MODEL: str = os.getenv("AI_MODEL", "gpt-4o-mini")
 
+    # Crawl settings
+    DEFAULT_CRAWL_MAX_PAGES: int = int(os.getenv("DEFAULT_CRAWL_MAX_PAGES", "50"))
+
 settings = Settings()

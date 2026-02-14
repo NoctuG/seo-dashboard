@@ -18,6 +18,8 @@ class ProjectRead(BaseModel):
 
 class CrawlCreate(BaseModel):
     project_id: int
+    max_pages: Optional[int] = None
+    sitemap_url: Optional[str] = None
 
 class CrawlRead(BaseModel):
     id: int
