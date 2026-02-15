@@ -83,6 +83,12 @@
   - `GA4_PROPERTY_ID`、`GA4_ACCESS_TOKEN`：GA4 Data API 所需参数。
   - `MATOMO_BASE_URL`、`MATOMO_SITE_ID`、`MATOMO_TOKEN_AUTH`：Matomo API 所需参数。
   - `ALLOWED_ORIGINS`：后端 CORS 白名单，支持逗号分隔（如 `https://app.example.com,https://admin.example.com`）或 JSON 数组。
+  - `RATE_LIMIT_LOGIN`：登录接口限流阈值（默认 `5/minute`）。
+  - `RATE_LIMIT_CRAWL_START`：爬取启动接口限流阈值（默认 `2/minute`）。
+
+- 当触发限流时，后端统一返回 `429 Too Many Requests`，并附带 `Retry-After` 响应头用于告知客户端重试等待时间。
+  - `LOG_LEVEL`：日志级别（如 `DEBUG`、`INFO`、`WARNING`、`ERROR`）。
+  - `LOG_FORMAT`：日志输出格式，支持 `json`（默认，推荐 ELK/Loki）或 `plain`。
 
 - 前端支持 `.env` 配置文件（位于 `frontend/.env`），可配置：
   - `VITE_API_URL`
@@ -154,3 +160,25 @@
 在这种模式下，仍建议保持前端 API 基地址为同源 `/api/v1`，由入口代理统一转发到后端，避免 HTTPS 页面请求 HTTP API 导致 mixed content。
 
 > ⚠️ 生产环境必须将 `ALLOWED_ORIGINS` 配置为真实业务域名列表，严禁使用 `*`，否则会带来严重的跨域安全风险。
+
+## 日志采集建议（ELK / Loki）
+
+后端启动后会统一输出结构化日志（JSON），每条日志包含以下字段，便于在日志平台中检索与聚合：
+
+- `timestamp`：UTC ISO8601 时间戳。
+- `level`：日志等级。
+- `message`：日志消息内容。
+- `trace_id`：请求链路追踪 ID（同一个请求内保持一致，同时会通过响应头 `X-Trace-Id` 返回）。
+- `path`：请求路径（非请求上下文日志为 `-`）。
+
+### ELK（Filebeat / Logstash / Elasticsearch）
+
+- 建议将后端 stdout 作为 JSON 日志源采集。
+- Filebeat 可启用 `json.keys_under_root: true`（或等价配置）直接展开字段。
+- 推荐以 `trace_id` + `path` 作为排障主键，配合 `level` 做告警规则。
+
+### Loki（Promtail / Grafana）
+
+- Promtail 可使用 `json` stage 提取 `level`、`trace_id`、`path`。
+- 建议将低基数字段（如 `level`、服务名）作为 labels；`trace_id` 更适合保留在 log line/parsed field，避免高基数标签导致成本上升。
+- Grafana Explore 中可通过 `trace_id="..."` 快速定位单次请求全链路日志。

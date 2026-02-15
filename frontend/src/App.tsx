@@ -13,7 +13,9 @@ import Users from './pages/Users';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ChangePassword from './pages/ChangePassword';
+import SystemSettings from './pages/SystemSettings';
 import { useAuth } from './auth';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useTranslation } from 'react-i18next';
 
 function Protected({ children }: { children: ReactElement }) {
@@ -24,13 +26,23 @@ function Protected({ children }: { children: ReactElement }) {
   return children;
 }
 
+function withRouteBoundary(routeScope: string, element: ReactElement) {
+  return <ErrorBoundary scope={routeScope}>{element}</ErrorBoundary>;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/login" element={withRouteBoundary('login-route', <Login />)} />
+        <Route
+          path="/forgot-password"
+          element={withRouteBoundary('forgot-password-route', <ForgotPassword />)}
+        />
+        <Route
+          path="/reset-password"
+          element={withRouteBoundary('reset-password-route', <ResetPassword />)}
+        />
         <Route
           path="/"
           element={
@@ -48,6 +60,7 @@ function App() {
           <Route path="ai" element={<AiAssistant />} />
           <Route path="users" element={<Users />} />
           <Route path="change-password" element={<ChangePassword />} />
+          <Route path="settings" element={<SystemSettings />} />
         </Route>
       </Routes>
     </BrowserRouter>

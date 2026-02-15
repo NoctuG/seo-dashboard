@@ -12,6 +12,10 @@ class Settings:
     PROJECT_NAME: str = "SEO Tool"
     API_V1_STR: str = "/api/v1"
 
+    # Logging
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    LOG_FORMAT: str = os.getenv("LOG_FORMAT", "json")  # json or plain
+
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/seo_tool.db")
 
@@ -20,6 +24,7 @@ class Settings:
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "change-me")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))
+    JWT_REFRESH_EXPIRE_MINUTES: int = int(os.getenv("JWT_REFRESH_EXPIRE_MINUTES", "10080"))
 
     # bootstrap admin
     INITIAL_ADMIN_EMAIL: str = os.getenv("INITIAL_ADMIN_EMAIL", "")
@@ -36,7 +41,8 @@ class Settings:
     SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_FROM: str = os.getenv("SMTP_FROM", "")
-    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", os.getenv("SMTP_USE_TLS", "true")).lower() == "true"
+    SMTP_USE_TLS: bool = SMTP_TLS
 
     # AI settings (OpenAI-compatible)
     AI_BASE_URL: str = os.getenv("AI_BASE_URL", "")
@@ -46,12 +52,21 @@ class Settings:
     # Crawl settings
     DEFAULT_CRAWL_MAX_PAGES: int = int(os.getenv("DEFAULT_CRAWL_MAX_PAGES", "50"))
 
+    # Rate limit settings
+    RATE_LIMIT_LOGIN: str = os.getenv("RATE_LIMIT_LOGIN", "5/minute")
+    RATE_LIMIT_CRAWL_START: str = os.getenv("RATE_LIMIT_CRAWL_START", "2/minute")
+
     # Performance providers (optional)
     LIGHTHOUSE_API_URL: str = os.getenv("LIGHTHOUSE_API_URL", "")
     WEB_VITALS_API_URL: str = os.getenv("WEB_VITALS_API_URL", "")
 
     # backup
     BACKUP_DIR: str = os.getenv("BACKUP_DIR", "/data/backups")
+
+    # webhook
+    WEBHOOK_TIMEOUT_SECONDS: int = int(os.getenv("WEBHOOK_TIMEOUT_SECONDS", "8"))
+    WEBHOOK_MAX_RETRIES: int = int(os.getenv("WEBHOOK_MAX_RETRIES", "3"))
+    WEBHOOK_RETRY_BASE_SECONDS: int = int(os.getenv("WEBHOOK_RETRY_BASE_SECONDS", "1"))
 
     # CORS
     @staticmethod

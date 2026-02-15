@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from app.config import settings
+from app.runtime_settings import get_runtime_settings
 
 
 class AnalyticsService:
@@ -20,7 +21,8 @@ class AnalyticsService:
         brand_regex: Optional[str] = None,
         cost_config: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        provider = (settings.ANALYTICS_PROVIDER or "sample").lower()
+        runtime = get_runtime_settings()
+        provider = (runtime.analytics_provider or "sample").lower()
         rules = self._build_brand_rules(brand_keywords_json, brand_regex)
         if provider == "matomo":
             try:
@@ -41,20 +43,21 @@ class AnalyticsService:
         return self._attach_roi_metrics(self._build_sample_analytics(project_id, domain, rules), cost_config)
 
     def _get_matomo_analytics(self, project_id: int, brand_rules: Dict[str, Any]) -> Dict[str, Any]:
-        if not settings.MATOMO_BASE_URL or not settings.MATOMO_SITE_ID or not settings.MATOMO_TOKEN_AUTH:
+        runtime = get_runtime_settings()
+        if not runtime.matomo_base_url or not runtime.matomo_site_id or not runtime.matomo_token_auth:
             raise ValueError("MATOMO_BASE_URL, MATOMO_SITE_ID and MATOMO_TOKEN_AUTH are required")
 
         params = {
             "module": "API",
             "method": "API.getBulkRequest",
             "format": "JSON",
-            "token_auth": settings.MATOMO_TOKEN_AUTH,
-            "urls[0]": "method=VisitsSummary.get&idSite={site}&period=day&date=last30".format(site=settings.MATOMO_SITE_ID),
-            "urls[1]": "method=UserCountry.getCountry&idSite={site}&period=month&date=today".format(site=settings.MATOMO_SITE_ID),
-            "urls[2]": "method=DevicesDetection.getType&idSite={site}&period=month&date=today".format(site=settings.MATOMO_SITE_ID),
-            "urls[3]": "method=Actions.getPageUrls&idSite={site}&period=day&date=last30".format(site=settings.MATOMO_SITE_ID),
+            "token_auth": runtime.matomo_token_auth,
+            "urls[0]": "method=VisitsSummary.get&idSite={site}&period=day&date=last30".format(site=runtime.matomo_site_id),
+            "urls[1]": "method=UserCountry.getCountry&idSite={site}&period=month&date=today".format(site=runtime.matomo_site_id),
+            "urls[2]": "method=DevicesDetection.getType&idSite={site}&period=month&date=today".format(site=runtime.matomo_site_id),
+            "urls[3]": "method=Actions.getPageUrls&idSite={site}&period=day&date=last30".format(site=runtime.matomo_site_id),
         }
-        response = requests.get(settings.MATOMO_BASE_URL.rstrip("/") + "/", params=params, timeout=20)
+        response = requests.get(runtime.matomo_base_url.rstrip("/") + "/", params=params, timeout=20)
         response.raise_for_status()
         data = response.json()
 
@@ -177,10 +180,11 @@ class AnalyticsService:
         }
 
     def _get_ga4_analytics(self, project_id: int, brand_rules: Dict[str, Any]) -> Dict[str, Any]:
-        if not settings.GA4_PROPERTY_ID or not settings.GA4_ACCESS_TOKEN:
+        runtime = get_runtime_settings()
+        if not runtime.ga4_property_id or not runtime.ga4_access_token:
             raise ValueError("GA4_PROPERTY_ID and GA4_ACCESS_TOKEN are required")
 
-        endpoint = f"https://analyticsdata.googleapis.com/v1beta/properties/{settings.GA4_PROPERTY_ID}:runReport"
+        endpoint = f"https://analyticsdata.googleapis.com/v1beta/properties/{runtime.ga4_property_id}:runReport"
         body = {
             "dateRanges": [{"startDate": "30daysAgo", "endDate": "today"}],
             "metrics": [
@@ -196,7 +200,7 @@ class AnalyticsService:
             "dimensions": [{"name": "date"}, {"name": "country"}, {"name": "deviceCategory"}, {"name": "landingPagePlusQueryString"}],
             "limit": 10000,
         }
-        headers = {"Authorization": f"Bearer {settings.GA4_ACCESS_TOKEN}"}
+        headers = {"Authorization": f"Bearer {runtime.ga4_access_token}"}
         response = requests.post(endpoint, json=body, headers=headers, timeout=20)
         response.raise_for_status()
         payload = response.json()
