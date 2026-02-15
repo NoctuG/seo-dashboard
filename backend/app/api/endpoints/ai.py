@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 import httpx
 
+from app.core.error_codes import ErrorCode
 from app.runtime_settings import get_runtime_settings
 
 router = APIRouter()
@@ -21,7 +22,7 @@ async def analyze_with_ai(payload: AiAnalyzeRequest):
     if not runtime.ai_base_url or not runtime.ai_api_key:
         raise HTTPException(
             status_code=400,
-            detail="AI is not configured. Please set AI_BASE_URL and AI_API_KEY in .env",
+            detail=ErrorCode.AI_IS_NOT_CONFIGURED_PLEASE_SET_AI_BASE_URL_AND_AI_API_KEY_IN_ENV,
         )
 
     base_url = runtime.ai_base_url.rstrip("/")
@@ -53,11 +54,11 @@ async def analyze_with_ai(payload: AiAnalyzeRequest):
             response.raise_for_status()
             data = response.json()
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"AI request failed: {exc}") from exc
+        raise HTTPException(status_code=502, detail=ErrorCode.AI_REQUEST_FAILED_EXC) from exc
 
     choices = data.get("choices") or []
     if not choices:
-        raise HTTPException(status_code=502, detail="AI response missing choices")
+        raise HTTPException(status_code=502, detail=ErrorCode.AI_RESPONSE_MISSING_CHOICES)
 
     message = choices[0].get("message") or {}
     content = message.get("content", "")

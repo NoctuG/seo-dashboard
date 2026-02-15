@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   createWebhookConfig,
   deleteWebhookConfig,
@@ -9,6 +10,7 @@ import {
 } from '../api';
 
 export default function SystemSettings() {
+  const { t } = useTranslation();
   const [configs, setConfigs] = useState<WebhookConfig[]>([]);
   const [events, setEvents] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +28,7 @@ export default function SystemSettings() {
       setEvents(webhookEvents);
       setConfigs(webhookConfigs);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '加载配置失败');
+      setError(err?.response?.data?.detail || t('systemSettings.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -55,24 +57,24 @@ export default function SystemSettings() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('确认删除该 webhook 配置？')) return;
+    if (!window.confirm(t('systemSettings.confirmDelete'))) return;
     await deleteWebhookConfig(id);
     await load();
   };
 
-  if (loading) return <div>加载中...</div>;
+  if (loading) return <div>{t('common.loading')}</div>;
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <h1 className="text-2xl font-bold">系统设置 / Webhook 通知</h1>
+      <h1 className="text-2xl font-bold">{t('systemSettings.title')}</h1>
       {error && <div className="p-3 rounded border border-red-200 bg-red-50 text-red-700">{error}</div>}
 
       <form onSubmit={handleCreate} className="space-y-4 border rounded bg-white p-4">
-        <h2 className="text-lg font-semibold">新增 Webhook</h2>
-        <input className="w-full border rounded p-2" placeholder="Webhook URL" value={url} onChange={(e) => setUrl(e.target.value)} required />
-        <input className="w-full border rounded p-2" placeholder="Secret" value={secret} onChange={(e) => setSecret(e.target.value)} required />
+        <h2 className="text-lg font-semibold">{t('systemSettings.addWebhook')}</h2>
+        <input className="w-full border rounded p-2" placeholder={t('systemSettings.webhookUrl')} value={url} onChange={(e) => setUrl(e.target.value)} required />
+        <input className="w-full border rounded p-2" placeholder={t('systemSettings.secret')} value={secret} onChange={(e) => setSecret(e.target.value)} required />
         <div>
-          <div className="text-sm text-gray-600 mb-2">订阅事件</div>
+          <div className="text-sm text-gray-600 mb-2">{t('systemSettings.subscribedEvents')}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {events.map((event) => (
               <label key={event} className="flex items-center gap-2 text-sm">
@@ -82,34 +84,28 @@ export default function SystemSettings() {
             ))}
           </div>
         </div>
-        <button className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700" type="submit">
-          保存配置
-        </button>
+        <button className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700" type="submit">{t('systemSettings.saveConfig')}</button>
       </form>
 
       <div className="border rounded bg-white p-4">
-        <h2 className="text-lg font-semibold mb-3">现有配置</h2>
+        <h2 className="text-lg font-semibold mb-3">{t('systemSettings.existingConfigs')}</h2>
         <div className="space-y-3">
           {configs.map((config) => (
             <div key={config.id} className="border rounded p-3">
               <div className="font-medium">{config.url}</div>
-              <div className="text-sm text-gray-600">事件: {config.subscribed_events.join(', ') || '-'}</div>
+              <div className="text-sm text-gray-600">{t('systemSettings.events')}: {config.subscribed_events.join(', ') || '-'}</div>
               <div className="text-xs text-gray-500 mt-1">secret: {config.secret}</div>
               <div className="mt-3 flex gap-2">
-                <button
-                  className="px-3 py-1 rounded border hover:bg-gray-50"
-                  onClick={() => handleToggleEnabled(config)}
-                  type="button"
-                >
-                  {config.enabled ? '禁用' : '启用'}
+                <button className="px-3 py-1 rounded border hover:bg-gray-50" onClick={() => handleToggleEnabled(config)} type="button">
+                  {config.enabled ? t('systemSettings.disable') : t('systemSettings.enable')}
                 </button>
                 <button className="px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleDelete(config.id)} type="button">
-                  删除
+                  {t('common.delete')}
                 </button>
               </div>
             </div>
           ))}
-          {!configs.length && <div className="text-sm text-gray-500">暂无 webhook 配置。</div>}
+          {!configs.length && <div className="text-sm text-gray-500">{t('systemSettings.empty')}</div>}
         </div>
       </div>
     </div>

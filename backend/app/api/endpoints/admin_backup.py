@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.engine import make_url
 from sqlmodel import Session
 
+from app.core.error_codes import ErrorCode
 from app.api.deps import require_superuser, write_audit_log
 from app.config import BASE_DIR, settings
 from app.db import get_session
@@ -39,12 +40,12 @@ def _sqlite_db_path() -> Path:
     if db_url.get_backend_name() != "sqlite":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Backup/restore currently supports SQLite only",
+            detail=ErrorCode.BACKUP_RESTORE_CURRENTLY_SUPPORTS_SQLITE_ONLY,
         )
 
     db_name = db_url.database
     if not db_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SQLite database path")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.INVALID_SQLITE_DATABASE_PATH)
 
     return Path(db_name).resolve()
 
@@ -59,21 +60,21 @@ def _ensure_allowed_backup_file(candidate: Path, backup_dir: Path) -> Path:
     try:
         target.relative_to(backup_dir)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Backup file must be inside backup dir") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.BACKUP_FILE_MUST_BE_INSIDE_BACKUP_DIR) from exc
 
     if target.suffix.lower() not in _ALLOWED_BACKUP_SUFFIXES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported backup file format")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.UNSUPPORTED_BACKUP_FILE_FORMAT)
 
     if not target.exists() or not target.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backup file not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=ErrorCode.BACKUP_FILE_NOT_FOUND)
 
     if target.stat().st_size == 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Backup file is empty")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.BACKUP_FILE_IS_EMPTY)
 
     with target.open("rb") as f:
         header = f.read(16)
     if header != b"SQLite format 3\x00":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SQLite backup header")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.INVALID_SQLITE_BACKUP_HEADER)
 
     return target
 
@@ -126,7 +127,7 @@ def restore_backup(
     session: Session = Depends(get_session),
 ):
     if payload.confirm_phrase != "RESTORE":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid confirmation phrase")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.INVALID_CONFIRMATION_PHRASE)
 
     db_path = _sqlite_db_path()
     backup_dir = _backup_dir()

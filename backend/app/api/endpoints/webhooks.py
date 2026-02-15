@@ -5,6 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
+from app.core.error_codes import ErrorCode
 from app.api.deps import require_superuser
 from app.db import get_session
 from app.models import User, WebhookConfig
@@ -18,7 +19,7 @@ def _normalize_events(events: List[str]) -> List[str]:
     normalized = [event.strip() for event in events if event and event.strip()]
     invalid = [event for event in normalized if event != "*" and event not in SUPPORTED_WEBHOOK_EVENTS]
     if invalid:
-        raise HTTPException(status_code=400, detail=f"Unsupported events: {', '.join(invalid)}")
+        raise HTTPException(status_code=400, detail=ErrorCode.UNSUPPORTED_EVENTS_JOIN_INVALID)
     return sorted(list(dict.fromkeys(normalized)))
 
 
@@ -80,7 +81,7 @@ def update_webhook_config(
 ):
     config = session.get(WebhookConfig, webhook_id)
     if not config:
-        raise HTTPException(status_code=404, detail="Webhook config not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.WEBHOOK_CONFIG_NOT_FOUND)
 
     if payload.url is not None:
         config.url = payload.url
@@ -106,7 +107,7 @@ def delete_webhook_config(
 ):
     config = session.get(WebhookConfig, webhook_id)
     if not config:
-        raise HTTPException(status_code=404, detail="Webhook config not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.WEBHOOK_CONFIG_NOT_FOUND)
 
     session.delete(config)
     session.commit()

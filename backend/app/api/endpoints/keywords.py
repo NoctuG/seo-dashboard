@@ -5,6 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
+from app.core.error_codes import ErrorCode
 from app.db import get_session
 from app.models import CompetitorDomain, Keyword, RankHistory, Project, ProjectRoleType, User
 from app.schemas import (
@@ -33,7 +34,7 @@ def _resolve_geo_language(project: Project, keyword: Keyword) -> tuple[str, str]
 def list_competitors(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     return session.exec(
         select(CompetitorDomain)
@@ -51,7 +52,7 @@ def create_competitor(
 ):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     normalized_domain = payload.domain.strip().lower()
     exists = session.exec(
@@ -61,7 +62,7 @@ def create_competitor(
         )
     ).first()
     if exists:
-        raise HTTPException(status_code=400, detail="Competitor domain already exists")
+        raise HTTPException(status_code=400, detail=ErrorCode.COMPETITOR_DOMAIN_ALREADY_EXISTS)
 
     competitor = CompetitorDomain(project_id=project_id, domain=normalized_domain)
     session.add(competitor)
@@ -74,7 +75,7 @@ def create_competitor(
 def delete_competitor(project_id: int, competitor_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.ADMIN))):
     competitor = session.get(CompetitorDomain, competitor_id)
     if not competitor or competitor.project_id != project_id:
-        raise HTTPException(status_code=404, detail="Competitor not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.COMPETITOR_NOT_FOUND)
 
     session.delete(competitor)
     session.commit()
@@ -85,7 +86,7 @@ def delete_competitor(project_id: int, competitor_id: int, session: Session = De
 def list_keywords(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     keywords = session.exec(
         select(Keyword).where(Keyword.project_id == project_id)
@@ -102,7 +103,7 @@ def create_keyword(
 ):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     keyword = Keyword(
         project_id=project_id,
@@ -126,7 +127,7 @@ def delete_keyword(
 ):
     keyword = session.get(Keyword, keyword_id)
     if not keyword or keyword.project_id != project_id:
-        raise HTTPException(status_code=404, detail="Keyword not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.KEYWORD_NOT_FOUND)
 
     session.delete(keyword)
     session.commit()
@@ -142,7 +143,7 @@ def check_rank(
 ):
     keyword = session.get(Keyword, keyword_id)
     if not keyword or keyword.project_id != project_id:
-        raise HTTPException(status_code=404, detail="Keyword not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.KEYWORD_NOT_FOUND)
 
     project = session.get(Project, project_id)
     competitors = session.exec(select(CompetitorDomain).where(CompetitorDomain.project_id == project_id)).all()
@@ -174,7 +175,7 @@ def check_all_ranks(
 ):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     keywords = session.exec(
         select(Keyword).where(Keyword.project_id == project_id)
@@ -210,7 +211,7 @@ def check_all_compare(
 ):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     keywords = session.exec(select(Keyword).where(Keyword.project_id == project_id)).all()
     competitors = session.exec(select(CompetitorDomain).where(CompetitorDomain.project_id == project_id)).all()
@@ -289,7 +290,7 @@ def get_rank_history(
 ):
     keyword = session.get(Keyword, keyword_id)
     if not keyword or keyword.project_id != project_id:
-        raise HTTPException(status_code=404, detail="Keyword not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.KEYWORD_NOT_FOUND)
 
     history = session.exec(
         select(RankHistory)

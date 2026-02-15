@@ -6,6 +6,7 @@ from datetime import date, datetime
 from fastapi.responses import Response
 from collections import Counter
 
+from app.core.error_codes import ErrorCode
 from app.db import get_session
 from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog, ProjectMember, ProjectRoleType, Role, User, AuditActionType
 from app.schemas import (
@@ -99,7 +100,7 @@ def read_projects(skip: int = 0, limit: int = 100, session: Session = Depends(ge
 def read_project(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
     return _project_to_read(project)
 
 
@@ -114,7 +115,7 @@ def update_project_settings(
 ):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     if payload.default_gl is not None:
         project.default_gl = payload.default_gl.strip().lower() or project.default_gl
@@ -130,7 +131,7 @@ def update_project_settings(
 def delete_project(project_id: int, session: Session = Depends(get_session), user: User = Depends(require_project_role(ProjectRoleType.ADMIN))):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
     session.delete(project)
     session.commit()
     write_audit_log(session, AuditActionType.PROJECT_DELETE, user.id, "project", project_id, {"name": project.name})
@@ -150,7 +151,7 @@ def start_crawl(
 ):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     crawl = Crawl(project_id=project_id, status=CrawlStatus.PENDING)
     session.add(crawl)
@@ -173,7 +174,7 @@ def read_crawls(project_id: int, session: Session = Depends(get_session), _: Use
 def get_dashboard(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     crawls = session.exec(
         select(Crawl).where(Crawl.project_id == project_id).order_by(Crawl.start_time.desc()).limit(5)
@@ -288,7 +289,7 @@ def get_project_roi(
 ):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     cost_config = session.exec(select(SeoCostConfig).where(SeoCostConfig.project_id == project_id)).first()
     if not cost_config:
@@ -360,7 +361,7 @@ def get_content_performance(
 ):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     return content_performance_service.get_project_content_performance(
         session=session,
@@ -375,7 +376,7 @@ def get_content_performance(
 def get_project_visibility(project_id: int, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     return visibility_service.get_project_visibility(session=session, project_id=project_id)
 
@@ -420,7 +421,7 @@ def _sync_backlink_snapshot(session: Session, project_id: int, domain: str):
 def get_project_authority(project_id: int, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     _sync_backlink_snapshot(session, project_id, project.domain)
 
@@ -455,7 +456,7 @@ def get_project_authority(project_id: int, session: Session = Depends(get_sessio
 def get_project_backlinks(project_id: int, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     _sync_backlink_snapshot(session, project_id, project.domain)
 
@@ -494,7 +495,7 @@ def get_project_backlinks(project_id: int, session: Session = Depends(get_sessio
 def get_project_backlink_changes(project_id: int, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     _sync_backlink_snapshot(session, project_id, project.domain)
 
@@ -542,7 +543,7 @@ def list_report_templates(project_id: int, session: Session = Depends(get_sessio
 def create_report_template(project_id: int, payload: ReportTemplateCreate, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     template = ReportTemplate(
         project_id=project_id,
@@ -562,7 +563,7 @@ def create_report_template(project_id: int, payload: ReportTemplateCreate, sessi
 def update_report_template(project_id: int, template_id: int, payload: ReportTemplateCreate, session: Session = Depends(get_session)):
     template = session.get(ReportTemplate, template_id)
     if not template or template.project_id != project_id:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.TEMPLATE_NOT_FOUND)
 
     template.name = payload.name
     template.indicators_json = json.dumps(payload.indicators, ensure_ascii=False)
@@ -580,7 +581,7 @@ def update_report_template(project_id: int, template_id: int, payload: ReportTem
 def export_report(project_id: int, payload: ReportExportRequest, session: Session = Depends(get_session)):
     template = session.get(ReportTemplate, payload.template_id)
     if not template or template.project_id != project_id:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.TEMPLATE_NOT_FOUND)
 
     try:
         if payload.locale:
@@ -599,7 +600,7 @@ def export_report(project_id: int, payload: ReportExportRequest, session: Sessio
             status="failed",
             error_message=report_service.format_delivery_error(exc),
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=ErrorCode.UNEXPECTED_ERROR) from exc
 
     report_service.create_delivery_log(
         session,
@@ -636,7 +637,7 @@ def list_report_schedules(project_id: int, session: Session = Depends(get_sessio
 def create_report_schedule(project_id: int, payload: ReportScheduleCreate, session: Session = Depends(get_session)):
     template = session.get(ReportTemplate, payload.template_id)
     if not template or template.project_id != project_id:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.TEMPLATE_NOT_FOUND)
 
     schedule = ReportSchedule(project_id=project_id, **payload.model_dump())
     session.add(schedule)
@@ -650,7 +651,7 @@ def create_report_schedule(project_id: int, payload: ReportScheduleCreate, sessi
 def delete_report_schedule(project_id: int, schedule_id: int, session: Session = Depends(get_session)):
     schedule = session.get(ReportSchedule, schedule_id)
     if not schedule or schedule.project_id != project_id:
-        raise HTTPException(status_code=404, detail="Schedule not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.SCHEDULE_NOT_FOUND)
     session.delete(schedule)
     session.commit()
     scheduler_service.reload_jobs()
@@ -671,6 +672,6 @@ def get_project_permissions(project_id: int, session: Session = Depends(get_sess
         return {"role": "admin"}
     membership = session.exec(select(ProjectMember).join(Role, Role.id == ProjectMember.role_id).where(ProjectMember.project_id == project_id, ProjectMember.user_id == user.id)).first()
     if not membership:
-        raise HTTPException(status_code=403, detail="No project access")
+        raise HTTPException(status_code=403, detail=ErrorCode.NO_PROJECT_ACCESS)
     role = session.get(Role, membership.role_id)
     return {"role": role.name.value}

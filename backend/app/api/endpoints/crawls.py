@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from typing import List, Optional
 
+from app.core.error_codes import ErrorCode
 from app.crawler.events import crawl_event_broker
 from app.db import get_session
 from app.models import Crawl, Page, Issue, IssueSeverity
@@ -23,7 +24,7 @@ def _format_sse(event: dict) -> str:
 def read_crawl(crawl_id: int, session: Session = Depends(get_session)):
     crawl = session.get(Crawl, crawl_id)
     if not crawl:
-        raise HTTPException(status_code=404, detail="Crawl not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.CRAWL_NOT_FOUND)
     return crawl
 
 @router.get("/{crawl_id}/pages", response_model=List[PageRead])
@@ -61,7 +62,7 @@ def read_crawl_issues(
 async def stream_crawl_events(crawl_id: int, request: Request, session: Session = Depends(get_session)):
     crawl = session.get(Crawl, crawl_id)
     if not crawl:
-        raise HTTPException(status_code=404, detail="Crawl not found")
+        raise HTTPException(status_code=404, detail=ErrorCode.CRAWL_NOT_FOUND)
 
     async def event_generator():
         subscriber = crawl_event_broker.subscribe(crawl_id)

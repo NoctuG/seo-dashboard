@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, EmailStr
 from sqlmodel import Session, select
 
+from app.core.error_codes import ErrorCode
 from app.api.deps import require_superuser
 from app.auth_service import hash_password
 from app.db import get_session
@@ -47,7 +48,7 @@ def create_user(
     email = payload.email.lower()
     existing = session.exec(select(User).where(User.email == email)).first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.EMAIL_ALREADY_EXISTS)
 
     user = User(
         email=email,
@@ -80,13 +81,13 @@ def update_user(
 ):
     user = session.get(User, id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=ErrorCode.USER_NOT_FOUND)
 
     if payload.email is not None:
         normalized = payload.email.lower()
         existing = session.exec(select(User).where(User.email == normalized, User.id != user.id)).first()
         if existing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.EMAIL_ALREADY_EXISTS)
         user.email = normalized
 
     if payload.full_name is not None:
@@ -99,7 +100,7 @@ def update_user(
         if current_user.id == user.id and not payload.is_superuser:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot remove your own superuser permission",
+                detail=ErrorCode.CANNOT_REMOVE_YOUR_OWN_SUPERUSER_PERMISSION,
             )
         user.is_superuser = payload.is_superuser
 
@@ -117,9 +118,9 @@ def delete_user(
 ):
     user = session.get(User, id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=ErrorCode.USER_NOT_FOUND)
     if current_user.id == user.id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete your own account")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.CANNOT_DELETE_YOUR_OWN_ACCOUNT)
 
     session.delete(user)
     session.commit()
