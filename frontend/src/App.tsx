@@ -8,6 +8,7 @@ import ProjectIssues from './pages/ProjectIssues';
 import ProjectKeywords from './pages/ProjectKeywords';
 import AiAssistant from './pages/AiAssistant';
 import ProjectReports from './pages/ProjectReports';
+import ProjectApiKeys from './pages/ProjectApiKeys';
 import Login from './pages/Login';
 import Users from './pages/Users';
 import ForgotPassword from './pages/ForgotPassword';
