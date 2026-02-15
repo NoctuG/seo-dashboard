@@ -92,3 +92,40 @@
 
 - 侧边栏新增 **AI 助手** 页面。
 - 可粘贴 SEO 内容，获取由所配置 AI 接口生成的优化建议。
+
+
+## TLS 部署（Docker Compose）
+
+生产环境建议通过 HTTPS 暴露前端。当前 `frontend/nginx.conf` 已包含：
+
+- `80` 端口自动重定向到 `443`。
+- `443` 端口启用 TLS（`ssl_certificate` / `ssl_certificate_key`）。
+- `/api/` 反向代理到 `backend:8000`，前端通过同源路径 `/api/v1` 访问 API，避免浏览器 mixed content。
+
+### 方式一：自签证书（快速内网部署）
+
+1. 在仓库根目录创建证书目录：
+   ```bash
+   mkdir -p certs
+   ```
+2. 生成自签证书（示例域名替换为你的域名/IP）：
+   ```bash
+   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+     -keyout certs/privkey.pem \
+     -out certs/fullchain.pem \
+     -subj "/CN=your-domain-or-ip"
+   ```
+3. 启动服务：
+   ```bash
+   docker compose up -d --build
+   ```
+4. 浏览器访问 `https://<your-domain-or-ip>`（首次会提示证书不受信任，需手动信任）。
+
+### 方式二：使用反向代理自动证书（推荐公网）
+
+你也可以让本项目仅提供 HTTP（容器内部），由上层反向代理负责 TLS 终止与证书自动续期：
+
+- **Caddy**：通过 `reverse_proxy` 指向本项目前端服务，自动申请/续签 Let's Encrypt 证书。
+- **Traefik**：通过 Docker labels / IngressRoute 将域名路由到前端服务，配合 ACME 自动证书。
+
+在这种模式下，仍建议保持前端 API 基地址为同源 `/api/v1`，由入口代理统一转发到后端，避免 HTTPS 页面请求 HTTP API 导致 mixed content。
