@@ -83,6 +83,10 @@
   - `GA4_PROPERTY_ID`、`GA4_ACCESS_TOKEN`：GA4 Data API 所需参数。
   - `MATOMO_BASE_URL`、`MATOMO_SITE_ID`、`MATOMO_TOKEN_AUTH`：Matomo API 所需参数。
   - `ALLOWED_ORIGINS`：后端 CORS 白名单，支持逗号分隔（如 `https://app.example.com,https://admin.example.com`）或 JSON 数组。
+  - `RATE_LIMIT_LOGIN`：登录接口限流阈值（默认 `5/minute`）。
+  - `RATE_LIMIT_CRAWL_START`：爬取启动接口限流阈值（默认 `2/minute`）。
+
+- 当触发限流时，后端统一返回 `429 Too Many Requests`，并附带 `Retry-After` 响应头用于告知客户端重试等待时间。
 
 - 前端支持 `.env` 配置文件（位于 `frontend/.env`），可配置：
   - `VITE_API_URL`

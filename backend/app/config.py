@@ -44,6 +44,10 @@ class Settings:
     # Crawl settings
     DEFAULT_CRAWL_MAX_PAGES: int = int(os.getenv("DEFAULT_CRAWL_MAX_PAGES", "50"))
 
+    # Rate limit settings
+    RATE_LIMIT_LOGIN: str = os.getenv("RATE_LIMIT_LOGIN", "5/minute")
+    RATE_LIMIT_CRAWL_START: str = os.getenv("RATE_LIMIT_CRAWL_START", "2/minute")
+
     # Performance providers (optional)
     LIGHTHOUSE_API_URL: str = os.getenv("LIGHTHOUSE_API_URL", "")
     WEB_VITALS_API_URL: str = os.getenv("WEB_VITALS_API_URL", "")
