@@ -9,10 +9,11 @@ from sqlmodel import Session
 
 from app.config import settings
 from app.db import engine
-from app.models import Crawl, Page, Link, Issue, CrawlStatus, IssueStatus
+from app.models import Crawl, Page, Link, Issue, CrawlStatus, IssueStatus, PagePerformanceSnapshot
 from app.crawler.fetcher import Fetcher
 from app.crawler.parser import Parser
 from app.crawler.analyzer import Analyzer
+from app.crawler.performance_adapter import performance_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,14 @@ class CrawlerService:
                     html_content = response.text
 
                     parse_result = parser.parse(html_content, url)
+                    parse_result["url"] = str(response.url)
+                    parse_result["response_headers"] = dict(response.headers)
+
+                    perf_metrics = performance_adapter.collect(url)
+                    parse_result["lcp_ms"] = perf_metrics.lcp_ms
+                    parse_result["fcp_ms"] = perf_metrics.fcp_ms
+                    parse_result["cls"] = perf_metrics.cls
+
                     issues = analyzer.analyze(parse_result, status_code, load_time)
 
                     page = Page(
@@ -152,6 +161,15 @@ class CrawlerService:
                     session.add(page)
                     session.commit()
                     session.refresh(page)
+
+                    performance_snapshot = PagePerformanceSnapshot(
+                        page_id=page.id,
+                        lcp_ms=perf_metrics.lcp_ms,
+                        fcp_ms=perf_metrics.fcp_ms,
+                        cls=perf_metrics.cls,
+                        source=perf_metrics.source,
+                    )
+                    session.add(performance_snapshot)
 
                     current_domain = urlparse(url).netloc
                     if current_domain.startswith('www.'):

@@ -3,9 +3,10 @@ from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional, Literal
 import json
 from datetime import date
+from collections import Counter
 
 from app.db import get_session
-from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig
+from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot
 from app.schemas import (
     ProjectCreate,
     ProjectRead,
@@ -118,8 +119,11 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    statement = select(Crawl).where(Crawl.project_id == project_id).order_by(Crawl.start_time.desc())
-    last_crawl = session.exec(statement).first()
+    crawls = session.exec(
+        select(Crawl).where(Crawl.project_id == project_id).order_by(Crawl.start_time.desc()).limit(5)
+    ).all()
+    last_crawl = crawls[0] if crawls else None
+
     cost_config = session.exec(select(SeoCostConfig).where(SeoCostConfig.project_id == project_id)).first()
     analytics = analytics_service.get_project_analytics(
         project_id,
@@ -129,16 +133,22 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session)):
         cost_config.dict() if cost_config else None,
     )
 
+    empty_technical_health = {
+        "pass_rate": 0,
+        "failed_items": 0,
+        "trend": [],
+        "cwv_scorecard": {"good": 0, "needs_improvement": 0, "poor": 0, "missing": 0},
+        "indexability_anomalies": [],
+        "structured_data_errors": [],
+    }
+
     if not last_crawl:
         return {
             "last_crawl": None,
             "total_pages": 0,
             "issues_count": 0,
-            "issues_breakdown": {
-                "critical": 0,
-                "warning": 0,
-                "info": 0,
-            },
+            "issues_breakdown": {"critical": 0, "warning": 0, "info": 0},
+            "technical_health": empty_technical_health,
             "analytics": analytics,
         }
 
@@ -147,14 +157,60 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session)):
     warning = len([i for i in issues if i.severity == "warning"])
     info = len([i for i in issues if i.severity == "info"])
 
+    issue_counter = Counter(i.issue_type for i in issues)
+    total_checks = max(last_crawl.total_pages, 1)
+    failed_items = len([i for i in issues if i.severity in {"critical", "warning"}])
+    pass_rate = round(max((total_checks - failed_items) / total_checks, 0) * 100, 2)
+
+    trend = []
+    for crawl in reversed(crawls):
+        crawl_issues = session.exec(select(Issue).where(Issue.crawl_id == crawl.id)).all()
+        crawl_failures = len([i for i in crawl_issues if i.severity in {"critical", "warning"}])
+        denominator = max(crawl.total_pages, 1)
+        crawl_pass_rate = round(max((denominator - crawl_failures) / denominator, 0) * 100, 2)
+        trend.append({"crawl_id": crawl.id, "date": crawl.start_time.date().isoformat(), "pass_rate": crawl_pass_rate})
+
+    perf_snapshots = session.exec(
+        select(PagePerformanceSnapshot)
+        .join(Page, Page.id == PagePerformanceSnapshot.page_id)
+        .where(Page.crawl_id == last_crawl.id)
+    ).all()
+
+    cwv_scorecard = {"good": 0, "needs_improvement": 0, "poor": 0, "missing": 0}
+    for snapshot in perf_snapshots:
+        if snapshot.lcp_ms is None or snapshot.cls is None:
+            cwv_scorecard["missing"] += 1
+            continue
+        if snapshot.lcp_ms <= 2500 and snapshot.cls <= 0.1:
+            cwv_scorecard["good"] += 1
+        elif snapshot.lcp_ms > 4000 or snapshot.cls > 0.25:
+            cwv_scorecard["poor"] += 1
+        else:
+            cwv_scorecard["needs_improvement"] += 1
+
+    indexability_anomalies = [
+        {"issue_type": issue_type, "count": count}
+        for issue_type, count in issue_counter.items()
+        if issue_type in {"noindex_detected", "nofollow_detected", "missing_canonical"}
+    ]
+    structured_data_errors = [
+        {"issue_type": issue_type, "count": count}
+        for issue_type, count in issue_counter.items()
+        if issue_type in {"structured_data_invalid", "structured_data_missing"}
+    ]
+
     return {
         "last_crawl": last_crawl,
         "total_pages": last_crawl.total_pages,
         "issues_count": last_crawl.issues_count,
-        "issues_breakdown": {
-            "critical": critical,
-            "warning": warning,
-            "info": info
+        "issues_breakdown": {"critical": critical, "warning": warning, "info": info},
+        "technical_health": {
+            "pass_rate": pass_rate,
+            "failed_items": failed_items,
+            "trend": trend,
+            "cwv_scorecard": cwv_scorecard,
+            "indexability_anomalies": indexability_anomalies,
+            "structured_data_errors": structured_data_errors,
         },
         "analytics": analytics,
     }

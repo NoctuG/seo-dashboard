@@ -154,6 +154,20 @@ class VisibilityHistory(SQLModel, table=True):
     checked_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class PagePerformanceSnapshot(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_pageperf_page_checked_at", "page_id", "checked_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    page_id: int = Field(foreign_key="page.id", index=True)
+    checked_at: datetime = Field(default_factory=datetime.utcnow)
+    lcp_ms: Optional[int] = None
+    fcp_ms: Optional[int] = None
+    cls: Optional[float] = None
+    source: str = "unavailable"
+
+
 class PageTrafficSnapshot(SQLModel, table=True):
     __table_args__ = (
         Index("ix_pagetraffic_project_url_date", "project_id", "url", "date"),
