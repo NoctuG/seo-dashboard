@@ -584,16 +584,29 @@ def export_report(project_id: int, payload: ReportExportRequest, session: Sessio
         report_payload = report_service.build_report_payload(session, project_id, template)
         content, media_type = report_service.render(report_payload, payload.format)
     except ValueError as exc:
+        report_service.create_delivery_log(
+            session,
+            project_id=project_id,
+            template_id=template.id,
+            schedule_id=None,
+            recipient_email=None,
+            export_format=payload.format,
+            retries=0,
+            status="failed",
+            error_message=report_service.format_delivery_error(exc),
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    log = ReportDeliveryLog(
+    report_service.create_delivery_log(
+        session,
         project_id=project_id,
         template_id=template.id,
-        format=payload.format.lower(),
+        schedule_id=None,
+        recipient_email=None,
+        export_format=payload.format,
+        retries=0,
         status="success",
     )
-    session.add(log)
-    session.commit()
 
     filename = f"report-{project_id}-{template.id}.{payload.format.lower()}"
     return Response(content=content, media_type=media_type, headers={"Content-Disposition": f"attachment; filename={filename}"})
