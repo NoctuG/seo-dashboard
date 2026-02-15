@@ -29,6 +29,12 @@ class Settings:
     SERP_API_KEY: str = os.getenv("SERP_API_KEY", "")
     SERP_API_PROVIDER: str = os.getenv("SERP_API_PROVIDER", "serpapi")  # serpapi or valueserp
 
+    # Backlink providers
+    BACKLINK_PROVIDER: str = os.getenv("BACKLINK_PROVIDER", "sample")  # sample, moz, ahrefs, majestic
+    MOZ_API_KEY: str = os.getenv("MOZ_API_KEY", "")
+    AHREFS_API_KEY: str = os.getenv("AHREFS_API_KEY", "")
+    MAJESTIC_API_KEY: str = os.getenv("MAJESTIC_API_KEY", "")
+
     # Web analytics settings
     ANALYTICS_PROVIDER: str = os.getenv("ANALYTICS_PROVIDER", "sample")  # sample, ga4, matomo
     ANALYTICS_MEANINGFUL_GROWTH_PCT: float = float(os.getenv("ANALYTICS_MEANINGFUL_GROWTH_PCT", "10"))
