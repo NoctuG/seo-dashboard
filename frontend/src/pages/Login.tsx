@@ -15,8 +15,8 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      await signIn(email, password);
-      navigate('/');
+      const result = await signIn(email, password);
+      navigate(result === '2fa_required' ? '/two-factor/verify' : '/');
     } catch {
       setError('登录失败，请检查邮箱和密码。');
     } finally {

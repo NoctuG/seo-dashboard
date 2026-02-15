@@ -7,18 +7,23 @@ import {
   login,
   registerAuthFailureHandler,
   setAuthTokens,
+  verifyTwoFactorLogin,
   type UserProfile,
 } from './api';
+
+type SignInResult = 'authenticated' | '2fa_required';
 
 type AuthContextValue = {
   user: UserProfile | null;
   loading: boolean;
   isAuthenticated: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<SignInResult>;
+  completeTwoFactorSignIn: (code: string) => Promise<void>;
   signOut: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const TWO_FACTOR_TOKEN_STORAGE_KEY = 'seo.auth.two-factor-token';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -26,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(() => {
     clearAuthTokens();
+    sessionStorage.removeItem(TWO_FACTOR_TOKEN_STORAGE_KEY);
     setUser(null);
   }, []);
 
@@ -37,7 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       if (!getAccessToken() || !getRefreshToken()) {
-        signOut();
         setLoading(false);
         return;
       }
@@ -59,11 +64,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isAuthenticated: !!user,
       signIn: async (email: string, password: string) => {
-        const tokens = await login(email, password);
+        const response = await login(email, password);
+        if (response.requires_2fa && response.two_factor_token) {
+          sessionStorage.setItem(TWO_FACTOR_TOKEN_STORAGE_KEY, response.two_factor_token);
+          return '2fa_required';
+        }
+
+        if (!response.access_token || !response.refresh_token) {
+          throw new Error('Missing auth tokens from login response');
+        }
+
         setAuthTokens({
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
+          accessToken: response.access_token,
+          refreshToken: response.refresh_token,
         });
+        const me = await getCurrentUser();
+        setUser(me);
+        return 'authenticated';
+      },
+      completeTwoFactorSignIn: async (code: string) => {
+        const twoFactorToken = sessionStorage.getItem(TWO_FACTOR_TOKEN_STORAGE_KEY);
+        if (!twoFactorToken) {
+          throw new Error('Missing two-factor challenge token');
+        }
+
+        const response = await verifyTwoFactorLogin(twoFactorToken, code);
+        if (!response.access_token || !response.refresh_token) {
+          throw new Error('Missing auth tokens from 2FA response');
+        }
+
+        setAuthTokens({
+          accessToken: response.access_token,
+          refreshToken: response.refresh_token,
+        });
+        sessionStorage.removeItem(TWO_FACTOR_TOKEN_STORAGE_KEY);
         const me = await getCurrentUser();
         setUser(me);
       },

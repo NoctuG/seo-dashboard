@@ -1,23 +1,24 @@
-import type { ReactElement } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import Layout from "./Layout";
-import Projects from "./pages/Projects";
-import ProjectDashboard from "./pages/ProjectDashboard";
-import ProjectPages from "./pages/ProjectPages";
-import ProjectIssues from "./pages/ProjectIssues";
-import ProjectKeywords from "./pages/ProjectKeywords";
-import AiAssistant from "./pages/AiAssistant";
-import ProjectReports from "./pages/ProjectReports";
-import ProjectApiKeys from "./pages/ProjectApiKeys";
-import Login from "./pages/Login";
-import Users from "./pages/Users";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import ChangePassword from "./pages/ChangePassword";
-import SystemSettings from "./pages/SystemSettings";
-import { useAuth } from "./auth";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { useTranslation } from "react-i18next";
+import type { ReactElement } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import Layout from './Layout';
+import Projects from './pages/Projects';
+import ProjectDashboard from './pages/ProjectDashboard';
+import ProjectPages from './pages/ProjectPages';
+import ProjectIssues from './pages/ProjectIssues';
+import ProjectKeywords from './pages/ProjectKeywords';
+import AiAssistant from './pages/AiAssistant';
+import ProjectReports from './pages/ProjectReports';
+import Login from './pages/Login';
+import Users from './pages/Users';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import ChangePassword from './pages/ChangePassword';
+import SystemSettings from './pages/SystemSettings';
+import TwoFactorSetup from './pages/TwoFactorSetup';
+import TwoFactorVerify from './pages/TwoFactorVerify';
+import { useAuth } from './auth';
+import ErrorBoundary from './components/ErrorBoundary';
+import { useTranslation } from 'react-i18next';
 
 function Protected({ children }: { children: ReactElement }) {
   const { isAuthenticated, loading } = useAuth();
@@ -47,6 +48,10 @@ function App() {
           )}
         />
         <Route
+          path="/two-factor/verify"
+          element={withRouteBoundary('two-factor-verify-route', <TwoFactorVerify />)}
+        />
+        <Route
           path="/reset-password"
           element={withRouteBoundary("reset-password-route", <ResetPassword />)}
         />
@@ -69,6 +74,7 @@ function App() {
           <Route path="users" element={<Users />} />
           <Route path="change-password" element={<ChangePassword />} />
           <Route path="settings" element={<SystemSettings />} />
+          <Route path="security/2fa" element={<TwoFactorSetup />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -13,15 +13,15 @@ type AuthFailureHandler = (() => void) | null;
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
-let refreshPromise: Promise<TokenPair> | null = null;
 let authFailureHandler: AuthFailureHandler = null;
+let refreshPromise: Promise<TokenPair> | null = null;
 
-const storedRaw = localStorage.getItem(TOKEN_STORAGE_KEY);
-if (storedRaw) {
+const cachedTokensRaw = localStorage.getItem(TOKEN_STORAGE_KEY);
+if (cachedTokensRaw) {
   try {
-    const stored = JSON.parse(storedRaw) as TokenPair;
-    accessToken = stored.accessToken ?? null;
-    refreshToken = stored.refreshToken ?? null;
+    const cached = JSON.parse(cachedTokensRaw) as TokenPair;
+    accessToken = cached.accessToken ?? null;
+    refreshToken = cached.refreshToken ?? null;
   } catch {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
   }
@@ -80,9 +80,21 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 export interface LoginResponse {
-  access_token: string;
-  refresh_token: string;
+  access_token?: string;
+  refresh_token?: string;
   token_type: string;
+  requires_2fa?: boolean;
+  two_factor_token?: string;
+}
+
+export interface TwoFactorBindResponse {
+  secret: string;
+  otpauth_url: string;
+}
+
+export interface TwoFactorEnableResponse {
+  message: string;
+  backup_codes: string[];
 }
 
 export interface UserProfile {
@@ -102,6 +114,10 @@ async function requestTokenRefresh(): Promise<TokenPair> {
     { refresh_token: refreshToken },
     { headers: { Authorization: "" } },
   );
+  if (!res.data.access_token || !res.data.refresh_token) {
+    throw new Error('missing tokens in refresh response');
+  }
+
   const tokens = {
     accessToken: res.data.access_token,
     refreshToken: res.data.refresh_token,
@@ -254,6 +270,29 @@ export async function login(
   password: string,
 ): Promise<LoginResponse> {
   const res = await api.post<LoginResponse>("/auth/login", { email, password });
+  return res.data;
+}
+
+export async function verifyTwoFactorLogin(twoFactorToken: string, code: string): Promise<LoginResponse> {
+  const res = await api.post<LoginResponse>('/auth/2fa/verify', {
+    two_factor_token: twoFactorToken,
+    code,
+  });
+  return res.data;
+}
+
+export async function getTwoFactorStatus(): Promise<{ enabled: boolean }> {
+  const res = await api.get<{ enabled: boolean }>('/auth/2fa/status');
+  return res.data;
+}
+
+export async function bindTwoFactor(): Promise<TwoFactorBindResponse> {
+  const res = await api.post<TwoFactorBindResponse>('/auth/2fa/bind');
+  return res.data;
+}
+
+export async function enableTwoFactor(code: string): Promise<TwoFactorEnableResponse> {
+  const res = await api.post<TwoFactorEnableResponse>('/auth/2fa/enable', { code });
   return res.data;
 }
 
