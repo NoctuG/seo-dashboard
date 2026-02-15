@@ -101,5 +101,11 @@ class SchedulerService:
         session.add(log)
         session.commit()
 
+    def get_status(self) -> dict[str, int | bool]:
+        return {
+            "running": self.scheduler.running,
+            "job_count": len(self.scheduler.get_jobs()) if self.scheduler.running else 0,
+        }
+
 
 scheduler_service = SchedulerService()
