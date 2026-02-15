@@ -14,6 +14,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ChangePassword from './pages/ChangePassword';
 import { useAuth } from './auth';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useTranslation } from 'react-i18next';
 
 function Protected({ children }: { children: ReactElement }) {
@@ -24,13 +25,23 @@ function Protected({ children }: { children: ReactElement }) {
   return children;
 }
 
+function withRouteBoundary(routeScope: string, element: ReactElement) {
+  return <ErrorBoundary scope={routeScope}>{element}</ErrorBoundary>;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/login" element={withRouteBoundary('login-route', <Login />)} />
+        <Route
+          path="/forgot-password"
+          element={withRouteBoundary('forgot-password-route', <ForgotPassword />)}
+        />
+        <Route
+          path="/reset-password"
+          element={withRouteBoundary('reset-password-route', <ResetPassword />)}
+        />
         <Route
           path="/"
           element={
@@ -39,15 +50,33 @@ function App() {
             </Protected>
           }
         >
-          <Route index element={<Projects />} />
-          <Route path="projects/:id" element={<ProjectDashboard />} />
-          <Route path="projects/:id/pages" element={<ProjectPages />} />
-          <Route path="projects/:id/issues" element={<ProjectIssues />} />
-          <Route path="projects/:id/keywords" element={<ProjectKeywords />} />
-          <Route path="projects/:id/reports" element={<ProjectReports />} />
-          <Route path="ai" element={<AiAssistant />} />
-          <Route path="users" element={<Users />} />
-          <Route path="change-password" element={<ChangePassword />} />
+          <Route index element={withRouteBoundary('projects-route', <Projects />)} />
+          <Route
+            path="projects/:id"
+            element={withRouteBoundary('project-dashboard-route', <ProjectDashboard />)}
+          />
+          <Route
+            path="projects/:id/pages"
+            element={withRouteBoundary('project-pages-route', <ProjectPages />)}
+          />
+          <Route
+            path="projects/:id/issues"
+            element={withRouteBoundary('project-issues-route', <ProjectIssues />)}
+          />
+          <Route
+            path="projects/:id/keywords"
+            element={withRouteBoundary('project-keywords-route', <ProjectKeywords />)}
+          />
+          <Route
+            path="projects/:id/reports"
+            element={withRouteBoundary('project-reports-route', <ProjectReports />)}
+          />
+          <Route path="ai" element={withRouteBoundary('ai-route', <AiAssistant />)} />
+          <Route path="users" element={withRouteBoundary('users-route', <Users />)} />
+          <Route
+            path="change-password"
+            element={withRouteBoundary('change-password-route', <ChangePassword />)}
+          />
         </Route>
       </Routes>
     </BrowserRouter>
