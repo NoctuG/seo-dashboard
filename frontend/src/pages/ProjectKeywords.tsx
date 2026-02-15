@@ -16,6 +16,7 @@ import type {
     VisibilityHistoryItem,
     VisibilityResponse,
     Project,
+    PaginatedResponse,
 } from '../api';
 import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield } from 'lucide-react';
 import { useProjectRole } from '../useProjectRole';
@@ -30,10 +31,13 @@ import {
     BarChart,
     Bar,
 } from 'recharts';
+import PaginationControls from '../components/PaginationControls';
 
 export default function ProjectKeywords() {
     const { id } = useParams<{ id: string }>();
     const [keywords, setKeywords] = useState<KeywordItem[]>([]);
+    const [keywordTotal, setKeywordTotal] = useState(0);
+    const [keywordPage, setKeywordPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [term, setTerm] = useState('');
     const [targetUrl, setTargetUrl] = useState('');
@@ -48,6 +52,8 @@ export default function ProjectKeywords() {
     const [historyLoading, setHistoryLoading] = useState(false);
 
     const [competitors, setCompetitors] = useState<CompetitorDomainItem[]>([]);
+    const [competitorTotal, setCompetitorTotal] = useState(0);
+    const [competitorPage, setCompetitorPage] = useState(1);
     const [competitorInput, setCompetitorInput] = useState('');
     const [compareHistory, setCompareHistory] = useState<VisibilityHistoryItem[]>([]);
     const [visibility, setVisibility] = useState<VisibilityResponse | null>(null);
@@ -57,17 +63,31 @@ export default function ProjectKeywords() {
 
     useEffect(() => {
         if (id) {
-            fetchKeywords();
-            fetchCompetitors();
             fetchVisibility();
             fetchProject();
         }
     }, [id]);
 
-    const fetchKeywords = async () => {
+    useEffect(() => {
+        if (id) {
+            fetchKeywords(keywordPage);
+        }
+    }, [id, keywordPage]);
+
+    useEffect(() => {
+        if (id) {
+            fetchCompetitors(competitorPage);
+        }
+    }, [id, competitorPage]);
+
+    const fetchKeywords = async (page: number = keywordPage) => {
         try {
-            const res = await api.get<KeywordItem[]>(`/projects/${id}/keywords`);
-            setKeywords(res.data);
+            const res = await api.get<PaginatedResponse<KeywordItem>>(`/projects/${id}/keywords`, {
+                params: { page, page_size: 20 },
+            });
+            setKeywords(res.data.items);
+            setKeywordTotal(res.data.total);
+            setKeywordPage(res.data.page);
         } catch (error) {
             console.error(error);
         } finally {
@@ -75,10 +95,13 @@ export default function ProjectKeywords() {
         }
     };
 
-    const fetchCompetitors = async () => {
+    const fetchCompetitors = async (page: number = competitorPage) => {
         if (!id) return;
         try {
-            setCompetitors(await getProjectCompetitors(id));
+            const res = await getProjectCompetitors(id, page, 20);
+            setCompetitors(res.items);
+            setCompetitorTotal(res.total);
+            setCompetitorPage(res.page);
         } catch (error) {
             console.error(error);
         }
@@ -117,7 +140,7 @@ export default function ProjectKeywords() {
             setTargetUrl('');
             setLocale('');
             setMarket('');
-            fetchKeywords();
+            fetchKeywords(keywordPage);
         } catch (error) {
             console.error(error);
         }
@@ -128,7 +151,7 @@ export default function ProjectKeywords() {
         try {
             await addProjectCompetitor(id, competitorInput.trim());
             setCompetitorInput('');
-            fetchCompetitors();
+            fetchCompetitors(competitorPage);
         } catch (error) {
             console.error(error);
         }
@@ -138,7 +161,7 @@ export default function ProjectKeywords() {
         if (!id) return;
         try {
             await deleteProjectCompetitor(id, competitorId);
-            fetchCompetitors();
+            fetchCompetitors(competitorPage);
         } catch (error) {
             console.error(error);
         }
@@ -151,7 +174,7 @@ export default function ProjectKeywords() {
                 setSelectedKeyword(null);
                 setHistory([]);
             }
-            fetchKeywords();
+            fetchKeywords(keywordPage);
         } catch (error) {
             console.error(error);
         }
@@ -161,7 +184,7 @@ export default function ProjectKeywords() {
         setChecking(keywordId);
         try {
             await api.post(`/projects/${id}/keywords/${keywordId}/check`);
-            fetchKeywords();
+            fetchKeywords(keywordPage);
             if (selectedKeyword?.id === keywordId) {
                 fetchHistory(keywordId);
             }
@@ -176,7 +199,7 @@ export default function ProjectKeywords() {
         setCheckingAll(true);
         try {
             await api.post(`/projects/${id}/keywords/check-all`);
-            fetchKeywords();
+            fetchKeywords(keywordPage);
             if (selectedKeyword) {
                 fetchHistory(selectedKeyword.id);
             }
@@ -193,7 +216,7 @@ export default function ProjectKeywords() {
         try {
             const rows = await runProjectKeywordCompare(id);
             setCompareHistory(rows);
-            fetchKeywords();
+            fetchKeywords(keywordPage);
             fetchVisibility();
             fetchProject();
         } catch (error) {
@@ -315,6 +338,7 @@ export default function ProjectKeywords() {
                         ))
                     )}
                 </div>
+                <PaginationControls page={competitorPage} pageSize={20} total={competitorTotal} onPageChange={setCompetitorPage} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -442,6 +466,7 @@ export default function ProjectKeywords() {
                             ))}
                         </tbody>
                     </table>
+                    <PaginationControls page={keywordPage} pageSize={20} total={keywordTotal} onPageChange={setKeywordPage} />
                 </div>
             )}
 

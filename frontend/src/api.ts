@@ -4,10 +4,40 @@ import type { InternalAxiosRequestConfig } from 'axios';
 export const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 const TOKEN_STORAGE_KEY = 'seo.auth.token';
 
+type TokenPair = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+type AuthFailureHandler = () => void;
+
+let accessToken: string | null = null;
+let refreshToken: string | null = null;
+let refreshPromise: Promise<TokenPair> | null = null;
+let authFailureHandler: AuthFailureHandler | null = null;
+
+function persistTokens(tokens: TokenPair | null) {
+  if (tokens) {
+    accessToken = tokens.accessToken;
+    refreshToken = tokens.refreshToken;
+    localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens));
+    return;
+  }
+
   accessToken = null;
   refreshToken = null;
-  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+const storedTokenPair = localStorage.getItem(TOKEN_STORAGE_KEY);
+if (storedTokenPair) {
+  try {
+    const parsed = JSON.parse(storedTokenPair) as TokenPair;
+    accessToken = parsed.accessToken;
+    refreshToken = parsed.refreshToken;
+  } catch {
+    persistTokens(null);
+  }
 }
 
 export function setAuthTokens(tokens: TokenPair | null) {
@@ -24,6 +54,10 @@ export function getAccessToken() {
 
 export function getRefreshToken() {
   return refreshToken;
+}
+
+export function getAuthToken() {
+  return accessToken;
 }
 
 export function registerAuthFailureHandler(handler: AuthFailureHandler | null) {
@@ -376,6 +410,13 @@ export interface VisibilityResponse {
   serp_feature_coverage: Record<string, number>;
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export interface VisibilityHistoryItem {
   keyword_id?: number;
   keyword_term: string;
@@ -473,8 +514,14 @@ export async function getProjectBacklinkChanges(projectId: string | number): Pro
 }
 
 
-export async function getProjectCompetitors(projectId: string | number): Promise<CompetitorDomainItem[]> {
-  const res = await api.get<CompetitorDomainItem[]>(`/projects/${projectId}/competitors`);
+export async function getProjectCompetitors(
+  projectId: string | number,
+  page: number = 1,
+  pageSize: number = 20,
+): Promise<PaginatedResponse<CompetitorDomainItem>> {
+  const res = await api.get<PaginatedResponse<CompetitorDomainItem>>(`/projects/${projectId}/competitors`, {
+    params: { page, page_size: pageSize },
+  });
   return res.data;
 }
 
