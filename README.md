@@ -63,7 +63,7 @@
 
 5.  **访问应用**
 
-    服务启动后，您可以通过浏览器访问 `https://localhost`。由于使用的是自签名证书，首次访问时浏览器会提示安全警告，请选择信任即可。
+    服务启动后，您可以通过浏览器访问 `https://localhost:32443`。由于使用的是自签名证书，首次访问时浏览器会提示安全警告，请选择信任即可。
 
 ### 🛠️ 方式二：从源代码构建
 
@@ -96,9 +96,9 @@ cp .env.example .env
 alembic upgrade heads
 
 # 6. 启动后端服务
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 28000
 ```
-后端 API 将运行在 `http://localhost:8000`。
+后端 API 将运行在 `http://localhost:28000`。
 
 **2. 前端设置**
 
@@ -111,12 +111,12 @@ npm install
 
 # 3. 创建并配置 .env 文件
 cp .env.example .env
-# 确保 .env 文件中的 VITE_API_URL 指向后端服务地址，默认为 http://localhost:8000/api/v1
+# 确保 .env 文件中的 VITE_API_URL 指向后端服务地址，默认为 http://localhost:28000/api/v1
 
 # 4. 启动前端开发服务器
 npm run dev -- --host
 ```
-前端应用将运行在 `http://localhost:5173` (或终端提示的其他地址)。
+前端应用将运行在 `http://localhost:32000` (或终端提示的其他地址)。
 
 **3. 访问应用**
 
