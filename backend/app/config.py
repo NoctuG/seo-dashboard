@@ -13,9 +13,15 @@ class Settings:
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/seo_tool.db")
 
-    # API auth (optional)
-    API_USERNAME: str = os.getenv("API_USERNAME", "")
-    API_PASSWORD: str = os.getenv("API_PASSWORD", "")
+    # JWT auth
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "change-me")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))
+
+    # bootstrap admin
+    INITIAL_ADMIN_EMAIL: str = os.getenv("INITIAL_ADMIN_EMAIL", "")
+    INITIAL_ADMIN_PASSWORD: str = os.getenv("INITIAL_ADMIN_PASSWORD", "")
+    INITIAL_ADMIN_NAME: str = os.getenv("INITIAL_ADMIN_NAME", "Administrator")
 
     # AI settings (OpenAI-compatible)
     AI_BASE_URL: str = os.getenv("AI_BASE_URL", "")

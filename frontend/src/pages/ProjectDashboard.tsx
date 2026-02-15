@@ -31,6 +31,7 @@ import {
   BadgePercent,
 } from 'lucide-react';
 import RoiAttributionNote from '../components/RoiAttributionNote';
+import { useProjectRole } from '../useProjectRole';
 import {
   ResponsiveContainer,
   LineChart,
@@ -62,6 +63,7 @@ export default function ProjectDashboard() {
   const [roiRange, setRoiRange] = useState<'30d' | '90d' | '12m'>('30d');
   const [attributionModel, setAttributionModel] = useState<'linear' | 'first_click' | 'last_click'>('linear');
   const [roi, setRoi] = useState<RoiBreakdownResponse | null>(null);
+  const { isAdmin } = useProjectRole(id);
 
   useEffect(() => {
     if (id) {
@@ -200,9 +202,11 @@ export default function ProjectDashboard() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3"><h1 className="text-2xl font-bold">Dashboard</h1><Link to={`/projects/${id}/reports`} className="text-sm text-blue-600 underline">Reports</Link></div>
+        {isAdmin && (
         <button onClick={startCrawl} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700">
           <Play size={18} /> Start New Crawl
         </button>
+        )}
       </div>
 
 

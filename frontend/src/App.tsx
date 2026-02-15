@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import type { ReactElement } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './Layout';
 import Projects from './pages/Projects';
 import ProjectDashboard from './pages/ProjectDashboard';
@@ -7,12 +8,29 @@ import ProjectIssues from './pages/ProjectIssues';
 import ProjectKeywords from './pages/ProjectKeywords';
 import AiAssistant from './pages/AiAssistant';
 import ProjectReports from './pages/ProjectReports';
+import Login from './pages/Login';
+import { useAuth } from './auth';
+
+function Protected({ children }: { children: ReactElement }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return <div className="p-8">Loading...</div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return children;
+}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Layout />}>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/"
+          element={
+            <Protected>
+              <Layout />
+            </Protected>
+          }
+        >
           <Route index element={<Projects />} />
           <Route path="projects/:id" element={<ProjectDashboard />} />
           <Route path="projects/:id/pages" element={<ProjectPages />} />
@@ -23,7 +41,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
 
-export default App
+export default App;

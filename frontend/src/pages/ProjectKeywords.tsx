@@ -16,6 +16,7 @@ import type {
     VisibilityResponse,
 } from '../api';
 import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield } from 'lucide-react';
+import { useProjectRole } from '../useProjectRole';
 import {
     LineChart,
     Line,
@@ -46,6 +47,7 @@ export default function ProjectKeywords() {
     const [competitorInput, setCompetitorInput] = useState('');
     const [compareHistory, setCompareHistory] = useState<VisibilityHistoryItem[]>([]);
     const [visibility, setVisibility] = useState<VisibilityResponse | null>(null);
+    const { isAdmin } = useProjectRole(id);
 
     useEffect(() => {
         if (id) {
@@ -218,7 +220,7 @@ export default function ProjectKeywords() {
                     <TrendingUp size={24} /> 关键词排名跟踪
                 </h1>
                 <div className="flex gap-2">
-                    {keywords.length > 0 && (
+                    {isAdmin && keywords.length > 0 && (
                         <button
                             onClick={checkAllRanks}
                             disabled={checkingAll}
@@ -228,14 +230,14 @@ export default function ProjectKeywords() {
                             {checkingAll ? '查询中...' : '查询全部排名'}
                         </button>
                     )}
-                    <button
+                    {isAdmin && (<button
                         onClick={runCompare}
                         disabled={comparing || keywords.length === 0}
                         className="bg-indigo-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50"
                     >
                         <BarChart3 size={18} className={comparing ? 'animate-pulse' : ''} />
                         {comparing ? '对比中...' : '批量对比本站/竞品'}
-                    </button>
+                    </button>)}
                 </div>
             </div>
 
@@ -253,13 +255,13 @@ export default function ProjectKeywords() {
                             onKeyDown={(e) => e.key === 'Enter' && addCompetitor()}
                         />
                     </label>
-                    <button
+                    {isAdmin && (<button
                         onClick={addCompetitor}
                         disabled={!competitorInput.trim()}
                         className="bg-slate-800 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-slate-900 disabled:opacity-50"
-                    >
+>
                         <Plus size={18} /> 添加竞争对手
-                    </button>
+                    </button>)}
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {competitors.length === 0 ? (
@@ -268,9 +270,11 @@ export default function ProjectKeywords() {
                         competitors.map((item) => (
                             <span key={item.id} className="inline-flex items-center gap-2 bg-slate-100 rounded-full px-3 py-1 text-sm">
                                 {item.domain}
+                                {isAdmin && (
                                 <button onClick={() => removeCompetitor(item.id)} className="text-red-500 hover:text-red-700">
                                     <Trash2 size={14} />
                                 </button>
+                                )}
                             </span>
                         ))
                     )}
@@ -324,9 +328,11 @@ export default function ProjectKeywords() {
                         <span className="text-gray-600">目标 URL（可选）</span>
                         <input type="url" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} placeholder="https://example.com/page" className="border rounded px-3 py-2" onKeyDown={(e) => e.key === 'Enter' && addKeyword()} />
                     </label>
+                    {isAdmin && (
                     <button onClick={addKeyword} disabled={!term.trim()} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50">
                         <Plus size={18} /> 添加
                     </button>
+                    )}
                 </div>
             </div>
 
@@ -356,8 +362,10 @@ export default function ProjectKeywords() {
                                     <td className="px-4 py-3 text-sm text-gray-500">{kw.last_checked ? new Date(kw.last_checked).toLocaleString() : '-'}</td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex items-center justify-end gap-2">
+                                            {isAdmin && (<>
                                             <button onClick={(e) => { e.stopPropagation(); checkRank(kw.id); }} disabled={checking === kw.id} className="text-green-600 hover:text-green-800 p-1 disabled:opacity-50"><RefreshCw size={16} className={checking === kw.id ? 'animate-spin' : ''} /></button>
                                             <button onClick={(e) => { e.stopPropagation(); deleteKeyword(kw.id); }} className="text-red-500 hover:text-red-700 p-1"><Trash2 size={16} /></button>
+                                            </>)}
                                         </div>
                                     </td>
                                 </tr>

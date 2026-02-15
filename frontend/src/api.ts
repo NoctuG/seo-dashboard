@@ -1,18 +1,65 @@
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-const API_USERNAME = import.meta.env.VITE_API_USERNAME as string | undefined;
-const API_PASSWORD = import.meta.env.VITE_API_PASSWORD as string | undefined;
+const TOKEN_STORAGE_KEY = 'seo.auth.token';
 
-const authHeader = (() => {
-  if (!API_USERNAME || !API_PASSWORD) return undefined;
-  return `Basic ${btoa(`${API_USERNAME}:${API_PASSWORD}`)}`;
-})();
+let authToken: string | null = localStorage.getItem(TOKEN_STORAGE_KEY);
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+  if (token) {
+    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  }
+}
+
+export function getAuthToken() {
+  return authToken;
+}
 
 export const api = axios.create({
   baseURL: API_URL,
-  headers: authHeader ? { Authorization: authHeader } : undefined,
 });
+
+api.interceptors.request.use((config) => {
+  if (authToken) {
+    config.headers.Authorization = `Bearer ${authToken}`;
+  }
+  return config;
+});
+
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface UserProfile {
+  id: number;
+  email: string;
+  full_name: string;
+  is_superuser: boolean;
+}
+
+export interface ProjectPermissions {
+  role: 'admin' | 'viewer';
+}
+
+export async function login(email: string, password: string): Promise<LoginResponse> {
+  const res = await api.post<LoginResponse>('/auth/login', { email, password });
+  return res.data;
+}
+
+export async function getCurrentUser(): Promise<UserProfile> {
+  const res = await api.get<UserProfile>('/auth/me');
+  return res.data;
+}
+
+export async function getProjectPermissions(projectId: string | number): Promise<ProjectPermissions> {
+  const res = await api.get<ProjectPermissions>(`/projects/${projectId}/permissions`);
+  return res.data;
+}
 
 export interface Project {
   id: number;
