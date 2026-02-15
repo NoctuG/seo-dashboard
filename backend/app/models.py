@@ -80,6 +80,22 @@ class User(SQLModel, table=True):
 
     organizations: List["OrganizationMember"] = Relationship(back_populates="user")
     project_memberships: List["ProjectMember"] = Relationship(back_populates="user")
+    password_reset_tokens: List["PasswordResetToken"] = Relationship(back_populates="user")
+
+
+class PasswordResetToken(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_passwordresettoken_user_expires_at", "user_id", "expires_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    token_hash: str = Field(index=True, unique=True)
+    expires_at: datetime = Field(index=True)
+    used_at: Optional[datetime] = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    user: User = Relationship(back_populates="password_reset_tokens")
 
 
 class Role(SQLModel, table=True):

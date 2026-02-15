@@ -101,6 +101,27 @@ export async function getCurrentUser(): Promise<UserProfile> {
   return res.data;
 }
 
+export async function changePassword(oldPassword: string, newPassword: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/change-password', {
+    old_password: oldPassword,
+    new_password: newPassword,
+  });
+  return res.data;
+}
+
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/forgot-password', { email });
+  return res.data;
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/reset-password', {
+    token,
+    new_password: newPassword,
+  });
+  return res.data;
+}
+
 export async function getProjectPermissions(projectId: string | number): Promise<ProjectPermissions> {
   const res = await api.get<ProjectPermissions>(`/projects/${projectId}/permissions`);
   return res.data;
