@@ -15,6 +15,11 @@ from app.crawler.parser import Parser
 from app.crawler.analyzer import Analyzer
 from app.crawler.events import crawl_event_broker
 from app.crawler.performance_adapter import performance_adapter
+from app.webhook_service import (
+    WEBHOOK_EVENT_CRAWL_COMPLETED,
+    WEBHOOK_EVENT_CRITICAL_ISSUE_FOUND,
+    webhook_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +140,7 @@ class CrawlerService:
             issues_found = 0
             error_count = 0
             internal_link_validation_cache: Dict[str, Tuple[Optional[int], int]] = {}
+            critical_issue_alert_sent = False
 
             try:
                 while queue and pages_processed < crawl_max_pages:
@@ -275,6 +281,20 @@ class CrawlerService:
                         session.add(issue)
                         issues_found += 1
 
+                        if issue_data['severity'] == 'critical' and not critical_issue_alert_sent:
+                            webhook_service.dispatch_event(
+                                session,
+                                WEBHOOK_EVENT_CRITICAL_ISSUE_FOUND,
+                                {
+                                    "crawl_id": crawl.id,
+                                    "project_id": crawl.project_id,
+                                    "page_url": page.url,
+                                    "issue_type": issue_data['type'],
+                                    "description": issue_data.get('description'),
+                                },
+                            )
+                            critical_issue_alert_sent = True
+
                     pages_processed += 1
                     session.commit()
                     crawl_event_broker.publish(crawl.id, {
@@ -318,6 +338,21 @@ class CrawlerService:
                 crawl.issues_count = issues_found
                 session.add(crawl)
                 session.commit()
+
+                if crawl.status == CrawlStatus.COMPLETED:
+                    webhook_service.dispatch_event(
+                        session,
+                        WEBHOOK_EVENT_CRAWL_COMPLETED,
+                        {
+                            "crawl_id": crawl.id,
+                            "project_id": crawl.project_id,
+                            "status": crawl.status,
+                            "total_pages": crawl.total_pages,
+                            "issues_count": crawl.issues_count,
+                            "started_at": crawl.start_time.isoformat() if crawl.start_time else None,
+                            "ended_at": crawl.end_time.isoformat() if crawl.end_time else None,
+                        },
+                    )
 
 
 crawler_service = CrawlerService()

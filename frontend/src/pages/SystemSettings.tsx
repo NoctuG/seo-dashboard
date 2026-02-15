@@ -1,130 +1,117 @@
 import { useEffect, useState } from 'react';
-import { getSystemSettings, updateSystemSettings, type SystemSettingsPayload } from '../api';
-
-const initialState: SystemSettingsPayload = {
-  smtp: { host: '', port: 587, user: '', password: '', from: '', use_tls: true },
-  analytics: {
-    provider: 'sample',
-    ga4_property_id: '',
-    ga4_access_token: '',
-    matomo_base_url: '',
-    matomo_site_id: '',
-    matomo_token_auth: '',
-  },
-  ai: { base_url: '', api_key: '', model: 'gpt-4o-mini' },
-  crawler: { default_max_pages: 50 },
-};
+import {
+  createWebhookConfig,
+  deleteWebhookConfig,
+  listWebhookConfigs,
+  listWebhookEvents,
+  updateWebhookConfig,
+  type WebhookConfig,
+} from '../api';
 
 export default function SystemSettings() {
-  const [form, setForm] = useState<SystemSettingsPayload>(initialState);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [configs, setConfigs] = useState<WebhookConfig[]>([]);
+  const [events, setEvents] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadSettings = async () => {
+  const [url, setUrl] = useState('');
+  const [secret, setSecret] = useState('');
+  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
+
+  const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getSystemSettings();
-      setForm({
-        smtp: {
-          host: data.smtp.host,
-          port: data.smtp.port,
-          user: data.smtp.user,
-          password: data.smtp.password,
-          from: data.smtp.from,
-          use_tls: data.smtp.use_tls,
-        },
-        analytics: data.analytics,
-        ai: data.ai,
-        crawler: data.crawler,
-      });
-    } catch {
-      setError('加载系统设置失败');
+      const [webhookEvents, webhookConfigs] = await Promise.all([listWebhookEvents(), listWebhookConfigs()]);
+      setEvents(webhookEvents);
+      setConfigs(webhookConfigs);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || '加载配置失败');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSettings();
+    load();
   }, []);
 
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const updated = await updateSystemSettings(form);
-      setForm(updated);
-      setMessage('设置已保存');
-    } catch {
-      setError('保存失败');
-    } finally {
-      setSaving(false);
-    }
+  const toggleEvent = (event: string) => {
+    setSelectedEvents((prev) => (prev.includes(event) ? prev.filter((item) => item !== event) : [...prev, event]));
   };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await createWebhookConfig({ url, secret, subscribed_events: selectedEvents, enabled: true });
+    setUrl('');
+    setSecret('');
+    setSelectedEvents([]);
+    await load();
+  };
+
+  const handleToggleEnabled = async (config: WebhookConfig) => {
+    await updateWebhookConfig(config.id, { enabled: !config.enabled });
+    await load();
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('确认删除该 webhook 配置？')) return;
+    await deleteWebhookConfig(id);
+    await load();
+  };
+
+  if (loading) return <div>加载中...</div>;
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <h1 className="text-2xl font-bold">系统设置</h1>
-      <p className="text-sm text-gray-500">敏感字段会脱敏展示，保持为 ******** 则代表不修改原值。</p>
+      <h1 className="text-2xl font-bold">系统设置 / Webhook 通知</h1>
+      {error && <div className="p-3 rounded border border-red-200 bg-red-50 text-red-700">{error}</div>}
 
-      {loading ? (
-        <p>加载中...</p>
-      ) : (
-        <form onSubmit={save} className="space-y-6">
-          <section className="bg-white rounded shadow p-5 space-y-3">
-            <h2 className="text-lg font-semibold">SMTP</h2>
-            <div className="grid md:grid-cols-2 gap-3">
-              <input className="border rounded px-3 py-2" placeholder="Host" value={form.smtp.host} onChange={(e) => setForm({ ...form, smtp: { ...form.smtp, host: e.target.value } })} />
-              <input className="border rounded px-3 py-2" type="number" placeholder="Port" value={form.smtp.port} onChange={(e) => setForm({ ...form, smtp: { ...form.smtp, port: Number(e.target.value) } })} />
-              <input className="border rounded px-3 py-2" placeholder="User" value={form.smtp.user} onChange={(e) => setForm({ ...form, smtp: { ...form.smtp, user: e.target.value } })} />
-              <input className="border rounded px-3 py-2" type="password" placeholder="Password" value={form.smtp.password} onChange={(e) => setForm({ ...form, smtp: { ...form.smtp, password: e.target.value } })} />
-              <input className="border rounded px-3 py-2 md:col-span-2" placeholder="From" value={form.smtp.from} onChange={(e) => setForm({ ...form, smtp: { ...form.smtp, from: e.target.value } })} />
+      <form onSubmit={handleCreate} className="space-y-4 border rounded bg-white p-4">
+        <h2 className="text-lg font-semibold">新增 Webhook</h2>
+        <input className="w-full border rounded p-2" placeholder="Webhook URL" value={url} onChange={(e) => setUrl(e.target.value)} required />
+        <input className="w-full border rounded p-2" placeholder="Secret" value={secret} onChange={(e) => setSecret(e.target.value)} required />
+        <div>
+          <div className="text-sm text-gray-600 mb-2">订阅事件</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {events.map((event) => (
+              <label key={event} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={selectedEvents.includes(event)} onChange={() => toggleEvent(event)} />
+                <span>{event}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <button className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700" type="submit">
+          保存配置
+        </button>
+      </form>
+
+      <div className="border rounded bg-white p-4">
+        <h2 className="text-lg font-semibold mb-3">现有配置</h2>
+        <div className="space-y-3">
+          {configs.map((config) => (
+            <div key={config.id} className="border rounded p-3">
+              <div className="font-medium">{config.url}</div>
+              <div className="text-sm text-gray-600">事件: {config.subscribed_events.join(', ') || '-'}</div>
+              <div className="text-xs text-gray-500 mt-1">secret: {config.secret}</div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  className="px-3 py-1 rounded border hover:bg-gray-50"
+                  onClick={() => handleToggleEnabled(config)}
+                  type="button"
+                >
+                  {config.enabled ? '禁用' : '启用'}
+                </button>
+                <button className="px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleDelete(config.id)} type="button">
+                  删除
+                </button>
+              </div>
             </div>
-          </section>
-
-          <section className="bg-white rounded shadow p-5 space-y-3">
-            <h2 className="text-lg font-semibold">分析服务</h2>
-            <div className="grid md:grid-cols-2 gap-3">
-              <select className="border rounded px-3 py-2" value={form.analytics.provider} onChange={(e) => setForm({ ...form, analytics: { ...form.analytics, provider: e.target.value } })}>
-                <option value="sample">sample</option>
-                <option value="ga4">ga4</option>
-                <option value="matomo">matomo</option>
-              </select>
-              <input className="border rounded px-3 py-2" placeholder="GA4 Property ID" value={form.analytics.ga4_property_id} onChange={(e) => setForm({ ...form, analytics: { ...form.analytics, ga4_property_id: e.target.value } })} />
-              <input className="border rounded px-3 py-2" type="password" placeholder="GA4 Access Token" value={form.analytics.ga4_access_token} onChange={(e) => setForm({ ...form, analytics: { ...form.analytics, ga4_access_token: e.target.value } })} />
-              <input className="border rounded px-3 py-2" placeholder="Matomo Base URL" value={form.analytics.matomo_base_url} onChange={(e) => setForm({ ...form, analytics: { ...form.analytics, matomo_base_url: e.target.value } })} />
-              <input className="border rounded px-3 py-2" placeholder="Matomo Site ID" value={form.analytics.matomo_site_id} onChange={(e) => setForm({ ...form, analytics: { ...form.analytics, matomo_site_id: e.target.value } })} />
-              <input className="border rounded px-3 py-2" type="password" placeholder="Matomo Token" value={form.analytics.matomo_token_auth} onChange={(e) => setForm({ ...form, analytics: { ...form.analytics, matomo_token_auth: e.target.value } })} />
-            </div>
-          </section>
-
-          <section className="bg-white rounded shadow p-5 space-y-3">
-            <h2 className="text-lg font-semibold">AI 配置</h2>
-            <div className="grid md:grid-cols-2 gap-3">
-              <input className="border rounded px-3 py-2" placeholder="Base URL" value={form.ai.base_url} onChange={(e) => setForm({ ...form, ai: { ...form.ai, base_url: e.target.value } })} />
-              <input className="border rounded px-3 py-2" placeholder="Model" value={form.ai.model} onChange={(e) => setForm({ ...form, ai: { ...form.ai, model: e.target.value } })} />
-              <input className="border rounded px-3 py-2 md:col-span-2" type="password" placeholder="API Key" value={form.ai.api_key} onChange={(e) => setForm({ ...form, ai: { ...form.ai, api_key: e.target.value } })} />
-            </div>
-          </section>
-
-          <section className="bg-white rounded shadow p-5 space-y-3">
-            <h2 className="text-lg font-semibold">默认爬虫参数</h2>
-            <input className="border rounded px-3 py-2 w-full md:w-72" type="number" min={1} value={form.crawler.default_max_pages} onChange={(e) => setForm({ ...form, crawler: { default_max_pages: Number(e.target.value) } })} />
-          </section>
-
-          <button disabled={saving} className="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 disabled:opacity-50" type="submit">
-            {saving ? '保存中...' : '保存设置'}
-          </button>
-        </form>
-      )}
-
-      {message && <p className="text-green-600 text-sm">{message}</p>}
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+          ))}
+          {!configs.length && <div className="text-sm text-gray-500">暂无 webhook 配置。</div>}
+        </div>
+      </div>
     </div>
   );
 }

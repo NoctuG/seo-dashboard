@@ -61,6 +61,11 @@ class Settings:
     # backup
     BACKUP_DIR: str = os.getenv("BACKUP_DIR", "/data/backups")
 
+    # webhook
+    WEBHOOK_TIMEOUT_SECONDS: int = int(os.getenv("WEBHOOK_TIMEOUT_SECONDS", "8"))
+    WEBHOOK_MAX_RETRIES: int = int(os.getenv("WEBHOOK_MAX_RETRIES", "3"))
+    WEBHOOK_RETRY_BASE_SECONDS: int = int(os.getenv("WEBHOOK_RETRY_BASE_SECONDS", "1"))
+
     # CORS
     @staticmethod
     def _parse_allowed_origins(raw_value: str) -> list[str]:

@@ -612,6 +612,14 @@ def export_report(project_id: int, payload: ReportExportRequest, session: Sessio
         status="success",
     )
 
+    report_service.dispatch_report_generated(
+        session,
+        project_id=project_id,
+        template_id=template.id,
+        export_format=payload.format,
+        trigger="manual_export",
+    )
+
     filename = f"report-{project_id}-{template.id}.{payload.format.lower()}"
     return Response(content=content, media_type=media_type, headers={"Content-Disposition": f"attachment; filename={filename}"})
 

@@ -613,43 +613,43 @@ export async function getReportLogs(projectId: string | number): Promise<ReportD
   return res.data;
 }
 
-export interface SystemSettingsPayload {
-  smtp: {
-    host: string;
-    port: number;
-    user: string;
-    password: string;
-    from: string;
-    use_tls: boolean;
-  };
-  analytics: {
-    provider: string;
-    ga4_property_id: string;
-    ga4_access_token: string;
-    matomo_base_url: string;
-    matomo_site_id: string;
-    matomo_token_auth: string;
-  };
-  ai: {
-    base_url: string;
-    api_key: string;
-    model: string;
-  };
-  crawler: {
-    default_max_pages: number;
-  };
+export interface WebhookConfig {
+  id: number;
+  url: string;
+  secret: string;
+  subscribed_events: string[];
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface SystemSettingsResponse extends SystemSettingsPayload {
-  masked_fields: Record<string, string[]>;
+export interface WebhookConfigPayload {
+  url: string;
+  secret: string;
+  subscribed_events: string[];
+  enabled: boolean;
 }
 
-export async function getSystemSettings(): Promise<SystemSettingsResponse> {
-  const res = await api.get<SystemSettingsResponse>('/settings');
+export async function listWebhookEvents(): Promise<string[]> {
+  const res = await api.get<string[]>('/webhooks/events');
   return res.data;
 }
 
-export async function updateSystemSettings(payload: SystemSettingsPayload): Promise<SystemSettingsResponse> {
-  const res = await api.put<SystemSettingsResponse>('/settings', payload);
+export async function listWebhookConfigs(): Promise<WebhookConfig[]> {
+  const res = await api.get<WebhookConfig[]>('/webhooks');
   return res.data;
+}
+
+export async function createWebhookConfig(payload: WebhookConfigPayload): Promise<WebhookConfig> {
+  const res = await api.post<WebhookConfig>('/webhooks', payload);
+  return res.data;
+}
+
+export async function updateWebhookConfig(id: number, payload: Partial<WebhookConfigPayload>): Promise<WebhookConfig> {
+  const res = await api.put<WebhookConfig>(`/webhooks/${id}`, payload);
+  return res.data;
+}
+
+export async function deleteWebhookConfig(id: number): Promise<void> {
+  await api.delete(`/webhooks/${id}`);
 }
