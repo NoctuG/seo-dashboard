@@ -38,7 +38,8 @@ class Settings:
     SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_FROM: str = os.getenv("SMTP_FROM", "")
-    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", os.getenv("SMTP_USE_TLS", "true")).lower() == "true"
+    SMTP_USE_TLS: bool = SMTP_TLS
 
     # AI settings (OpenAI-compatible)
     AI_BASE_URL: str = os.getenv("AI_BASE_URL", "")

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlmodel import Session, select
 
 from app.db import engine
-from app.models import ReportSchedule, ReportTemplate, ReportDeliveryLog
+from app.models import ReportSchedule, ReportTemplate
 from app.report_service import report_service
 
 
@@ -60,46 +59,57 @@ class SchedulerService:
                 return
             template = session.get(ReportTemplate, schedule.template_id)
             if not template:
-                self._log_failure(session, schedule, "Template not found", retries=0)
+                report_service.create_delivery_log(
+                    session,
+                    project_id=schedule.project_id,
+                    template_id=schedule.template_id,
+                    schedule_id=schedule.id,
+                    recipient_email=schedule.recipient_email,
+                    export_format="csv",
+                    retries=0,
+                    status="failed",
+                    error_message="ValueError: Template not found",
+                )
                 return
 
             retries = 0
             while retries <= schedule.retry_limit:
                 try:
                     payload = report_service.build_report_payload(session, schedule.project_id, template)
-                    report_service.render(payload, "csv")
-                    log = ReportDeliveryLog(
+                    report_content, media_type = report_service.render(payload, "csv")
+                    report_service.send_report_email(
+                        recipient_email=schedule.recipient_email,
+                        payload=payload,
+                        report_content=report_content,
+                        media_type=media_type,
+                        export_format="csv",
+                    )
+                    report_service.create_delivery_log(
+                        session,
                         project_id=schedule.project_id,
                         template_id=template.id,
                         schedule_id=schedule.id,
-                        format="csv",
-                        status="success",
-                        retries=retries,
                         recipient_email=schedule.recipient_email,
+                        export_format="csv",
+                        retries=retries,
+                        status="success",
                     )
-                    session.add(log)
-                    session.commit()
                     return
                 except Exception as exc:  # noqa: BLE001
                     retries += 1
                     if retries > schedule.retry_limit:
-                        self._log_failure(session, schedule, str(exc), retries=schedule.retry_limit)
+                        report_service.create_delivery_log(
+                            session,
+                            project_id=schedule.project_id,
+                            template_id=schedule.template_id,
+                            schedule_id=schedule.id,
+                            recipient_email=schedule.recipient_email,
+                            export_format="csv",
+                            retries=schedule.retry_limit,
+                            status="failed",
+                            error_message=report_service.format_delivery_error(exc),
+                        )
                         return
-
-    def _log_failure(self, session: Session, schedule: ReportSchedule, message: str, retries: int) -> None:
-        log = ReportDeliveryLog(
-            project_id=schedule.project_id,
-            template_id=schedule.template_id,
-            schedule_id=schedule.id,
-            format="csv",
-            status="failed",
-            retries=retries,
-            recipient_email=schedule.recipient_email,
-            error_message=message[:500],
-            created_at=datetime.utcnow(),
-        )
-        session.add(log)
-        session.commit()
 
     def get_status(self) -> dict[str, int | bool]:
         return {
