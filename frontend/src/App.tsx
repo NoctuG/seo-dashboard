@@ -10,6 +10,9 @@ import AiAssistant from './pages/AiAssistant';
 import ProjectReports from './pages/ProjectReports';
 import Login from './pages/Login';
 import Users from './pages/Users';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import ChangePassword from './pages/ChangePassword';
 import { useAuth } from './auth';
 import { useTranslation } from 'react-i18next';
 
@@ -26,6 +29,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route
           path="/"
           element={
@@ -42,6 +47,7 @@ function App() {
           <Route path="projects/:id/reports" element={<ProjectReports />} />
           <Route path="ai" element={<AiAssistant />} />
           <Route path="users" element={<Users />} />
+          <Route path="change-password" element={<ChangePassword />} />
         </Route>
       </Routes>
     </BrowserRouter>

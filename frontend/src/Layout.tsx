@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Home, LogOut, Sparkles, Users } from 'lucide-react';
+import { Home, KeyRound, LogOut, Sparkles, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './auth';
 
@@ -43,6 +43,9 @@ export default function Layout() {
                         <Users size={20} /> Users
                     </Link>
                     )}
+                    <Link to="/change-password" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                        <KeyRound size={20} /> 修改密码
+                    </Link>
                 </nav>
                 <div className="p-4 border-t">
                     <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 border rounded px-3 py-2 hover:bg-gray-100">
