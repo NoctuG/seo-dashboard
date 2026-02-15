@@ -37,6 +37,7 @@ from app.report_service import report_service
 from app.scheduler_service import scheduler_service
 from app.api.deps import get_current_user, require_project_role, write_audit_log
 from app.config import settings
+from app.metrics import update_crawl_status
 from app.rate_limit import limiter
 
 router = APIRouter()
@@ -156,6 +157,7 @@ def start_crawl(
     session.add(crawl)
     session.commit()
     session.refresh(crawl)
+    update_crawl_status(None, CrawlStatus.PENDING.value)
 
     background_tasks.add_task(crawler_service.run_crawl, crawl.id, max_pages, sitemap_url)
     write_audit_log(session, AuditActionType.CRAWL_START, user.id, "crawl", crawl.id, {"project_id": project_id})
