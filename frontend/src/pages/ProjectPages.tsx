@@ -2,6 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { API_URL, api, getAuthToken } from '../api';
 import type { Page, Crawl } from '../api';
+import PaginationControls from '../components/PaginationControls';
+
+type PaginatedResponse<T> = {
+    items: T[];
+    total: number;
+    page: number;
+    page_size: number;
+};
 
 type CrawlEvent = {
     type: 'snapshot' | 'crawl_started' | 'crawl_progress' | 'crawl_error' | 'crawl_completed' | 'crawl_failed';
@@ -15,9 +23,13 @@ type CrawlEvent = {
     ts?: string;
 };
 
+const PAGE_SIZE = 20;
+
 export default function ProjectPages() {
     const { id } = useParams<{ id: string }>();
     const [pages, setPages] = useState<Page[]>([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
     const [latestCrawl, setLatestCrawl] = useState<Crawl | null>(null);
     const [loading, setLoading] = useState(true);
     const [logs, setLogs] = useState<string[]>([]);
@@ -28,28 +40,34 @@ export default function ProjectPages() {
         if (!id) return;
 
         try {
-            const crawlsRes = await api.get<Crawl[]>(`/projects/${id}/crawls`);
-            if (crawlsRes.data.length === 0) {
+            const crawlsRes = await api.get<PaginatedResponse<Crawl>>(`/projects/${id}/crawls`, {
+                params: { page: 1, page_size: 1 },
+            });
+            if (crawlsRes.data.items.length === 0) {
                 setLatestCrawl(null);
                 setPages([]);
+                setTotal(0);
                 return;
             }
 
-            const crawl = crawlsRes.data[0];
+            const crawl = crawlsRes.data.items[0];
             setLatestCrawl(crawl);
             setProgress((prev) => ({
                 ...prev,
                 pagesProcessed: crawl.total_pages ?? prev.pagesProcessed,
             }));
 
-            const pagesRes = await api.get<Page[]>(`/crawls/${crawl.id}/pages`);
-            setPages(pagesRes.data);
+            const pagesRes = await api.get<PaginatedResponse<Page>>(`/crawls/${crawl.id}/pages`, {
+                params: { page, page_size: PAGE_SIZE },
+            });
+            setPages(pagesRes.data.items);
+            setTotal(pagesRes.data.total);
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
         }
-    }, [id]);
+    }, [id, page]);
 
     useEffect(() => {
         void fetchPages();
@@ -218,22 +236,23 @@ export default function ProjectPages() {
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {pages.map(page => (
-                            <tr key={page.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate max-w-xs" title={page.url}>{page.url}</td>
+                        {pages.map(pageItem => (
+                            <tr key={pageItem.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate max-w-xs" title={pageItem.url}>{pageItem.url}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                        page.status_code === 200 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                        pageItem.status_code === 200 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                     }`}>
-                                        {page.status_code}
+                                        {pageItem.status_code}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs">{page.title || '-'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{page.load_time_ms}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs">{pageItem.title || '-'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pageItem.load_time_ms}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
+                <PaginationControls page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
             </div>
         </div>
     );

@@ -449,6 +449,13 @@ export interface VisibilityResponse {
   serp_feature_coverage: Record<string, number>;
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export interface VisibilityHistoryItem {
   keyword_id?: number;
   keyword_term: string;
@@ -546,8 +553,14 @@ export async function getProjectBacklinkChanges(projectId: string | number): Pro
 }
 
 
-export async function getProjectCompetitors(projectId: string | number): Promise<CompetitorDomainItem[]> {
-  const res = await api.get<CompetitorDomainItem[]>(`/projects/${projectId}/competitors`);
+export async function getProjectCompetitors(
+  projectId: string | number,
+  page: number = 1,
+  pageSize: number = 20,
+): Promise<PaginatedResponse<CompetitorDomainItem>> {
+  const res = await api.get<PaginatedResponse<CompetitorDomainItem>>(`/projects/${projectId}/competitors`, {
+    params: { page, page_size: pageSize },
+  });
   return res.data;
 }
 
