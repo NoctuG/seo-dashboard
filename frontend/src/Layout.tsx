@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Home, KeyRound, LogOut, Settings, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { Home, KeyRound, LogOut, MonitorCog, Settings, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './auth';
 import {
@@ -21,6 +21,12 @@ export default function Layout() {
     const navigate = useNavigate();
     const { t, i18n } = useTranslation();
     const [serverVersion, setServerVersion] = useState<string | null>(null);
+    const [themePreference, setThemePreference] = useState<ThemePreference>(getStoredThemePreference);
+
+    useEffect(() => {
+        applyThemePreference(themePreference);
+        saveThemePreference(themePreference);
+    }, [themePreference]);
 
     const displayVersion = useMemo(() => {
         if (serverVersion) {
@@ -77,7 +83,7 @@ export default function Layout() {
                     </label>
                     <label className="block text-xs text-slate-700 dark:text-slate-200">
                         <span className="inline-flex items-center gap-1">
-                            <MonitorCog size={14} /> Theme
+                            <MonitorCog size={14} /> {t('layout.theme')}
                         </span>
                         <select
                             className="mt-1 w-full border border-slate-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
@@ -98,30 +104,25 @@ export default function Layout() {
                         <Sparkles size={20} /> {t('layout.aiAssistant')}
                     </Link>
                     {user?.is_superuser && (
-                    <Link to="/users" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                    <Link to="/users" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
                         <Users size={20} /> {t('layout.users')}
                     </Link>
                     )}
                     {user?.is_superuser && (
-                    <Link to="/settings" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                    <Link to="/settings" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
                         <Settings size={20} /> {t('layout.systemSettings')}
                     </Link>
                     )}
-                    <Link to="/change-password" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                    <Link to="/change-password" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
                         <KeyRound size={20} /> {t('layout.changePassword')}
                     </Link>
-                    <Link to="/security/2fa" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
-                        <ShieldCheck size={20} /> 双重认证
+                    <Link to="/security/2fa" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
+                        <ShieldCheck size={20} /> {t('layout.twoFactorAuth')}
                     </Link>
-                    {user?.is_superuser && (
-                    <Link to="/settings" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
-                        <Settings size={20} /> 系统设置
-                    </Link>
-                    )}
                 </nav>
-                <div className="p-4 border-t space-y-2">
-                    <p className="text-xs text-gray-500 text-center">Version: {displayVersion}</p>
-                    <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 border rounded px-3 py-2 hover:bg-gray-100">
+                <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 text-center">Version: {displayVersion}</p>
+                    <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                         <LogOut size={16} /> {t('layout.logout')}
                     </button>
                 </div>

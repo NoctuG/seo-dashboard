@@ -60,10 +60,6 @@ export function getRefreshToken() {
   return refreshToken;
 }
 
-export function getAuthToken() {
-  return accessToken;
-}
-
 export function registerAuthFailureHandler(handler: AuthFailureHandler | null) {
   authFailureHandler = handler;
 }
