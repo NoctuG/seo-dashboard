@@ -4,10 +4,40 @@ import type { InternalAxiosRequestConfig } from 'axios';
 export const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 const TOKEN_STORAGE_KEY = 'seo.auth.token';
 
-  accessToken = null;
-  refreshToken = null;
-  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+type TokenPair = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+type AuthFailureHandler = (() => void) | null;
+
+let accessToken: string | null = null;
+let refreshToken: string | null = null;
+let authFailureHandler: AuthFailureHandler = null;
+let refreshPromise: Promise<TokenPair> | null = null;
+
+const cachedTokensRaw = localStorage.getItem(TOKEN_STORAGE_KEY);
+if (cachedTokensRaw) {
+  try {
+    const cached = JSON.parse(cachedTokensRaw) as TokenPair;
+    accessToken = cached.accessToken ?? null;
+    refreshToken = cached.refreshToken ?? null;
+  } catch {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  }
+}
+
+function persistTokens(tokens: TokenPair | null) {
+  if (!tokens) {
+    accessToken = null;
+    refreshToken = null;
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    return;
+  }
+
+  accessToken = tokens.accessToken;
+  refreshToken = tokens.refreshToken;
+  localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens));
 }
 
 export function setAuthTokens(tokens: TokenPair | null) {
@@ -26,6 +56,10 @@ export function getRefreshToken() {
   return refreshToken;
 }
 
+export function getAuthToken() {
+  return accessToken;
+}
+
 export function registerAuthFailureHandler(handler: AuthFailureHandler | null) {
   authFailureHandler = handler;
 }
@@ -42,9 +76,21 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 export interface LoginResponse {
-  access_token: string;
-  refresh_token: string;
+  access_token?: string;
+  refresh_token?: string;
   token_type: string;
+  requires_2fa?: boolean;
+  two_factor_token?: string;
+}
+
+export interface TwoFactorBindResponse {
+  secret: string;
+  otpauth_url: string;
+}
+
+export interface TwoFactorEnableResponse {
+  message: string;
+  backup_codes: string[];
 }
 
 export interface UserProfile {
@@ -64,6 +110,10 @@ async function requestTokenRefresh(): Promise<TokenPair> {
     { refresh_token: refreshToken },
     { headers: { Authorization: '' } }
   );
+  if (!res.data.access_token || !res.data.refresh_token) {
+    throw new Error('missing tokens in refresh response');
+  }
+
   const tokens = {
     accessToken: res.data.access_token,
     refreshToken: res.data.refresh_token,
@@ -159,6 +209,29 @@ export interface ProjectPermissions {
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
   const res = await api.post<LoginResponse>('/auth/login', { email, password });
+  return res.data;
+}
+
+export async function verifyTwoFactorLogin(twoFactorToken: string, code: string): Promise<LoginResponse> {
+  const res = await api.post<LoginResponse>('/auth/2fa/verify', {
+    two_factor_token: twoFactorToken,
+    code,
+  });
+  return res.data;
+}
+
+export async function getTwoFactorStatus(): Promise<{ enabled: boolean }> {
+  const res = await api.get<{ enabled: boolean }>('/auth/2fa/status');
+  return res.data;
+}
+
+export async function bindTwoFactor(): Promise<TwoFactorBindResponse> {
+  const res = await api.post<TwoFactorBindResponse>('/auth/2fa/bind');
+  return res.data;
+}
+
+export async function enableTwoFactor(code: string): Promise<TwoFactorEnableResponse> {
+  const res = await api.post<TwoFactorEnableResponse>('/auth/2fa/enable', { code });
   return res.data;
 }
 

@@ -73,6 +73,10 @@ def create_refresh_token(subject: str, user_id: int, full_name: str, is_superuse
     return _create_token(subject, user_id, full_name, is_superuser, settings.JWT_REFRESH_EXPIRE_MINUTES, "refresh")
 
 
+def create_two_factor_challenge_token(subject: str, user_id: int, full_name: str, is_superuser: bool) -> str:
+    return _create_token(subject, user_id, full_name, is_superuser, 10, "2fa_challenge")
+
+
 def decode_token(token: str) -> dict[str, Any]:
     parts = token.split(".")
     if len(parts) != 3:
@@ -99,6 +103,13 @@ def decode_access_token(token: str) -> dict[str, Any]:
 def decode_refresh_token(token: str) -> dict[str, Any]:
     payload = decode_token(token)
     if payload.get("type") != "refresh":
+        raise ValueError("invalid token type")
+    return payload
+
+
+def decode_two_factor_challenge_token(token: str) -> dict[str, Any]:
+    payload = decode_token(token)
+    if payload.get("type") != "2fa_challenge":
         raise ValueError("invalid token type")
     return payload
 

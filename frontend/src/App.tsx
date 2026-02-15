@@ -14,6 +14,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ChangePassword from './pages/ChangePassword';
 import SystemSettings from './pages/SystemSettings';
+import TwoFactorSetup from './pages/TwoFactorSetup';
+import TwoFactorVerify from './pages/TwoFactorVerify';
 import { useAuth } from './auth';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useTranslation } from 'react-i18next';
@@ -40,6 +42,10 @@ function App() {
           element={withRouteBoundary('forgot-password-route', <ForgotPassword />)}
         />
         <Route
+          path="/two-factor/verify"
+          element={withRouteBoundary('two-factor-verify-route', <TwoFactorVerify />)}
+        />
+        <Route
           path="/reset-password"
           element={withRouteBoundary('reset-password-route', <ResetPassword />)}
         />
@@ -61,6 +67,7 @@ function App() {
           <Route path="users" element={<Users />} />
           <Route path="change-password" element={<ChangePassword />} />
           <Route path="settings" element={<SystemSettings />} />
+          <Route path="security/2fa" element={<TwoFactorSetup />} />
         </Route>
       </Routes>
     </BrowserRouter>

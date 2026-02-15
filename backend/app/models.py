@@ -86,6 +86,9 @@ class User(SQLModel, table=True):
     email: str = Field(index=True, unique=True)
     full_name: str = ""
     password_hash: str
+    two_factor_secret: Optional[str] = None
+    two_factor_enabled: bool = False
+    two_factor_backup_codes_hash: str = "[]"
     is_active: bool = True
     is_superuser: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
