@@ -116,6 +116,38 @@ class KeywordRead(BaseModel):
         from_attributes = True
 
 
+
+
+class KeywordResearchRequest(BaseModel):
+    seed_term: str
+    locale: str = "en"
+    market: str = "us"
+    limit: int = Field(default=20, ge=1, le=100)
+
+
+class KeywordResearchItem(BaseModel):
+    keyword: str
+    search_volume: int
+    cpc: float
+    difficulty: float
+    intent: str
+    provider_raw: dict
+
+
+class KeywordResearchResponse(BaseModel):
+    provider: str
+    items: List[KeywordResearchItem]
+
+
+class KeywordBulkCreateRequest(BaseModel):
+    keywords: List[str] = Field(default_factory=list)
+    locale: Optional[str] = None
+    market: Optional[str] = None
+
+
+class KeywordBulkCreateResponse(BaseModel):
+    created: List[KeywordRead]
+    skipped_existing: List[str]
 class RankHistoryRead(BaseModel):
     id: int
     keyword_id: int

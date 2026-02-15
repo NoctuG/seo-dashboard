@@ -83,6 +83,12 @@ export default function ProjectApiKeys() {
           >
             Keywords
           </Link>
+          <Link
+            to={`/projects/${id}/keyword-research`}
+            className="text-blue-600 hover:underline"
+          >
+            Keyword Research
+          </Link>
         </div>
       </div>
 

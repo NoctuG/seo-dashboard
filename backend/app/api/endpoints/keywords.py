@@ -8,11 +8,16 @@ from sqlmodel import Session, func, select
 from app.core.error_codes import ErrorCode
 from app.db import get_session
 from app.models import CompetitorDomain, Keyword, RankHistory, Project, ProjectRoleType, User
+from app.keyword_research_service import keyword_research_service
 from app.schemas import (
     CompetitorDomainCreate,
     CompetitorDomainRead,
+    KeywordBulkCreateRequest,
+    KeywordBulkCreateResponse,
     KeywordCreate,
     KeywordRead,
+    KeywordResearchRequest,
+    KeywordResearchResponse,
     RankHistoryRead,
     VisibilityHistoryRead,
     PaginatedResponse,
@@ -144,6 +149,87 @@ def create_keyword(
     session.refresh(keyword)
     return keyword
 
+
+
+
+@router.post("/{project_id}/keyword-research", response_model=KeywordResearchResponse)
+def run_keyword_research(
+    project_id: int,
+    payload: KeywordResearchRequest,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    locale = (payload.locale or project.default_hl or "en").strip().lower()
+    market = (payload.market or project.default_gl or "us").strip().lower()
+    seed_term = payload.seed_term.strip()
+    if not seed_term:
+        raise HTTPException(status_code=400, detail="seed_term is required")
+
+    results = keyword_research_service.get_keywords(
+        seed_term=seed_term,
+        locale=locale,
+        market=market,
+        limit=payload.limit,
+    )
+    return {"provider": keyword_research_service.current_provider(), "items": results}
+
+
+@router.post("/{project_id}/keywords/bulk-create", response_model=KeywordBulkCreateResponse)
+def bulk_create_keywords(
+    project_id: int,
+    payload: KeywordBulkCreateRequest,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    normalized_terms: list[str] = []
+    seen_terms: set[str] = set()
+    for term in payload.keywords:
+        normalized = term.strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen_terms:
+            continue
+        seen_terms.add(key)
+        normalized_terms.append(normalized)
+
+    if not normalized_terms:
+        return {"created": [], "skipped_existing": []}
+
+    existing_rows = session.exec(
+        select(Keyword.term).where(
+            Keyword.project_id == project_id,
+            func.lower(Keyword.term).in_([value.lower() for value in normalized_terms]),
+        )
+    ).all()
+    existing_lower = {term.lower() for term in existing_rows}
+
+    to_create = [term for term in normalized_terms if term.lower() not in existing_lower]
+    created: list[Keyword] = []
+    for term in to_create:
+        keyword = Keyword(
+            project_id=project_id,
+            term=term,
+            locale=payload.locale,
+            market=payload.market,
+        )
+        session.add(keyword)
+        created.append(keyword)
+
+    session.commit()
+    for item in created:
+        session.refresh(item)
+
+    skipped_existing = [term for term in normalized_terms if term.lower() in existing_lower]
+    return {"created": created, "skipped_existing": skipped_existing}
 
 @router.delete("/{project_id}/keywords/{keyword_id}")
 def delete_keyword(

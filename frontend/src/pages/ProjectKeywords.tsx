@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
     addProjectCompetitor,
     api,
@@ -271,6 +271,12 @@ export default function ProjectKeywords() {
                     <TrendingUp size={24} /> 关键词排名跟踪
                 </h1>
                 <div className="flex gap-2">
+                    <Link
+                        to={`/projects/${id}/keyword-research`}
+                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                    >
+                        关键词研究
+                    </Link>
                     {isAdmin && keywords.length > 0 && (
                         <button
                             onClick={checkAllRanks}

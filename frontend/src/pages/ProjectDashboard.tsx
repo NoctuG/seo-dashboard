@@ -795,6 +795,12 @@ export default function ProjectDashboard() {
             >
               Keyword Rankings
             </Link>
+            <Link
+              to={`/projects/${id}/keyword-research`}
+              className="text-blue-600 hover:underline"
+            >
+              Keyword Research
+            </Link>
             {isAdmin && (
               <Link
                 to={`/projects/${id}/api-keys`}

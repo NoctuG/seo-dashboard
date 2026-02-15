@@ -6,6 +6,7 @@ import ProjectDashboard from './pages/ProjectDashboard';
 import ProjectPages from './pages/ProjectPages';
 import ProjectIssues from './pages/ProjectIssues';
 import ProjectKeywords from './pages/ProjectKeywords';
+import ProjectKeywordResearch from './pages/ProjectKeywordResearch';
 import AiAssistant from './pages/AiAssistant';
 import ProjectReports from './pages/ProjectReports';
 import ProjectApiKeys from './pages/ProjectApiKeys';
@@ -69,6 +70,7 @@ function App() {
           <Route path="projects/:id/pages" element={<ProjectPages />} />
           <Route path="projects/:id/issues" element={<ProjectIssues />} />
           <Route path="projects/:id/keywords" element={<ProjectKeywords />} />
+          <Route path="projects/:id/keyword-research" element={<ProjectKeywordResearch />} />
           <Route path="projects/:id/reports" element={<ProjectReports />} />
           <Route path="projects/:id/api-keys" element={<ProjectApiKeys />} />
           <Route path="ai" element={<AiAssistant />} />

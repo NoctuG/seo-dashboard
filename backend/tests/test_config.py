@@ -47,6 +47,10 @@ def _base_settings(**overrides):
         "MOZ_API_KEY": "",
         "AHREFS_API_KEY": "",
         "MAJESTIC_API_KEY": "",
+        "KEYWORD_RESEARCH_PROVIDER": "sample",
+        "DATAFORSEO_LOGIN": "",
+        "DATAFORSEO_PASSWORD": "",
+        "SEMRUSH_API_KEY": "",
         "GA4_PROPERTY_ID": "",
         "GA4_ACCESS_TOKEN": "",
         "MATOMO_BASE_URL": "",
@@ -83,3 +87,13 @@ def test_validate_settings_accepts_valid_production_settings():
     )
 
     validate_settings(prod_settings)
+
+
+def test_validate_settings_requires_dataforseo_credentials_when_selected():
+    with pytest.raises(SettingsValidationError, match="DATAFORSEO_LOGIN"):
+        validate_settings(_base_settings(KEYWORD_RESEARCH_PROVIDER="dataforseo"))
+
+
+def test_validate_settings_requires_semrush_key_when_selected():
+    with pytest.raises(SettingsValidationError, match="SEMRUSH_API_KEY"):
+        validate_settings(_base_settings(KEYWORD_RESEARCH_PROVIDER="semrush"))
