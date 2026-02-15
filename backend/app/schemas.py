@@ -261,6 +261,9 @@ class AuthorityResponse(BaseModel):
     project_id: int
     provider: str
     domain_authority: float
+    ahrefs_rank: Optional[int] = None
+    last_fetched_at: Optional[datetime] = None
+    fetch_status: str = "pending"
     history: List[AuthorityPoint]
     notes: List[str]
 
@@ -270,9 +273,20 @@ class BacklinkSummaryResponse(BaseModel):
     provider: str
     backlinks_total: int
     ref_domains: int
+    ahrefs_rank: Optional[int] = None
+    top_backlinks: List[dict] = Field(default_factory=list)
+    last_fetched_at: Optional[datetime] = None
+    fetch_status: str = "pending"
     anchor_distribution: dict[str, int]
     history: List[dict]
     notes: List[str]
+
+
+class BacklinkStatusResponse(BaseModel):
+    project_id: int
+    provider: str
+    last_fetched_at: Optional[datetime] = None
+    fetch_status: str
 
 
 class BacklinkChangeItem(BaseModel):
