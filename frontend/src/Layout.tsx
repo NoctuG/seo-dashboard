@@ -43,6 +43,11 @@ export default function Layout() {
                         <Users size={20} /> Users
                     </Link>
                     )}
+                    {user?.is_superuser && (
+                    <Link to="/settings" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                        <Settings size={20} /> 系统设置
+                    </Link>
+                    )}
                     <Link to="/change-password" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
                         <KeyRound size={20} /> 修改密码
                     </Link>

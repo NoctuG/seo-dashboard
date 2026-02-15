@@ -1,37 +1,49 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+export const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 const TOKEN_STORAGE_KEY = 'seo.auth.token';
 
-let authToken: string | null = localStorage.getItem(TOKEN_STORAGE_KEY);
-
-export function setAuthToken(token: string | null) {
-  authToken = token;
-  if (token) {
-    localStorage.setItem(TOKEN_STORAGE_KEY, token);
-  } else {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-  }
+  accessToken = null;
+  refreshToken = null;
+  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
 }
 
-export function getAuthToken() {
-  return authToken;
+export function setAuthTokens(tokens: TokenPair | null) {
+  persistTokens(tokens);
+}
+
+export function clearAuthTokens() {
+  persistTokens(null);
+}
+
+export function getAccessToken() {
+  return accessToken;
+}
+
+export function getRefreshToken() {
+  return refreshToken;
+}
+
+export function registerAuthFailureHandler(handler: AuthFailureHandler | null) {
+  authFailureHandler = handler;
 }
 
 export const api = axios.create({
   baseURL: API_URL,
 });
 
-api.interceptors.request.use((config) => {
-  if (authToken) {
-    config.headers.Authorization = `Bearer ${authToken}`;
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
 
-
 export interface LoginResponse {
   access_token: string;
+  refresh_token: string;
   token_type: string;
 }
 
@@ -42,7 +54,61 @@ export interface UserProfile {
   is_superuser: boolean;
 }
 
+async function requestTokenRefresh(): Promise<TokenPair> {
+  if (!refreshToken) {
+    throw new Error('missing refresh token');
+  }
 
+  const res = await api.post<LoginResponse>(
+    '/auth/refresh',
+    { refresh_token: refreshToken },
+    { headers: { Authorization: '' } }
+  );
+  const tokens = {
+    accessToken: res.data.access_token,
+    refreshToken: res.data.refresh_token,
+  };
+  setAuthTokens(tokens);
+  return tokens;
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const shouldRefresh =
+      error.response?.status === 401 &&
+      !!originalRequest &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login') &&
+      !originalRequest.url?.includes('/auth/refresh');
+
+    if (!shouldRefresh) {
+      throw error;
+    }
+
+    if (!refreshToken) {
+      clearAuthTokens();
+      authFailureHandler?.();
+      throw error;
+    }
+
+    originalRequest._retry = true;
+
+    try {
+      refreshPromise = refreshPromise ?? requestTokenRefresh();
+      const tokens = await refreshPromise;
+      originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
+      return api(originalRequest);
+    } catch (refreshError) {
+      clearAuthTokens();
+      authFailureHandler?.();
+      throw refreshError;
+    } finally {
+      refreshPromise = null;
+    }
+  }
+);
 
 export interface ManagedUser {
   id: number;

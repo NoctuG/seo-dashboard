@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional, Literal
 import json
@@ -36,6 +36,8 @@ from app.visibility_service import visibility_service
 from app.report_service import report_service
 from app.scheduler_service import scheduler_service
 from app.api.deps import get_current_user, require_project_role, write_audit_log
+from app.config import settings
+from app.rate_limit import limiter
 
 router = APIRouter()
 
@@ -136,7 +138,9 @@ def delete_project(project_id: int, session: Session = Depends(get_session), use
 
 
 @router.post("/{project_id}/crawl", response_model=CrawlRead)
+@limiter.limit(settings.RATE_LIMIT_CRAWL_START)
 def start_crawl(
+    request: Request,
     project_id: int,
     background_tasks: BackgroundTasks,
     max_pages: Optional[int] = None,
@@ -584,16 +588,29 @@ def export_report(project_id: int, payload: ReportExportRequest, session: Sessio
         report_payload = report_service.build_report_payload(session, project_id, template)
         content, media_type = report_service.render(report_payload, payload.format)
     except ValueError as exc:
+        report_service.create_delivery_log(
+            session,
+            project_id=project_id,
+            template_id=template.id,
+            schedule_id=None,
+            recipient_email=None,
+            export_format=payload.format,
+            retries=0,
+            status="failed",
+            error_message=report_service.format_delivery_error(exc),
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    log = ReportDeliveryLog(
+    report_service.create_delivery_log(
+        session,
         project_id=project_id,
         template_id=template.id,
-        format=payload.format.lower(),
+        schedule_id=None,
+        recipient_email=None,
+        export_format=payload.format,
+        retries=0,
         status="success",
     )
-    session.add(log)
-    session.commit()
 
     report_service.dispatch_report_generated(
         session,

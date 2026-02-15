@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session, select
 
-from app.auth_service import decode_token
+from app.auth_service import decode_access_token
 from app.db import get_session
 from app.models import AuditActionType, AuditLog, ProjectMember, ProjectRoleType, Role, User
 
@@ -17,7 +17,7 @@ def get_current_user(
     session: Session = Depends(get_session),
 ) -> User:
     try:
-        payload = decode_token(credentials.credentials)
+        payload = decode_access_token(credentials.credentials)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
