@@ -11,6 +11,10 @@ class Settings:
     PROJECT_NAME: str = "SEO Tool"
     API_V1_STR: str = "/api/v1"
 
+    # Logging
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    LOG_FORMAT: str = os.getenv("LOG_FORMAT", "json")  # json or plain
+
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/seo_tool.db")
 
