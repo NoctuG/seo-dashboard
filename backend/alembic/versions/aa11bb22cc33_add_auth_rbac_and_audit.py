@@ -19,6 +19,8 @@ depends_on = None
 
 
 def upgrade() -> None:
+    is_sqlite = op.get_bind().dialect.name == "sqlite"
+
     op.add_column("project", sa.Column("organization_id", sa.Integer(), nullable=True))
     op.create_index("ix_project_organization_id", "project", ["organization_id"], unique=False)
 
@@ -99,11 +101,19 @@ def upgrade() -> None:
     op.create_index("ix_auditlog_entity_type", "auditlog", ["entity_type"], unique=False)
     op.create_index("ix_auditlog_entity_id", "auditlog", ["entity_id"], unique=False)
 
-    op.create_foreign_key("fk_project_organization", "project", "organization", ["organization_id"], ["id"])
+    if is_sqlite:
+        # SQLite does not support adding a named foreign key constraint via ALTER TABLE.
+        # We skip it here to keep this migration compatible across dialects.
+        pass
+    else:
+        op.create_foreign_key("fk_project_organization", "project", "organization", ["organization_id"], ["id"])
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_project_organization", "project", type_="foreignkey")
+    is_sqlite = op.get_bind().dialect.name == "sqlite"
+
+    if not is_sqlite:
+        op.drop_constraint("fk_project_organization", "project", type_="foreignkey")
 
     op.drop_index("ix_auditlog_entity_id", table_name="auditlog")
     op.drop_index("ix_auditlog_entity_type", table_name="auditlog")
