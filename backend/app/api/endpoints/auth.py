@@ -2,7 +2,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -12,6 +12,7 @@ from app.config import settings
 from app.db import get_session
 from app.email_service import email_service
 from app.models import AuditActionType, Organization, OrganizationMember, PasswordResetToken, User
+from app.rate_limit import limiter
 
 router = APIRouter()
 
@@ -63,7 +64,8 @@ def _hash_reset_token(token: str) -> str:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, session: Session = Depends(get_session)):
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+def login(request: Request, payload: LoginRequest, session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == payload.email.lower())).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")

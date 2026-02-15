@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional, Literal
 import json
@@ -36,6 +36,8 @@ from app.visibility_service import visibility_service
 from app.report_service import report_service
 from app.scheduler_service import scheduler_service
 from app.api.deps import get_current_user, require_project_role, write_audit_log
+from app.config import settings
+from app.rate_limit import limiter
 
 router = APIRouter()
 
@@ -136,7 +138,9 @@ def delete_project(project_id: int, session: Session = Depends(get_session), use
 
 
 @router.post("/{project_id}/crawl", response_model=CrawlRead)
+@limiter.limit(settings.RATE_LIMIT_CRAWL_START)
 def start_crawl(
+    request: Request,
     project_id: int,
     background_tasks: BackgroundTasks,
     max_pages: Optional[int] = None,

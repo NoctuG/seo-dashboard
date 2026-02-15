@@ -9,16 +9,13 @@ from app.auth_service import create_initial_admin
 from app.config import settings
 from app.api.api import api_router
 from app.db import init_db, engine
-from app.logging_config import (
-    REQUEST_PATH_CONTEXT,
-    TRACE_ID_CONTEXT,
-    configure_logging,
-    generate_trace_id,
-)
+from app.rate_limit import limiter, rate_limit_exceeded_handler
 from app.scheduler_service import scheduler_service
+from slowapi.errors import RateLimitExceeded
 
 app = FastAPI(title=settings.PROJECT_NAME)
-logger = logging.getLogger(__name__)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # Set all CORS enabled origins
 app.add_middleware(
