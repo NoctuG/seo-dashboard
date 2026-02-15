@@ -13,6 +13,7 @@ import Users from './pages/Users';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ChangePassword from './pages/ChangePassword';
+import SystemSettings from './pages/SystemSettings';
 import { useAuth } from './auth';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useTranslation } from 'react-i18next';
@@ -50,33 +51,16 @@ function App() {
             </Protected>
           }
         >
-          <Route index element={withRouteBoundary('projects-route', <Projects />)} />
-          <Route
-            path="projects/:id"
-            element={withRouteBoundary('project-dashboard-route', <ProjectDashboard />)}
-          />
-          <Route
-            path="projects/:id/pages"
-            element={withRouteBoundary('project-pages-route', <ProjectPages />)}
-          />
-          <Route
-            path="projects/:id/issues"
-            element={withRouteBoundary('project-issues-route', <ProjectIssues />)}
-          />
-          <Route
-            path="projects/:id/keywords"
-            element={withRouteBoundary('project-keywords-route', <ProjectKeywords />)}
-          />
-          <Route
-            path="projects/:id/reports"
-            element={withRouteBoundary('project-reports-route', <ProjectReports />)}
-          />
-          <Route path="ai" element={withRouteBoundary('ai-route', <AiAssistant />)} />
-          <Route path="users" element={withRouteBoundary('users-route', <Users />)} />
-          <Route
-            path="change-password"
-            element={withRouteBoundary('change-password-route', <ChangePassword />)}
-          />
+          <Route index element={<Projects />} />
+          <Route path="projects/:id" element={<ProjectDashboard />} />
+          <Route path="projects/:id/pages" element={<ProjectPages />} />
+          <Route path="projects/:id/issues" element={<ProjectIssues />} />
+          <Route path="projects/:id/keywords" element={<ProjectKeywords />} />
+          <Route path="projects/:id/reports" element={<ProjectReports />} />
+          <Route path="ai" element={<AiAssistant />} />
+          <Route path="users" element={<Users />} />
+          <Route path="change-password" element={<ChangePassword />} />
+          <Route path="settings" element={<SystemSettings />} />
         </Route>
       </Routes>
     </BrowserRouter>

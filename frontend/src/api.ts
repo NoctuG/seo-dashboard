@@ -612,3 +612,44 @@ export async function getReportLogs(projectId: string | number): Promise<ReportD
   const res = await api.get<ReportDeliveryLog[]>(`/projects/${projectId}/reports/logs`);
   return res.data;
 }
+
+export interface SystemSettingsPayload {
+  smtp: {
+    host: string;
+    port: number;
+    user: string;
+    password: string;
+    from: string;
+    use_tls: boolean;
+  };
+  analytics: {
+    provider: string;
+    ga4_property_id: string;
+    ga4_access_token: string;
+    matomo_base_url: string;
+    matomo_site_id: string;
+    matomo_token_auth: string;
+  };
+  ai: {
+    base_url: string;
+    api_key: string;
+    model: string;
+  };
+  crawler: {
+    default_max_pages: number;
+  };
+}
+
+export interface SystemSettingsResponse extends SystemSettingsPayload {
+  masked_fields: Record<string, string[]>;
+}
+
+export async function getSystemSettings(): Promise<SystemSettingsResponse> {
+  const res = await api.get<SystemSettingsResponse>('/settings');
+  return res.data;
+}
+
+export async function updateSystemSettings(payload: SystemSettingsPayload): Promise<SystemSettingsResponse> {
+  const res = await api.put<SystemSettingsResponse>('/settings', payload);
+  return res.data;
+}

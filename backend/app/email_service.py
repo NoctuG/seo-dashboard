@@ -2,12 +2,13 @@ import smtplib
 from email.message import EmailMessage
 from typing import Sequence
 
-from app.config import settings
+from app.runtime_settings import get_runtime_settings
 
 
 class EmailService:
     def _assert_configured(self) -> None:
-        if not settings.SMTP_HOST or not settings.SMTP_FROM:
+        runtime = get_runtime_settings()
+        if not runtime.smtp_host or not runtime.smtp_from:
             raise RuntimeError("SMTP is not configured")
 
     def send_email(
@@ -22,7 +23,8 @@ class EmailService:
 
         message = EmailMessage()
         message["Subject"] = subject
-        message["From"] = settings.SMTP_FROM
+        runtime = get_runtime_settings()
+        message["From"] = runtime.smtp_from
         message["To"] = to_email
         message.set_content(text_body)
         if html_body:
@@ -31,11 +33,11 @@ class EmailService:
             maintype, subtype = mime_type.split("/", 1)
             message.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
 
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as smtp:
-            if settings.SMTP_TLS:
+        with smtplib.SMTP(runtime.smtp_host, runtime.smtp_port, timeout=30) as smtp:
+            if runtime.smtp_use_tls:
                 smtp.starttls()
-            if settings.SMTP_USER:
-                smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            if runtime.smtp_user:
+                smtp.login(runtime.smtp_user, runtime.smtp_password)
             smtp.send_message(message)
 
 

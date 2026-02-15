@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 import httpx
 
-from app.config import settings
+from app.runtime_settings import get_runtime_settings
 
 router = APIRouter()
 
@@ -17,13 +17,14 @@ class AiAnalyzeResponse(BaseModel):
 
 @router.post("/analyze", response_model=AiAnalyzeResponse)
 async def analyze_with_ai(payload: AiAnalyzeRequest):
-    if not settings.AI_BASE_URL or not settings.AI_API_KEY:
+    runtime = get_runtime_settings()
+    if not runtime.ai_base_url or not runtime.ai_api_key:
         raise HTTPException(
             status_code=400,
             detail="AI is not configured. Please set AI_BASE_URL and AI_API_KEY in .env",
         )
 
-    base_url = settings.AI_BASE_URL.rstrip("/")
+    base_url = runtime.ai_base_url.rstrip("/")
     endpoint = f"{base_url}/chat/completions"
 
     prompt = (
@@ -33,7 +34,7 @@ async def analyze_with_ai(payload: AiAnalyzeRequest):
     )
 
     request_body = {
-        "model": settings.AI_MODEL,
+        "model": runtime.ai_model,
         "messages": [
             {"role": "system", "content": "你是一名SEO审计助手。"},
             {"role": "user", "content": prompt},
@@ -42,7 +43,7 @@ async def analyze_with_ai(payload: AiAnalyzeRequest):
     }
 
     headers = {
-        "Authorization": f"Bearer {settings.AI_API_KEY}",
+        "Authorization": f"Bearer {runtime.ai_api_key}",
         "Content-Type": "application/json",
     }
 
