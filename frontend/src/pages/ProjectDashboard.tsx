@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api';
 import type { DashboardStats } from '../api';
-import { Play, AlertTriangle, Info, AlertOctagon } from 'lucide-react';
+import { Play, AlertTriangle, Info, AlertOctagon, TrendingUp, TrendingDown, Activity, MousePointerClick } from 'lucide-react';
 
 export default function ProjectDashboard() {
     const { id } = useParams<{ id: string }>();
@@ -41,44 +41,10 @@ export default function ProjectDashboard() {
         }
     };
 
-    if (loading) return <div>Loading...</div>;
+    if (loading || !stats) return <div>Loading...</div>;
 
-    if (!stats || !stats.last_crawl) return (
-        <div>
-            <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-            <p>No crawl data yet.</p>
-            <div className="mt-4 mb-4 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-                <label className="flex flex-col gap-2 text-sm">
-                    <span className="text-gray-700">Max pages</span>
-                    <input
-                        type="number"
-                        min={1}
-                        value={maxPages}
-                        onChange={(e) => setMaxPages(Number(e.target.value) || 1)}
-                        className="border rounded px-3 py-2"
-                    />
-                </label>
-                <label className="flex flex-col gap-2 text-sm">
-                    <span className="text-gray-700">Sitemap URL (optional)</span>
-                    <input
-                        type="url"
-                        placeholder="https://example.com/sitemap.xml"
-                        value={sitemapUrl}
-                        onChange={(e) => setSitemapUrl(e.target.value)}
-                        className="border rounded px-3 py-2"
-                    />
-                </label>
-            </div>
-            <button onClick={startCrawl} className="bg-blue-600 text-white px-4 py-2 rounded mt-2 flex items-center gap-2">
-                <Play size={18} /> Start Crawl
-            </button>
-            <div className="mt-4">
-                <Link to={`/projects/${id}/keywords`} className="text-blue-600 hover:underline">Keyword Rankings</Link>
-            </div>
-        </div>
-    );
-
-    const { last_crawl, issues_breakdown } = stats;
+    const { last_crawl, issues_breakdown, analytics } = stats;
+    const hasGrowth = analytics.period.growth_pct >= 0;
 
     return (
         <div>
@@ -112,6 +78,12 @@ export default function ProjectDashboard() {
                 </label>
             </div>
 
+            {analytics.notes.length > 0 && (
+                <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded p-4 text-sm text-yellow-900">
+                    {analytics.notes.map((note) => <p key={note}>{note}</p>)}
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div className="bg-white p-6 rounded shadow">
                     <h3 className="text-gray-500 text-sm uppercase">Total Pages</h3>
@@ -131,30 +103,128 @@ export default function ProjectDashboard() {
                 </div>
             </div>
 
-            <div className="bg-white p-6 rounded shadow">
-                <h2 className="text-xl font-bold mb-4">Last Crawl Status</h2>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <span className="text-gray-500">Status:</span>
-                        <span className={`ml-2 px-2 py-1 rounded text-sm ${
-                            last_crawl.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            last_crawl.status === 'failed' ? 'bg-red-100 text-red-800' :
-                            'bg-yellow-100 text-yellow-800'
-                        }`}>
-                            {last_crawl.status}
-                        </span>
-                    </div>
-                    <div>
-                        <span className="text-gray-500">Date:</span>
-                        <span className="ml-2">{new Date(last_crawl.start_time).toLocaleString()}</span>
-                    </div>
+            <h2 className="text-xl font-bold mb-4">Traffic & Conversion Insights</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white p-6 rounded shadow border-l-4 border-indigo-500">
+                    <h3 className="text-gray-500 text-sm uppercase">Monthly Sessions</h3>
+                    <p className="text-3xl font-bold">{analytics.period.monthly_total.toLocaleString()}</p>
                 </div>
-                <div className="mt-4 flex gap-4">
-                    <Link to={`/projects/${id}/pages`} className="text-blue-600 hover:underline">View Pages</Link>
-                    <Link to={`/projects/${id}/issues`} className="text-blue-600 hover:underline">View Issues</Link>
-                    <Link to={`/projects/${id}/keywords`} className="text-blue-600 hover:underline">Keyword Rankings</Link>
+                <div className="bg-white p-6 rounded shadow border-l-4 border-emerald-500">
+                    <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2">
+                        {hasGrowth ? <TrendingUp size={16} /> : <TrendingDown size={16} />} Growth vs Last Month
+                    </h3>
+                    <p className={`text-3xl font-bold ${hasGrowth ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {analytics.period.growth_pct}%
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                        {analytics.period.meaningful_growth ? 'Meaningful growth trend' : 'Growth below meaningful threshold'}
+                    </p>
+                </div>
+                <div className="bg-white p-6 rounded shadow border-l-4 border-purple-500">
+                    <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2"><Activity size={16}/> Bounce Rate</h3>
+                    <p className="text-3xl font-bold">{analytics.totals.bounce_rate}%</p>
+                </div>
+                <div className="bg-white p-6 rounded shadow border-l-4 border-cyan-500">
+                    <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2"><MousePointerClick size={16}/> Conversions</h3>
+                    <p className="text-3xl font-bold">{analytics.totals.conversions}</p>
                 </div>
             </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div className="bg-white p-6 rounded shadow">
+                    <h3 className="font-semibold mb-3">Top Countries</h3>
+                    <ul className="space-y-2 text-sm">
+                        {analytics.audience.top_countries.map((item) => (
+                            <li key={item.country} className="flex justify-between border-b pb-1">
+                                <span>{item.country}</span>
+                                <span className="font-medium">{item.sessions}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                <div className="bg-white p-6 rounded shadow">
+                    <h3 className="font-semibold mb-3">Devices</h3>
+                    <ul className="space-y-2 text-sm">
+                        {analytics.audience.devices.map((item) => (
+                            <li key={item.device} className="flex justify-between border-b pb-1">
+                                <span className="capitalize">{item.device}</span>
+                                <span className="font-medium">{item.sessions}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                <div className="bg-white p-6 rounded shadow">
+                    <h3 className="font-semibold mb-3">Daily Sessions (Last 7 days)</h3>
+                    <ul className="space-y-2 text-sm">
+                        {analytics.daily_sessions.slice(-7).map((item) => (
+                            <li key={item.date} className="flex justify-between border-b pb-1">
+                                <span>{item.date}</span>
+                                <span className="font-medium">{item.sessions}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+
+            <div className="bg-white p-6 rounded shadow mb-8 overflow-x-auto">
+                <h3 className="font-semibold mb-3">Top Traffic Assets & Conversion Rate</h3>
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="text-left border-b">
+                            <th className="pb-2">Landing Page</th>
+                            <th className="pb-2">Sessions</th>
+                            <th className="pb-2">Conversions</th>
+                            <th className="pb-2">CVR</th>
+                            <th className="pb-2">A/B Variant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {analytics.top_assets.map((asset) => (
+                            <tr key={asset.path} className="border-b">
+                                <td className="py-2">{asset.path}</td>
+                                <td className="py-2">{asset.sessions}</td>
+                                <td className="py-2">{asset.conversions}</td>
+                                <td className="py-2">{asset.conversion_rate}%</td>
+                                <td className="py-2">{asset.ab_test_variant ?? '—'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {last_crawl ? (
+                <div className="bg-white p-6 rounded shadow">
+                    <h2 className="text-xl font-bold mb-4">Last Crawl Status</h2>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <span className="text-gray-500">Status:</span>
+                            <span className={`ml-2 px-2 py-1 rounded text-sm ${
+                                last_crawl.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                last_crawl.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                            }`}>
+                                {last_crawl.status}
+                            </span>
+                        </div>
+                        <div>
+                            <span className="text-gray-500">Date:</span>
+                            <span className="ml-2">{new Date(last_crawl.start_time).toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div className="mt-4 flex gap-4">
+                        <Link to={`/projects/${id}/pages`} className="text-blue-600 hover:underline">View Pages</Link>
+                        <Link to={`/projects/${id}/issues`} className="text-blue-600 hover:underline">View Issues</Link>
+                        <Link to={`/projects/${id}/keywords`} className="text-blue-600 hover:underline">Keyword Rankings</Link>
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-white p-6 rounded shadow">
+                    <h2 className="text-xl font-bold mb-4">Last Crawl Status</h2>
+                    <p className="text-gray-600">No crawl data yet. Start a crawl to populate technical SEO metrics.</p>
+                </div>
+            )}
         </div>
     );
 }

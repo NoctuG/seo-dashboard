@@ -6,6 +6,7 @@ from app.db import get_session
 from app.models import Project, Crawl, Issue, CrawlStatus
 from app.schemas import ProjectCreate, ProjectRead, CrawlRead
 from app.crawler.crawler import crawler_service
+from app.analytics_service import analytics_service
 
 router = APIRouter()
 
@@ -73,11 +74,26 @@ def read_crawls(project_id: int, session: Session = Depends(get_session)):
 
 @router.get("/{project_id}/dashboard", response_model=Dict[str, Any])
 def get_dashboard(project_id: int, session: Session = Depends(get_session)):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
     statement = select(Crawl).where(Crawl.project_id == project_id).order_by(Crawl.start_time.desc())
     last_crawl = session.exec(statement).first()
+    analytics = analytics_service.get_project_analytics(project_id, project.domain)
 
     if not last_crawl:
-        return {"stats": None}
+        return {
+            "last_crawl": None,
+            "total_pages": 0,
+            "issues_count": 0,
+            "issues_breakdown": {
+                "critical": 0,
+                "warning": 0,
+                "info": 0,
+            },
+            "analytics": analytics,
+        }
 
     issues = session.exec(select(Issue).where(Issue.crawl_id == last_crawl.id)).all()
     critical = len([i for i in issues if i.severity == "critical"])
@@ -92,5 +108,6 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session)):
             "critical": critical,
             "warning": warning,
             "info": info
-        }
+        },
+        "analytics": analytics,
     }

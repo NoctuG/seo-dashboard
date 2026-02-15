@@ -53,8 +53,39 @@ export interface Issue {
   description?: string;
 }
 
+
+export interface AnalyticsData {
+  provider: string;
+  source: 'live' | 'sample';
+  period: {
+    daily_average: number;
+    monthly_total: number;
+    previous_month_total: number;
+    growth_pct: number;
+    meaningful_growth: boolean;
+  };
+  totals: {
+    sessions: number;
+    bounce_rate: number;
+    conversions: number;
+  };
+  audience: {
+    top_countries: Array<{ country: string; sessions: number }>;
+    devices: Array<{ device: string; sessions: number }>;
+  };
+  top_assets: Array<{
+    path: string;
+    sessions: number;
+    conversions: number;
+    conversion_rate: number;
+    ab_test_variant?: string;
+  }>;
+  daily_sessions: Array<{ date: string; sessions: number }>;
+  notes: string[];
+}
+
 export interface DashboardStats {
-  last_crawl?: Crawl;
+  last_crawl?: Crawl | null;
   total_pages: number;
   issues_count: number;
   issues_breakdown: {
@@ -62,6 +93,7 @@ export interface DashboardStats {
     warning: number;
     info: number;
   };
+  analytics: AnalyticsData;
 }
 
 export interface KeywordItem {

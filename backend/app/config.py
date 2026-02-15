@@ -29,4 +29,17 @@ class Settings:
     SERP_API_KEY: str = os.getenv("SERP_API_KEY", "")
     SERP_API_PROVIDER: str = os.getenv("SERP_API_PROVIDER", "serpapi")  # serpapi or valueserp
 
+    # Web analytics settings
+    ANALYTICS_PROVIDER: str = os.getenv("ANALYTICS_PROVIDER", "sample")  # sample, ga4, matomo
+    ANALYTICS_MEANINGFUL_GROWTH_PCT: float = float(os.getenv("ANALYTICS_MEANINGFUL_GROWTH_PCT", "10"))
+
+    # GA4 (optional, uses an externally managed OAuth access token)
+    GA4_PROPERTY_ID: str = os.getenv("GA4_PROPERTY_ID", "")
+    GA4_ACCESS_TOKEN: str = os.getenv("GA4_ACCESS_TOKEN", "")
+
+    # Matomo (optional)
+    MATOMO_BASE_URL: str = os.getenv("MATOMO_BASE_URL", "")
+    MATOMO_SITE_ID: str = os.getenv("MATOMO_SITE_ID", "")
+    MATOMO_TOKEN_AUTH: str = os.getenv("MATOMO_TOKEN_AUTH", "")
+
 settings = Settings()

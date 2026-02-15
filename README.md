@@ -8,6 +8,7 @@ A lightweight, self-hosted SEO tool built with Python (FastAPI) and React (Vite)
 - **Crawler**: Crawl websites, extract metadata, and analyze internal links.
 - **Audit**: Detect common SEO issues (404, missing title/description, duplicate content).
 - **Dashboard**: View crawl statistics and issue breakdowns.
+- **Traffic Analytics**: Integrate GA4 or Matomo to monitor sessions, audience segments, bounce rate, growth trend, and top converting landing pages.
 
 ## Tech Stack
 
@@ -77,6 +78,12 @@ A lightweight, self-hosted SEO tool built with Python (FastAPI) and React (Vite)
 - Backend supports `.env` via `python-dotenv` (`backend/.env`). You can configure:
   - `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` for AI SEO analysis.
   - `API_USERNAME`, `API_PASSWORD` for optional basic auth.
+  - `SERP_API_KEY`, `SERP_API_PROVIDER` for keyword rank lookup.
+  - `ANALYTICS_PROVIDER` (`sample`, `ga4`, `matomo`) to configure dashboard traffic analytics.
+  - `ANALYTICS_MEANINGFUL_GROWTH_PCT` threshold used for growth signal.
+  - `GA4_PROPERTY_ID`, `GA4_ACCESS_TOKEN` for GA4 Data API.
+  - `MATOMO_BASE_URL`, `MATOMO_SITE_ID`, `MATOMO_TOKEN_AUTH` for Matomo API.
+
 - Frontend supports `.env` (`frontend/.env`) to configure:
   - `VITE_API_URL`
   - `VITE_API_USERNAME`, `VITE_API_PASSWORD` (if backend auth is enabled).
