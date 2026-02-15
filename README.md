@@ -77,6 +77,7 @@
 - 后端通过 `python-dotenv` 支持 `.env` 配置文件（位于 `backend/.env`），可配置以下参数：
   - `AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL`：用于 AI 驱动的 SEO 分析。
   - `API_USERNAME`、`API_PASSWORD`：可选的基础身份验证。
+  - `JWT_SECRET_KEY`：JWT 签名密钥，开发环境必须显式配置；生产环境建议使用不少于 32 字节（推荐 64 字节）的高强度随机值（可用密码学安全随机源生成），严禁使用 `change-me` 等默认弱值。
   - `SERP_API_KEY`、`SERP_API_PROVIDER`：用于关键词排名查询。
   - `ANALYTICS_PROVIDER`（可选值：`sample`、`ga4`、`matomo`）：配置仪表盘的流量数据源。
   - `ANALYTICS_MEANINGFUL_GROWTH_PCT`：用于判断增长信号的阈值百分比。
