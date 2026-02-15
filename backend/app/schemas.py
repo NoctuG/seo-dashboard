@@ -355,3 +355,25 @@ class WebhookConfigRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ApiKeyCreate(BaseModel):
+    name: str
+    scopes: List[str] = Field(default_factory=list)
+    expires_at: Optional[datetime] = None
+
+
+class ApiKeyRead(BaseModel):
+    id: int
+    project_id: int
+    name: str
+    key_prefix: str
+    scopes: List[str] = Field(default_factory=list)
+    expires_at: Optional[datetime]
+    revoked_at: Optional[datetime]
+    created_by_user_id: Optional[int]
+    created_at: datetime
+
+
+class ApiKeyCreateResponse(ApiKeyRead):
+    plain_key: str

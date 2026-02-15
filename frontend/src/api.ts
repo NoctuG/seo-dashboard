@@ -1,8 +1,8 @@
-import axios, { AxiosError } from 'axios';
-import type { InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from "axios";
+import type { InternalAxiosRequestConfig } from "axios";
 
-export const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
-const TOKEN_STORAGE_KEY = 'seo.auth.token';
+export const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
+const TOKEN_STORAGE_KEY = "seo.auth.token";
 
 type TokenPair = {
   accessToken: string;
@@ -49,6 +49,10 @@ export function clearAuthTokens() {
 }
 
 export function getAccessToken() {
+  return accessToken;
+}
+
+export function getAuthToken() {
   return accessToken;
 }
 
@@ -102,13 +106,13 @@ export interface UserProfile {
 
 async function requestTokenRefresh(): Promise<TokenPair> {
   if (!refreshToken) {
-    throw new Error('missing refresh token');
+    throw new Error("missing refresh token");
   }
 
   const res = await api.post<LoginResponse>(
-    '/auth/refresh',
+    "/auth/refresh",
     { refresh_token: refreshToken },
-    { headers: { Authorization: '' } }
+    { headers: { Authorization: "" } },
   );
   if (!res.data.access_token || !res.data.refresh_token) {
     throw new Error('missing tokens in refresh response');
@@ -125,13 +129,15 @@ async function requestTokenRefresh(): Promise<TokenPair> {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const originalRequest = error.config as
+      | (InternalAxiosRequestConfig & { _retry?: boolean })
+      | undefined;
     const shouldRefresh =
       error.response?.status === 401 &&
       !!originalRequest &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes('/auth/login') &&
-      !originalRequest.url?.includes('/auth/refresh');
+      !originalRequest.url?.includes("/auth/login") &&
+      !originalRequest.url?.includes("/auth/refresh");
 
     if (!shouldRefresh) {
       throw error;
@@ -157,7 +163,7 @@ api.interceptors.response.use(
     } finally {
       refreshPromise = null;
     }
-  }
+  },
 );
 
 export interface ManagedUser {
@@ -185,16 +191,21 @@ export interface UpdateUserPayload {
 }
 
 export async function getUsers(): Promise<ManagedUser[]> {
-  const res = await api.get<ManagedUser[]>('/users');
+  const res = await api.get<ManagedUser[]>("/users");
   return res.data;
 }
 
-export async function createUser(payload: CreateUserPayload): Promise<ManagedUser> {
-  const res = await api.post<ManagedUser>('/users', payload);
+export async function createUser(
+  payload: CreateUserPayload,
+): Promise<ManagedUser> {
+  const res = await api.post<ManagedUser>("/users", payload);
   return res.data;
 }
 
-export async function updateUser(id: number, payload: UpdateUserPayload): Promise<ManagedUser> {
+export async function updateUser(
+  id: number,
+  payload: UpdateUserPayload,
+): Promise<ManagedUser> {
   const res = await api.patch<ManagedUser>(`/users/${id}`, payload);
   return res.data;
 }
@@ -204,11 +215,61 @@ export async function deleteUser(id: number): Promise<void> {
 }
 
 export interface ProjectPermissions {
-  role: 'admin' | 'viewer';
+  role: "admin" | "viewer";
 }
 
-export async function login(email: string, password: string): Promise<LoginResponse> {
-  const res = await api.post<LoginResponse>('/auth/login', { email, password });
+export interface ProjectApiKey {
+  id: number;
+  project_id: number;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  created_by_user_id?: number | null;
+  created_at: string;
+}
+
+export interface CreateProjectApiKeyPayload {
+  name: string;
+  scopes: string[];
+  expires_at?: string | null;
+}
+
+export interface CreateProjectApiKeyResponse extends ProjectApiKey {
+  plain_key: string;
+}
+
+export async function listProjectApiKeys(
+  projectId: string | number,
+): Promise<ProjectApiKey[]> {
+  const res = await api.get<ProjectApiKey[]>(`/projects/${projectId}/api-keys`);
+  return res.data;
+}
+
+export async function createProjectApiKey(
+  projectId: string | number,
+  payload: CreateProjectApiKeyPayload,
+): Promise<CreateProjectApiKeyResponse> {
+  const res = await api.post<CreateProjectApiKeyResponse>(
+    `/projects/${projectId}/api-keys`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function revokeProjectApiKey(
+  projectId: string | number,
+  apiKeyId: number,
+): Promise<void> {
+  await api.post(`/projects/${projectId}/api-keys/${apiKeyId}/revoke`);
+}
+
+export async function login(
+  email: string,
+  password: string,
+): Promise<LoginResponse> {
+  const res = await api.post<LoginResponse>("/auth/login", { email, password });
   return res.data;
 }
 
@@ -236,33 +297,47 @@ export async function enableTwoFactor(code: string): Promise<TwoFactorEnableResp
 }
 
 export async function getCurrentUser(): Promise<UserProfile> {
-  const res = await api.get<UserProfile>('/auth/me');
+  const res = await api.get<UserProfile>("/auth/me");
   return res.data;
 }
 
-export async function changePassword(oldPassword: string, newPassword: string): Promise<{ message: string }> {
-  const res = await api.post<{ message: string }>('/auth/change-password', {
+export async function changePassword(
+  oldPassword: string,
+  newPassword: string,
+): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>("/auth/change-password", {
     old_password: oldPassword,
     new_password: newPassword,
   });
   return res.data;
 }
 
-export async function forgotPassword(email: string): Promise<{ message: string }> {
-  const res = await api.post<{ message: string }>('/auth/forgot-password', { email });
+export async function forgotPassword(
+  email: string,
+): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>("/auth/forgot-password", {
+    email,
+  });
   return res.data;
 }
 
-export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-  const res = await api.post<{ message: string }>('/auth/reset-password', {
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>("/auth/reset-password", {
     token,
     new_password: newPassword,
   });
   return res.data;
 }
 
-export async function getProjectPermissions(projectId: string | number): Promise<ProjectPermissions> {
-  const res = await api.get<ProjectPermissions>(`/projects/${projectId}/permissions`);
+export async function getProjectPermissions(
+  projectId: string | number,
+): Promise<ProjectPermissions> {
+  const res = await api.get<ProjectPermissions>(
+    `/projects/${projectId}/permissions`,
+  );
   return res.data;
 }
 
@@ -277,19 +352,21 @@ export interface Project {
   created_at: string;
 }
 
-
 export async function updateProjectSettings(
   projectId: string | number,
   payload: { default_gl?: string; default_hl?: string },
 ): Promise<Project> {
-  const res = await api.patch<Project>(`/projects/${projectId}/settings`, payload);
+  const res = await api.patch<Project>(
+    `/projects/${projectId}/settings`,
+    payload,
+  );
   return res.data;
 }
 
 export interface Crawl {
   id: number;
   project_id: number;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: "pending" | "running" | "completed" | "failed";
   start_time: string;
   end_time?: string;
   total_pages: number;
@@ -313,17 +390,16 @@ export interface Issue {
   crawl_id: number;
   page_id?: number;
   issue_type: string;
-  category: 'technical_seo' | 'accessibility' | 'content';
-  severity: 'critical' | 'warning' | 'info';
-  status: 'open' | 'ignored' | 'resolved';
+  category: "technical_seo" | "accessibility" | "content";
+  severity: "critical" | "warning" | "info";
+  status: "open" | "ignored" | "resolved";
   description?: string;
   fix_template?: string;
 }
 
-
 export interface AnalyticsData {
   provider: string;
-  source: 'live' | 'sample';
+  source: "live" | "sample";
   period: {
     daily_average: number;
     monthly_total: number;
@@ -422,8 +498,6 @@ export interface RankHistoryItem {
   checked_at: string;
 }
 
-
-
 export interface CompetitorDomainItem {
   id: number;
   project_id: number;
@@ -483,8 +557,8 @@ export interface ContentPerformanceItem {
 }
 
 export interface ContentPerformanceResponse {
-  window: '7d' | '30d' | '90d';
-  sort: 'traffic' | 'conversion_rate' | 'decay';
+  window: "7d" | "30d" | "90d";
+  sort: "traffic" | "conversion_rate" | "decay";
   items: ContentPerformanceItem[];
   top_content: ContentPerformanceItem[];
   top_conversion: ContentPerformanceItem[];
@@ -493,12 +567,15 @@ export interface ContentPerformanceResponse {
 
 export async function getProjectContentPerformance(
   projectId: string | number,
-  window: '7d' | '30d' | '90d' = '30d',
-  sort: 'traffic' | 'conversion_rate' | 'decay' = 'traffic',
+  window: "7d" | "30d" | "90d" = "30d",
+  sort: "traffic" | "conversion_rate" | "decay" = "traffic",
 ): Promise<ContentPerformanceResponse> {
-  const res = await api.get<ContentPerformanceResponse>(`/projects/${projectId}/content-performance`, {
-    params: { window, sort },
-  });
+  const res = await api.get<ContentPerformanceResponse>(
+    `/projects/${projectId}/content-performance`,
+    {
+      params: { window, sort },
+    },
+  );
   return res.data;
 }
 
@@ -506,8 +583,10 @@ export interface AiAnalyzeResponse {
   result: string;
 }
 
-export async function analyzeSeoWithAi(content: string): Promise<AiAnalyzeResponse> {
-  const res = await api.post<AiAnalyzeResponse>('/ai/analyze', { content });
+export async function analyzeSeoWithAi(
+  content: string,
+): Promise<AiAnalyzeResponse> {
+  const res = await api.post<AiAnalyzeResponse>("/ai/analyze", { content });
   return res.data;
 }
 
@@ -525,70 +604,109 @@ export interface BacklinkResponse {
   backlinks_total: number;
   ref_domains: number;
   anchor_distribution: Record<string, number>;
-  history: Array<{ date: string; backlinks_total: number; ref_domains: number }>;
+  history: Array<{
+    date: string;
+    backlinks_total: number;
+    ref_domains: number;
+  }>;
   notes: string[];
 }
 
 export interface BacklinkChangesResponse {
   project_id: number;
   provider: string;
-  new_links: Array<{ url: string; source?: string; anchor?: string; date?: string }>;
-  lost_links: Array<{ url: string; source?: string; anchor?: string; date?: string }>;
+  new_links: Array<{
+    url: string;
+    source?: string;
+    anchor?: string;
+    date?: string;
+  }>;
+  lost_links: Array<{
+    url: string;
+    source?: string;
+    anchor?: string;
+    date?: string;
+  }>;
   notes: string[];
 }
 
-export async function getProjectAuthority(projectId: string | number): Promise<AuthorityResponse> {
-  const res = await api.get<AuthorityResponse>(`/projects/${projectId}/authority`);
+export async function getProjectAuthority(
+  projectId: string | number,
+): Promise<AuthorityResponse> {
+  const res = await api.get<AuthorityResponse>(
+    `/projects/${projectId}/authority`,
+  );
   return res.data;
 }
 
-export async function getProjectBacklinks(projectId: string | number): Promise<BacklinkResponse> {
-  const res = await api.get<BacklinkResponse>(`/projects/${projectId}/backlinks`);
+export async function getProjectBacklinks(
+  projectId: string | number,
+): Promise<BacklinkResponse> {
+  const res = await api.get<BacklinkResponse>(
+    `/projects/${projectId}/backlinks`,
+  );
   return res.data;
 }
 
-export async function getProjectBacklinkChanges(projectId: string | number): Promise<BacklinkChangesResponse> {
-  const res = await api.get<BacklinkChangesResponse>(`/projects/${projectId}/backlinks/changes`);
+export async function getProjectBacklinkChanges(
+  projectId: string | number,
+): Promise<BacklinkChangesResponse> {
+  const res = await api.get<BacklinkChangesResponse>(
+    `/projects/${projectId}/backlinks/changes`,
+  );
   return res.data;
 }
-
 
 export async function getProjectCompetitors(
   projectId: string | number,
-  page: number = 1,
-  pageSize: number = 20,
-): Promise<PaginatedResponse<CompetitorDomainItem>> {
-  const res = await api.get<PaginatedResponse<CompetitorDomainItem>>(`/projects/${projectId}/competitors`, {
-    params: { page, page_size: pageSize },
-  });
+): Promise<CompetitorDomainItem[]> {
+  const res = await api.get<CompetitorDomainItem[]>(
+    `/projects/${projectId}/competitors`,
+  );
   return res.data;
 }
 
-export async function addProjectCompetitor(projectId: string | number, domain: string): Promise<CompetitorDomainItem> {
-  const res = await api.post<CompetitorDomainItem>(`/projects/${projectId}/competitors`, { domain });
+export async function addProjectCompetitor(
+  projectId: string | number,
+  domain: string,
+): Promise<CompetitorDomainItem> {
+  const res = await api.post<CompetitorDomainItem>(
+    `/projects/${projectId}/competitors`,
+    { domain },
+  );
   return res.data;
 }
 
-export async function deleteProjectCompetitor(projectId: string | number, competitorId: number): Promise<void> {
+export async function deleteProjectCompetitor(
+  projectId: string | number,
+  competitorId: number,
+): Promise<void> {
   await api.delete(`/projects/${projectId}/competitors/${competitorId}`);
 }
 
-export async function runProjectKeywordCompare(projectId: string | number): Promise<VisibilityHistoryItem[]> {
-  const res = await api.post<VisibilityHistoryItem[]>(`/projects/${projectId}/keywords/check-all-compare`);
+export async function runProjectKeywordCompare(
+  projectId: string | number,
+): Promise<VisibilityHistoryItem[]> {
+  const res = await api.post<VisibilityHistoryItem[]>(
+    `/projects/${projectId}/keywords/check-all-compare`,
+  );
   return res.data;
 }
 
-export async function getProjectVisibility(projectId: string | number): Promise<VisibilityResponse> {
-  const res = await api.get<VisibilityResponse>(`/projects/${projectId}/visibility`);
+export async function getProjectVisibility(
+  projectId: string | number,
+): Promise<VisibilityResponse> {
+  const res = await api.get<VisibilityResponse>(
+    `/projects/${projectId}/visibility`,
+  );
   return res.data;
 }
-
 
 export interface RoiBreakdownResponse {
   project_id: number;
   provider: string;
-  time_range: '30d' | '90d' | '12m';
-  attribution_model: 'linear' | 'first_click' | 'last_click';
+  time_range: "30d" | "90d" | "12m";
+  attribution_model: "linear" | "first_click" | "last_click";
   assisted_conversions: number;
   conversions: number;
   revenue: number;
@@ -609,12 +727,15 @@ export interface RoiBreakdownResponse {
 
 export async function getProjectRoi(
   projectId: string | number,
-  timeRange: '30d' | '90d' | '12m' = '30d',
-  attributionModel: 'linear' | 'first_click' | 'last_click' = 'linear',
+  timeRange: "30d" | "90d" | "12m" = "30d",
+  attributionModel: "linear" | "first_click" | "last_click" = "linear",
 ): Promise<RoiBreakdownResponse> {
-  const res = await api.get<RoiBreakdownResponse>(`/projects/${projectId}/roi`, {
-    params: { time_range: timeRange, attribution_model: attributionModel },
-  });
+  const res = await api.get<RoiBreakdownResponse>(
+    `/projects/${projectId}/roi`,
+    {
+      params: { time_range: timeRange, attribution_model: attributionModel },
+    },
+  );
   return res.data;
 }
 
@@ -656,46 +777,80 @@ export interface ReportDeliveryLog {
   created_at: string;
 }
 
-export async function getReportTemplates(projectId: string | number): Promise<ReportTemplate[]> {
-  const res = await api.get<ReportTemplate[]>(`/projects/${projectId}/reports/templates`);
+export async function getReportTemplates(
+  projectId: string | number,
+): Promise<ReportTemplate[]> {
+  const res = await api.get<ReportTemplate[]>(
+    `/projects/${projectId}/reports/templates`,
+  );
   return res.data;
 }
 
 export async function createReportTemplate(
   projectId: string | number,
-  payload: Pick<ReportTemplate, 'name' | 'indicators' | 'brand_styles' | 'time_range' | 'locale'>,
+  payload: Pick<
+    ReportTemplate,
+    "name" | "indicators" | "brand_styles" | "time_range" | "locale"
+  >,
 ): Promise<ReportTemplate> {
-  const res = await api.post<ReportTemplate>(`/projects/${projectId}/reports/templates`, payload);
+  const res = await api.post<ReportTemplate>(
+    `/projects/${projectId}/reports/templates`,
+    payload,
+  );
   return res.data;
 }
 
 export async function exportProjectReport(
   projectId: string | number,
-  payload: { template_id: number; format: 'csv' | 'pdf'; locale?: string },
+  payload: { template_id: number; format: "csv" | "pdf"; locale?: string },
 ): Promise<Blob> {
-  const res = await api.post(`/projects/${projectId}/reports/export`, payload, { responseType: 'blob' });
+  const res = await api.post(`/projects/${projectId}/reports/export`, payload, {
+    responseType: "blob",
+  });
   return res.data;
 }
 
-export async function getReportSchedules(projectId: string | number): Promise<ReportSchedule[]> {
-  const res = await api.get<ReportSchedule[]>(`/projects/${projectId}/reports/schedules`);
+export async function getReportSchedules(
+  projectId: string | number,
+): Promise<ReportSchedule[]> {
+  const res = await api.get<ReportSchedule[]>(
+    `/projects/${projectId}/reports/schedules`,
+  );
   return res.data;
 }
 
 export async function createReportSchedule(
   projectId: string | number,
-  payload: Pick<ReportSchedule, 'template_id' | 'cron_expression' | 'timezone' | 'recipient_email' | 'active' | 'retry_limit'>,
+  payload: Pick<
+    ReportSchedule,
+    | "template_id"
+    | "cron_expression"
+    | "timezone"
+    | "recipient_email"
+    | "active"
+    | "retry_limit"
+  >,
 ): Promise<ReportSchedule> {
-  const res = await api.post<ReportSchedule>(`/projects/${projectId}/reports/schedules`, payload);
+  const res = await api.post<ReportSchedule>(
+    `/projects/${projectId}/reports/schedules`,
+    payload,
+  );
   return res.data;
 }
 
-export async function deleteReportSchedule(projectId: string | number, scheduleId: number): Promise<void> {
+export async function deleteReportSchedule(
+  projectId: string | number,
+  scheduleId: number,
+): Promise<void> {
   await api.delete(`/projects/${projectId}/reports/schedules/${scheduleId}`);
 }
 
-export async function getReportLogs(projectId: string | number): Promise<ReportDeliveryLog[]> {
-  const res = await api.get<ReportDeliveryLog[]>(`/projects/${projectId}/reports/logs`);
+export async function getReportLogs(
+  projectId: string | number,
+): Promise<ReportDeliveryLog[]> {
+  const res = await api.get<ReportDeliveryLog[]>(
+    `/projects/${projectId}/reports/logs`,
+  );
   return res.data;
 }
 
@@ -717,21 +872,26 @@ export interface WebhookConfigPayload {
 }
 
 export async function listWebhookEvents(): Promise<string[]> {
-  const res = await api.get<string[]>('/webhooks/events');
+  const res = await api.get<string[]>("/webhooks/events");
   return res.data;
 }
 
 export async function listWebhookConfigs(): Promise<WebhookConfig[]> {
-  const res = await api.get<WebhookConfig[]>('/webhooks');
+  const res = await api.get<WebhookConfig[]>("/webhooks");
   return res.data;
 }
 
-export async function createWebhookConfig(payload: WebhookConfigPayload): Promise<WebhookConfig> {
-  const res = await api.post<WebhookConfig>('/webhooks', payload);
+export async function createWebhookConfig(
+  payload: WebhookConfigPayload,
+): Promise<WebhookConfig> {
+  const res = await api.post<WebhookConfig>("/webhooks", payload);
   return res.data;
 }
 
-export async function updateWebhookConfig(id: number, payload: Partial<WebhookConfigPayload>): Promise<WebhookConfig> {
+export async function updateWebhookConfig(
+  id: number,
+  payload: Partial<WebhookConfigPayload>,
+): Promise<WebhookConfig> {
   const res = await api.put<WebhookConfig>(`/webhooks/${id}`, payload);
   return res.data;
 }

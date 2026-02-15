@@ -23,7 +23,7 @@ import { useTranslation } from 'react-i18next';
 function Protected({ children }: { children: ReactElement }) {
   const { isAuthenticated, loading } = useAuth();
   const { t } = useTranslation();
-  if (loading) return <div className="p-8">{t('app.loading')}</div>;
+  if (loading) return <div className="p-8">{t("app.loading")}</div>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return children;
 }
@@ -36,10 +36,16 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={withRouteBoundary('login-route', <Login />)} />
+        <Route
+          path="/login"
+          element={withRouteBoundary("login-route", <Login />)}
+        />
         <Route
           path="/forgot-password"
-          element={withRouteBoundary('forgot-password-route', <ForgotPassword />)}
+          element={withRouteBoundary(
+            "forgot-password-route",
+            <ForgotPassword />,
+          )}
         />
         <Route
           path="/two-factor/verify"
@@ -47,7 +53,7 @@ function App() {
         />
         <Route
           path="/reset-password"
-          element={withRouteBoundary('reset-password-route', <ResetPassword />)}
+          element={withRouteBoundary("reset-password-route", <ResetPassword />)}
         />
         <Route
           path="/"
@@ -63,6 +69,7 @@ function App() {
           <Route path="projects/:id/issues" element={<ProjectIssues />} />
           <Route path="projects/:id/keywords" element={<ProjectKeywords />} />
           <Route path="projects/:id/reports" element={<ProjectReports />} />
+          <Route path="projects/:id/api-keys" element={<ProjectApiKeys />} />
           <Route path="ai" element={<AiAssistant />} />
           <Route path="users" element={<Users />} />
           <Route path="change-password" element={<ChangePassword />} />

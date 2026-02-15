@@ -40,6 +40,8 @@ class AuditActionType(str, Enum):
     BACKUP_CREATE = "backup_create"
     BACKUP_RESTORE = "backup_restore"
     SETTINGS_UPDATE = "settings_update"
+    API_KEY_CREATE = "api_key_create"
+    API_KEY_REVOKE = "api_key_revoke"
 
 
 class SystemSettings(SQLModel, table=True):
@@ -377,3 +379,20 @@ class WebhookConfig(SQLModel, table=True):
     enabled: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ApiKey(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_apikey_project_active", "project_id", "revoked_at", "expires_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    name: str
+    key_prefix: str = Field(index=True)
+    key_hash: str = Field(index=True, unique=True)
+    scopes_json: str = "[]"
+    expires_at: Optional[datetime] = Field(default=None, index=True)
+    revoked_at: Optional[datetime] = Field(default=None, index=True)
+    created_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)

@@ -15,6 +15,13 @@ from app.crawler.parser import Parser
 from app.crawler.analyzer import Analyzer
 from app.crawler.events import crawl_event_broker
 from app.crawler.performance_adapter import performance_adapter
+from app.metrics import (
+    CRAWL_ERRORS_TOTAL,
+    CRAWL_ISSUES_FOUND_TOTAL,
+    CRAWL_PAGES_PROCESSED_TOTAL,
+    CRAWL_RUNS_TOTAL,
+    update_crawl_status,
+)
 from app.webhook_service import (
     WEBHOOK_EVENT_CRAWL_COMPLETED,
     WEBHOOK_EVENT_CRITICAL_ISSUE_FOUND,
@@ -93,7 +100,9 @@ class CrawlerService:
                 logger.error(f"Crawl {crawl_id} not found")
                 return
 
+            previous_status = crawl.status.value if crawl.status else None
             crawl.status = CrawlStatus.RUNNING
+            update_crawl_status(previous_status, crawl.status.value)
             crawl.start_time = datetime.utcnow()
             session.add(crawl)
             session.commit()
@@ -163,6 +172,7 @@ class CrawlerService:
                     if not response:
                         logger.warning(f"Failed to fetch {url}")
                         error_count += 1
+                        CRAWL_ERRORS_TOTAL.inc()
                         crawl_event_broker.publish(crawl.id, {
                             "type": "crawl_error",
                             "crawl_id": crawl.id,
@@ -280,6 +290,7 @@ class CrawlerService:
                         )
                         session.add(issue)
                         issues_found += 1
+                        CRAWL_ISSUES_FOUND_TOTAL.inc()
 
                         if issue_data['severity'] == 'critical' and not critical_issue_alert_sent:
                             webhook_service.dispatch_event(
@@ -296,6 +307,7 @@ class CrawlerService:
                             critical_issue_alert_sent = True
 
                     pages_processed += 1
+                    CRAWL_PAGES_PROCESSED_TOTAL.inc()
                     session.commit()
                     crawl_event_broker.publish(crawl.id, {
                         "type": "crawl_progress",
@@ -308,7 +320,9 @@ class CrawlerService:
                         "error_count": error_count,
                     })
 
+                update_crawl_status(crawl.status.value, CrawlStatus.COMPLETED.value)
                 crawl.status = CrawlStatus.COMPLETED
+                CRAWL_RUNS_TOTAL.labels(status="completed").inc()
                 crawl_event_broker.publish(crawl.id, {
                     "type": "crawl_completed",
                     "crawl_id": crawl.id,
@@ -321,8 +335,11 @@ class CrawlerService:
 
             except Exception as e:
                 logger.exception(f"Crawl failed: {e}")
+                update_crawl_status(crawl.status.value, CrawlStatus.FAILED.value)
                 crawl.status = CrawlStatus.FAILED
+                CRAWL_RUNS_TOTAL.labels(status="failed").inc()
                 error_count += 1
+                CRAWL_ERRORS_TOTAL.inc()
                 crawl_event_broker.publish(crawl.id, {
                     "type": "crawl_failed",
                     "crawl_id": crawl.id,
