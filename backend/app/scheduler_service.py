@@ -79,6 +79,13 @@ class SchedulerService:
                     )
                     session.add(log)
                     session.commit()
+                    report_service.dispatch_report_generated(
+                        session,
+                        project_id=schedule.project_id,
+                        template_id=template.id,
+                        export_format="csv",
+                        trigger="scheduled",
+                    )
                     return
                 except Exception as exc:  # noqa: BLE001
                     retries += 1

@@ -13,6 +13,7 @@ import Users from './pages/Users';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ChangePassword from './pages/ChangePassword';
+import SystemSettings from './pages/SystemSettings';
 import { useAuth } from './auth';
 import { useTranslation } from 'react-i18next';
 
@@ -48,6 +49,7 @@ function App() {
           <Route path="ai" element={<AiAssistant />} />
           <Route path="users" element={<Users />} />
           <Route path="change-password" element={<ChangePassword />} />
+          <Route path="settings" element={<SystemSettings />} />
         </Route>
       </Routes>
     </BrowserRouter>

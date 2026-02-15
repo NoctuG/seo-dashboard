@@ -314,3 +314,34 @@ class ReportDeliveryLogRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class WebhookConfigBase(BaseModel):
+    url: str
+    secret: str
+    subscribed_events: List[str] = Field(default_factory=list)
+    enabled: bool = True
+
+
+class WebhookConfigCreate(WebhookConfigBase):
+    pass
+
+
+class WebhookConfigUpdate(BaseModel):
+    url: Optional[str] = None
+    secret: Optional[str] = None
+    subscribed_events: Optional[List[str]] = None
+    enabled: Optional[bool] = None
+
+
+class WebhookConfigRead(BaseModel):
+    id: int
+    url: str
+    secret: str
+    subscribed_events: List[str]
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

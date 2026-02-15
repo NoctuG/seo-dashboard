@@ -11,6 +11,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 from sqlmodel import Session, select
 
 from app.models import Project, ReportTemplate, ReportDeliveryLog
+from app.webhook_service import WEBHOOK_EVENT_REPORT_GENERATED, webhook_service
 
 
 class ReportService:
@@ -129,6 +130,20 @@ class ReportService:
             f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_start}\n%%EOF".encode("latin-1")
         )
         return buffer.getvalue()
+
+
+    def dispatch_report_generated(self, session: Session, project_id: int, template_id: int, export_format: str, trigger: str) -> None:
+        webhook_service.dispatch_event(
+            session,
+            WEBHOOK_EVENT_REPORT_GENERATED,
+            {
+                "project_id": project_id,
+                "template_id": template_id,
+                "format": export_format.lower(),
+                "trigger": trigger,
+                "generated_at": datetime.utcnow().isoformat(),
+            },
+        )
 
     def render(self, payload: Dict[str, Any], export_format: str) -> Tuple[bytes, str]:
         fmt = export_format.lower()

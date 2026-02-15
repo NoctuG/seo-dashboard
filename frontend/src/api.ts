@@ -546,3 +546,44 @@ export async function getReportLogs(projectId: string | number): Promise<ReportD
   const res = await api.get<ReportDeliveryLog[]>(`/projects/${projectId}/reports/logs`);
   return res.data;
 }
+
+export interface WebhookConfig {
+  id: number;
+  url: string;
+  secret: string;
+  subscribed_events: string[];
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookConfigPayload {
+  url: string;
+  secret: string;
+  subscribed_events: string[];
+  enabled: boolean;
+}
+
+export async function listWebhookEvents(): Promise<string[]> {
+  const res = await api.get<string[]>('/webhooks/events');
+  return res.data;
+}
+
+export async function listWebhookConfigs(): Promise<WebhookConfig[]> {
+  const res = await api.get<WebhookConfig[]>('/webhooks');
+  return res.data;
+}
+
+export async function createWebhookConfig(payload: WebhookConfigPayload): Promise<WebhookConfig> {
+  const res = await api.post<WebhookConfig>('/webhooks', payload);
+  return res.data;
+}
+
+export async function updateWebhookConfig(id: number, payload: Partial<WebhookConfigPayload>): Promise<WebhookConfig> {
+  const res = await api.put<WebhookConfig>(`/webhooks/${id}`, payload);
+  return res.data;
+}
+
+export async function deleteWebhookConfig(id: number): Promise<void> {
+  await api.delete(`/webhooks/${id}`);
+}
