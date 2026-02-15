@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Dict, List, Protocol
+from typing import Any, Dict, List, Protocol
 
 from app.config import settings
 
@@ -13,11 +13,14 @@ class BacklinkMetrics:
     domain_authority: float
     backlinks_total: int
     ref_domains: int
+    ahrefs_rank: int | None
+    top_backlinks: List[Dict[str, str]]
     anchor_distribution: Dict[str, int]
     new_links: List[Dict[str, str]]
     lost_links: List[Dict[str, str]]
     notes: List[str]
     provider: str
+    success: bool = True
 
 
 class BacklinkProviderClient(Protocol):
@@ -29,6 +32,21 @@ class BacklinkProviderClient(Protocol):
 
 class _BaseBacklinkProvider:
     provider_name = "sample"
+
+    def _normalize_payload(self, payload: Dict[str, Any]) -> BacklinkMetrics:
+        return BacklinkMetrics(
+            domain_authority=float(payload.get("domain_authority") or 0),
+            backlinks_total=int(payload.get("backlinks") or payload.get("backlinks_total") or 0),
+            ref_domains=int(payload.get("referring_domains") or payload.get("ref_domains") or 0),
+            ahrefs_rank=payload.get("ahrefs_rank"),
+            top_backlinks=list(payload.get("top_backlinks") or []),
+            anchor_distribution=dict(payload.get("anchor_distribution") or {}),
+            new_links=list(payload.get("new_links") or []),
+            lost_links=list(payload.get("lost_links") or []),
+            notes=list(payload.get("notes") or []),
+            provider=str(payload.get("provider") or self.provider_name),
+            success=bool(payload.get("success", True)),
+        )
 
     def _build_sample(self, domain: str, authority_seed: int) -> BacklinkMetrics:
         seed = sum(ord(c) for c in domain) + authority_seed
@@ -62,16 +80,19 @@ class _BaseBacklinkProvider:
             for i in range(1, 4)
         ]
 
-        return BacklinkMetrics(
-            domain_authority=authority,
-            backlinks_total=backlinks_total,
-            ref_domains=ref_domains,
-            anchor_distribution=anchors,
-            new_links=new_links,
-            lost_links=lost_links,
-            notes=[f"Using {self.provider_name} provider sample response."],
-            provider=self.provider_name,
-        )
+        raw_payload = {
+            "domain_authority": authority,
+            "backlinks": backlinks_total,
+            "referring_domains": ref_domains,
+            "ahrefs_rank": max(1, 1_000_000 - ref_domains * 100),
+            "top_backlinks": new_links[:3],
+            "anchor_distribution": anchors,
+            "new_links": new_links,
+            "lost_links": lost_links,
+            "notes": [f"Using {self.provider_name} provider sample response."],
+            "provider": self.provider_name,
+        }
+        return self._normalize_payload(raw_payload)
 
 
 class MozClient(_BaseBacklinkProvider):
@@ -122,11 +143,14 @@ class BacklinkService:
             domain_authority=0,
             backlinks_total=0,
             ref_domains=0,
+            ahrefs_rank=None,
+            top_backlinks=[],
             anchor_distribution={},
             new_links=[],
             lost_links=[],
-            notes=[reason, "Fallback to empty backlink data to keep dashboard stable."],
+            notes=[reason, "Keeping previous successful snapshot to avoid dashboard jitter."],
             provider=provider,
+            success=False,
         )
 
     def get_metrics(self, domain: str) -> BacklinkMetrics:

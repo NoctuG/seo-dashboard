@@ -152,6 +152,7 @@ class Settings:
     MOZ_API_KEY: str = os.getenv("MOZ_API_KEY", "")
     AHREFS_API_KEY: str = os.getenv("AHREFS_API_KEY", "")
     MAJESTIC_API_KEY: str = os.getenv("MAJESTIC_API_KEY", "")
+    BACKLINK_CACHE_TTL_SECONDS: int = int(os.getenv("BACKLINK_CACHE_TTL_SECONDS", "21600"))
 
     # Keyword research providers
     KEYWORD_RESEARCH_PROVIDER: str = os.getenv("KEYWORD_RESEARCH_PROVIDER", "sample")  # sample, dataforseo, semrush

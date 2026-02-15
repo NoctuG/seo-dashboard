@@ -6,6 +6,7 @@ import {
   getProjectAuthority,
   getProjectBacklinks,
   getProjectBacklinkChanges,
+  getProjectBacklinkStatus,
   getProjectContentPerformance,
   getProjectRoi,
 } from "../api";
@@ -16,6 +17,7 @@ import type {
   AuthorityResponse,
   BacklinkResponse,
   BacklinkChangesResponse,
+  BacklinkStatusResponse,
   RoiBreakdownResponse,
 } from "../api";
 import {
@@ -63,6 +65,7 @@ export default function ProjectDashboard() {
   const [authority, setAuthority] = useState<AuthorityResponse | null>(null);
   const [backlinks, setBacklinks] = useState<BacklinkResponse | null>(null);
   const [changes, setChanges] = useState<BacklinkChangesResponse | null>(null);
+  const [backlinkStatus, setBacklinkStatus] = useState<BacklinkStatusResponse | null>(null);
   const [brandWindow, setBrandWindow] = useState<"7d" | "30d" | "90d">("30d");
   const [roiRange, setRoiRange] = useState<"30d" | "90d" | "12m">("30d");
   const [attributionModel, setAttributionModel] = useState<
@@ -89,6 +92,13 @@ export default function ProjectDashboard() {
     if (id) fetchRoiData();
   }, [id, roiRange, attributionModel]);
 
+  useEffect(() => {
+    if (!id) return;
+    fetchBacklinkStatus();
+    const timer = globalThis.setInterval(fetchBacklinkStatus, 10000);
+    return () => globalThis.clearInterval(timer);
+  }, [id]);
+
   const fetchDashboard = async () => {
     try {
       const res = await api.get(`/projects/${id}/dashboard`);
@@ -103,14 +113,26 @@ export default function ProjectDashboard() {
   const fetchBacklinkData = async () => {
     if (!id) return;
     try {
-      const [authorityData, backlinkData, changesData] = await Promise.all([
+      const [authorityData, backlinkData, changesData, statusData] = await Promise.all([
         getProjectAuthority(id),
         getProjectBacklinks(id),
         getProjectBacklinkChanges(id),
+        getProjectBacklinkStatus(id),
       ]);
       setAuthority(authorityData);
       setBacklinks(backlinkData);
       setChanges(changesData);
+      setBacklinkStatus(statusData);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchBacklinkStatus = async () => {
+    if (!id) return;
+    try {
+      const status = await getProjectBacklinkStatus(id);
+      setBacklinkStatus(status);
     } catch (error) {
       console.error(error);
     }
@@ -410,28 +432,30 @@ export default function ProjectDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded shadow">
           <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2">
             <Shield size={16} />
             Domain Authority
           </h3>
-          <p className="text-3xl font-bold">
-            {authority?.domain_authority ?? 0}
-          </p>
+          <p className="text-3xl font-bold">{authority?.domain_authority ?? 0}</p>
+          <p className="text-xs text-slate-500 mt-2">状态: {backlinkStatus?.fetch_status ?? backlinks?.fetch_status ?? "pending"}</p>
         </div>
         <div className="bg-white p-6 rounded shadow">
           <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2">
             <LinkIcon size={16} />
             Backlinks
           </h3>
-          <p className="text-3xl font-bold">
-            {backlinks?.backlinks_total ?? 0}
-          </p>
+          <p className="text-3xl font-bold">{backlinks?.backlinks_total ?? 0}</p>
         </div>
         <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
           <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Ref Domains</h3>
           <p className="text-3xl font-bold">{backlinks?.ref_domains ?? 0}</p>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
+          <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Ahrefs Rank</h3>
+          <p className="text-3xl font-bold">{backlinks?.ahrefs_rank ?? authority?.ahrefs_rank ?? "—"}</p>
+          <p className="text-xs text-slate-500 mt-2">上次刷新: {backlinkStatus?.last_fetched_at ?? backlinks?.last_fetched_at ?? "未刷新"}</p>
         </div>
       </div>
 
@@ -477,6 +501,19 @@ export default function ProjectDashboard() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8">
+        <h3 className="font-semibold mb-3">重要外链 Top N</h3>
+        <ul className="space-y-2 text-sm">
+          {(backlinks?.top_backlinks ?? []).length === 0 && <li className="text-slate-500">暂无缓存数据</li>}
+          {(backlinks?.top_backlinks ?? []).map((item, idx) => (
+            <li key={`top-link-${idx}-${item.url}`} className="border-b pb-2">
+              <p className="font-medium break-all">{item.url}</p>
+              <p className="text-xs text-slate-500">{item.source ?? "—"} · {item.anchor ?? "—"} · {item.date ?? "—"}</p>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8 overflow-x-auto">

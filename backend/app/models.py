@@ -319,6 +319,8 @@ class DomainMetricSnapshot(SQLModel, table=True):
 class BacklinkSnapshot(SQLModel, table=True):
     __table_args__ = (
         Index("ix_backlinksnapshot_project_date", "project_id", "date"),
+        Index("ix_backlinksnapshot_fetch_status", "fetch_status"),
+        Index("ix_backlinksnapshot_project_last_fetched", "project_id", "last_fetched_at"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -330,6 +332,10 @@ class BacklinkSnapshot(SQLModel, table=True):
     new_links_json: str = "[]"
     lost_links_json: str = "[]"
     notes_json: str = "[]"
+    top_backlinks_json: str = "[]"
+    ahrefs_rank: Optional[int] = None
+    last_fetched_at: Optional[datetime] = None
+    fetch_status: str = "pending"
     provider: str = "sample"
 
 

@@ -18,6 +18,7 @@ from app.schemas import (
     AuthorityPoint,
     BacklinkSummaryResponse,
     BacklinkChangesResponse,
+    BacklinkStatusResponse,
     VisibilityResponse,
     RoiFormulaBreakdownResponse,
     RoiCostBreakdown,
@@ -419,49 +420,127 @@ def get_project_visibility(project_id: int, session: Session = Depends(get_sessi
     return visibility_service.get_project_visibility(session=session, project_id=project_id)
 
 
-def _sync_backlink_snapshot(session: Session, project_id: int, domain: str):
-    metrics = backlink_service.get_metrics(domain)
+BACKLINK_CACHE_TTL_SECONDS = max(60, getattr(settings, "BACKLINK_CACHE_TTL_SECONDS", 6 * 3600))
+
+
+def _json_loads(payload: str, default):
+    try:
+        value = json.loads(payload or "")
+        return value if value is not None else default
+    except json.JSONDecodeError:
+        return default
+
+
+def _is_snapshot_fresh(snapshot: Optional[BacklinkSnapshot]) -> bool:
+    if not snapshot or snapshot.date != date.today() or not snapshot.last_fetched_at:
+        return False
+    age_seconds = (datetime.utcnow() - snapshot.last_fetched_at).total_seconds()
+    return age_seconds <= BACKLINK_CACHE_TTL_SECONDS and snapshot.fetch_status == "success"
+
+
+def _queue_backlink_refresh(project_id: int, domain: str) -> None:
+    from app.db import engine
+
+    with Session(engine) as worker_session:
+        _sync_backlink_snapshot(worker_session, project_id=project_id, domain=domain, force_refresh=True)
+
+
+def _sync_backlink_snapshot(session: Session, project_id: int, domain: str, force_refresh: bool = False):
     today = date.today()
-
-    dm = session.exec(
-        select(DomainMetricSnapshot).where(
-            DomainMetricSnapshot.project_id == project_id,
-            DomainMetricSnapshot.date == today,
-        )
-    ).first()
-    if not dm:
-        dm = DomainMetricSnapshot(project_id=project_id, date=today)
-    dm.domain_authority = metrics.domain_authority
-    session.add(dm)
-
     bs = session.exec(
         select(BacklinkSnapshot).where(
             BacklinkSnapshot.project_id == project_id,
             BacklinkSnapshot.date == today,
         )
     ).first()
+
+    if bs and _is_snapshot_fresh(bs) and not force_refresh:
+        return bs
+
     if not bs:
-        bs = BacklinkSnapshot(project_id=project_id, date=today)
+        bs = BacklinkSnapshot(project_id=project_id, date=today, fetch_status="pending")
 
-    bs.backlinks_total = metrics.backlinks_total
-    bs.ref_domains = metrics.ref_domains
-    bs.anchor_distribution_json = json.dumps(metrics.anchor_distribution, ensure_ascii=False)
-    bs.new_links_json = json.dumps(metrics.new_links, ensure_ascii=False)
-    bs.lost_links_json = json.dumps(metrics.lost_links, ensure_ascii=False)
-    bs.notes_json = json.dumps(metrics.notes, ensure_ascii=False)
+    metrics = backlink_service.get_metrics(domain)
+    now = datetime.utcnow()
     bs.provider = metrics.provider
-    session.add(bs)
+    bs.last_fetched_at = now
 
+    if metrics.success:
+        dm = session.exec(
+            select(DomainMetricSnapshot).where(
+                DomainMetricSnapshot.project_id == project_id,
+                DomainMetricSnapshot.date == today,
+            )
+        ).first()
+        if not dm:
+            dm = DomainMetricSnapshot(project_id=project_id, date=today)
+        dm.domain_authority = metrics.domain_authority
+        session.add(dm)
+
+        bs.backlinks_total = metrics.backlinks_total
+        bs.ref_domains = metrics.ref_domains
+        bs.ahrefs_rank = metrics.ahrefs_rank
+        bs.anchor_distribution_json = json.dumps(metrics.anchor_distribution, ensure_ascii=False)
+        bs.new_links_json = json.dumps(metrics.new_links, ensure_ascii=False)
+        bs.lost_links_json = json.dumps(metrics.lost_links, ensure_ascii=False)
+        bs.top_backlinks_json = json.dumps(metrics.top_backlinks, ensure_ascii=False)
+        bs.notes_json = json.dumps(metrics.notes, ensure_ascii=False)
+        bs.fetch_status = "success"
+    else:
+        existing_notes = _json_loads(bs.notes_json, []) if bs.id else []
+        bs.notes_json = json.dumps([*existing_notes, *metrics.notes][-10:], ensure_ascii=False)
+        bs.fetch_status = "failed"
+
+    session.add(bs)
     session.commit()
+    session.refresh(bs)
+    return bs
+
+
+def _ensure_backlink_snapshot(
+    session: Session,
+    project_id: int,
+    domain: str,
+    background_tasks: Optional[BackgroundTasks],
+) -> Optional[BacklinkSnapshot]:
+    latest = session.exec(
+        select(BacklinkSnapshot)
+        .where(BacklinkSnapshot.project_id == project_id)
+        .order_by(BacklinkSnapshot.date.desc())
+    ).first()
+
+    if _is_snapshot_fresh(latest):
+        return latest
+
+    if latest and latest.fetch_status == "pending":
+        return latest
+
+    today_row = session.exec(
+        select(BacklinkSnapshot).where(
+            BacklinkSnapshot.project_id == project_id,
+            BacklinkSnapshot.date == date.today(),
+        )
+    ).first()
+    if not today_row:
+        today_row = BacklinkSnapshot(project_id=project_id, date=date.today(), fetch_status="pending")
+    else:
+        today_row.fetch_status = "pending"
+    session.add(today_row)
+    session.commit()
+
+    if background_tasks is not None:
+        background_tasks.add_task(_queue_backlink_refresh, project_id, domain)
+
+    return latest or today_row
 
 
 @router.get("/{project_id}/authority", response_model=AuthorityResponse)
-def get_project_authority(project_id: int, session: Session = Depends(get_session)):
+def get_project_authority(project_id: int, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
-    _sync_backlink_snapshot(session, project_id, project.domain)
+    backlink_row = _ensure_backlink_snapshot(session, project_id, project.domain, background_tasks)
 
     metrics_history = session.exec(
         select(DomainMetricSnapshot)
@@ -469,12 +548,6 @@ def get_project_authority(project_id: int, session: Session = Depends(get_sessio
         .order_by(DomainMetricSnapshot.date.asc())
         .limit(90)
     ).all()
-
-    backlink_row = session.exec(
-        select(BacklinkSnapshot)
-        .where(BacklinkSnapshot.project_id == project_id)
-        .order_by(BacklinkSnapshot.date.desc())
-    ).first()
 
     history = [
         AuthorityPoint(date=str(item.date), domain_authority=item.domain_authority)
@@ -485,18 +558,21 @@ def get_project_authority(project_id: int, session: Session = Depends(get_sessio
         project_id=project_id,
         provider=backlink_row.provider if backlink_row else "sample",
         domain_authority=history[-1].domain_authority if history else 0,
+        ahrefs_rank=backlink_row.ahrefs_rank if backlink_row else None,
+        last_fetched_at=backlink_row.last_fetched_at if backlink_row else None,
+        fetch_status=backlink_row.fetch_status if backlink_row else "pending",
         history=history,
-        notes=json.loads(backlink_row.notes_json) if backlink_row else [],
+        notes=_json_loads(backlink_row.notes_json, []) if backlink_row else [],
     )
 
 
 @router.get("/{project_id}/backlinks", response_model=BacklinkSummaryResponse)
-def get_project_backlinks(project_id: int, session: Session = Depends(get_session)):
+def get_project_backlinks(project_id: int, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
-    _sync_backlink_snapshot(session, project_id, project.domain)
+    _ensure_backlink_snapshot(session, project_id, project.domain, background_tasks)
 
     latest = session.exec(
         select(BacklinkSnapshot)
@@ -516,7 +592,11 @@ def get_project_backlinks(project_id: int, session: Session = Depends(get_sessio
         provider=latest.provider if latest else "sample",
         backlinks_total=latest.backlinks_total if latest else 0,
         ref_domains=latest.ref_domains if latest else 0,
-        anchor_distribution=json.loads(latest.anchor_distribution_json) if latest else {},
+        ahrefs_rank=latest.ahrefs_rank if latest else None,
+        top_backlinks=_json_loads(latest.top_backlinks_json, []) if latest else [],
+        last_fetched_at=latest.last_fetched_at if latest else None,
+        fetch_status=latest.fetch_status if latest else "pending",
+        anchor_distribution=_json_loads(latest.anchor_distribution_json, {}) if latest else {},
         history=[
             {
                 "date": str(row.date),
@@ -525,17 +605,33 @@ def get_project_backlinks(project_id: int, session: Session = Depends(get_sessio
             }
             for row in history_rows
         ],
-        notes=json.loads(latest.notes_json) if latest else [],
+        notes=_json_loads(latest.notes_json, []) if latest else [],
     )
 
 
-@router.get("/{project_id}/backlinks/changes", response_model=BacklinkChangesResponse)
-def get_project_backlink_changes(project_id: int, session: Session = Depends(get_session)):
+@router.get("/{project_id}/backlinks/status", response_model=BacklinkStatusResponse)
+def get_project_backlink_status(project_id: int, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
-    _sync_backlink_snapshot(session, project_id, project.domain)
+    latest = _ensure_backlink_snapshot(session, project_id, project.domain, background_tasks)
+
+    return {
+        "project_id": project_id,
+        "provider": latest.provider if latest else "sample",
+        "last_fetched_at": latest.last_fetched_at if latest else None,
+        "fetch_status": latest.fetch_status if latest else "pending",
+    }
+
+
+@router.get("/{project_id}/backlinks/changes", response_model=BacklinkChangesResponse)
+def get_project_backlink_changes(project_id: int, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    _ensure_backlink_snapshot(session, project_id, project.domain, background_tasks)
 
     latest = session.exec(
         select(BacklinkSnapshot)
@@ -549,9 +645,9 @@ def get_project_backlink_changes(project_id: int, session: Session = Depends(get
     return BacklinkChangesResponse(
         project_id=project_id,
         provider=latest.provider,
-        new_links=json.loads(latest.new_links_json),
-        lost_links=json.loads(latest.lost_links_json),
-        notes=json.loads(latest.notes_json),
+        new_links=_json_loads(latest.new_links_json, []),
+        lost_links=_json_loads(latest.lost_links_json, []),
+        notes=_json_loads(latest.notes_json, []),
     )
 
 

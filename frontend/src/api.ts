@@ -647,6 +647,9 @@ export interface AuthorityResponse {
   project_id: number;
   provider: string;
   domain_authority: number;
+  ahrefs_rank?: number | null;
+  last_fetched_at?: string | null;
+  fetch_status?: string;
   history: Array<{ date: string; domain_authority: number }>;
   notes: string[];
 }
@@ -656,6 +659,10 @@ export interface BacklinkResponse {
   provider: string;
   backlinks_total: number;
   ref_domains: number;
+  ahrefs_rank?: number | null;
+  top_backlinks?: Array<{ url: string; source?: string; anchor?: string; date?: string }>;
+  last_fetched_at?: string | null;
+  fetch_status?: string;
   anchor_distribution: Record<string, number>;
   history: Array<{
     date: string;
@@ -663,6 +670,13 @@ export interface BacklinkResponse {
     ref_domains: number;
   }>;
   notes: string[];
+}
+
+export interface BacklinkStatusResponse {
+  project_id: number;
+  provider: string;
+  last_fetched_at?: string | null;
+  fetch_status: string;
 }
 
 export interface BacklinkChangesResponse {
@@ -697,6 +711,15 @@ export async function getProjectBacklinks(
 ): Promise<BacklinkResponse> {
   const res = await api.get<BacklinkResponse>(
     `/projects/${projectId}/backlinks`,
+  );
+  return res.data;
+}
+
+export async function getProjectBacklinkStatus(
+  projectId: string | number,
+): Promise<BacklinkStatusResponse> {
+  const res = await api.get<BacklinkStatusResponse>(
+    `/projects/${projectId}/backlinks/status`,
   );
   return res.data;
 }
