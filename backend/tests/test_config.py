@@ -10,10 +10,10 @@ def test_parse_allowed_origins_returns_safe_defaults_for_empty_value():
     origins = Settings._parse_allowed_origins("")
 
     assert origins == [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
+        "http://localhost:32000",
+        "http://127.0.0.1:32000",
+        "http://localhost:32001",
+        "http://127.0.0.1:32001",
     ]
 
 

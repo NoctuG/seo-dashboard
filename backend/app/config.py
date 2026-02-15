@@ -80,7 +80,7 @@ class Settings:
 
     # password reset
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES", "60"))
-    PASSWORD_RESET_URL: str = os.getenv("PASSWORD_RESET_URL", "http://localhost:5173/reset-password")
+    PASSWORD_RESET_URL: str = os.getenv("PASSWORD_RESET_URL", "http://localhost:32000/reset-password")
 
     # SMTP
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")
@@ -119,10 +119,10 @@ class Settings:
     @staticmethod
     def _parse_allowed_origins(raw_value: str) -> list[str]:
         default_origins = [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
+            "http://localhost:32000",
+            "http://127.0.0.1:32000",
+            "http://localhost:32001",
+            "http://127.0.0.1:32001",
         ]
 
         value = (raw_value or "").strip()
@@ -250,10 +250,10 @@ def validate_settings(current_settings: Settings | SimpleNamespace = settings) -
         errors.append("SMTP_HOST and SMTP_FROM must be configured together.")
 
     if is_production and (getattr(current_settings, "ALLOWED_ORIGINS", None) or []) == [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
+        "http://localhost:32000",
+        "http://127.0.0.1:32000",
+        "http://localhost:32001",
+        "http://127.0.0.1:32001",
     ]:
         errors.append("In production, ALLOWED_ORIGINS must be explicitly configured (not localhost defaults).")
 

@@ -26,6 +26,10 @@ const appVersion = process.env.VITE_APP_VERSION || packageJson.version || resolv
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    host: true,
+    port: 32000,
+  },
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },
