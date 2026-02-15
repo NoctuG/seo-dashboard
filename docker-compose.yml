@@ -6,7 +6,8 @@ services:
       - db-data:/data
       - backup-data:/data/backups  # SQLite 备份目录映射（可挂载到宿主机）
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     environment:
       - DATABASE_URL=sqlite:////data/seo_tool.db
     ports:
@@ -27,9 +28,6 @@ services:
     restart: unless-stopped
     ports:
       - "32000:32000"
-      - "32443:32443"
-    volumes:
-      - ./certs:/etc/nginx/certs:ro
     depends_on:
       - backend
 

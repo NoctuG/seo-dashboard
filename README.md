@@ -30,7 +30,7 @@
     cd seo-dashboard
     ```
 
-2.  **创建环境配置文件**
+2.  **创建环境配置文件（推荐）**
 
     项目通过 `.env` 文件进行配置。您需要为后端和前端分别创建配置文件。
 
@@ -38,32 +38,20 @@
       ```bash
       cp backend/.env.example backend/.env
       ```
-      > **重要**: 生产环境中，请务必修改 `backend/.env` 文件中的 `JWT_SECRET_KEY` 和 `ALLOWED_ORIGINS` 等默认值以确保安全。
+      > **说明**: 若未提供 `backend/.env`，容器会使用内置开发默认值启动；但在生产环境中，请务必显式创建并修改 `JWT_SECRET_KEY`、`ALLOWED_ORIGINS` 等配置以确保安全。
 
     - **前端配置**: `docker-compose.yml` 已将 API 地址配置为 `/api/v1`，由 Nginx 自动代理到后端，因此前端无需额外配置。
 
-3.  **生成 SSL 证书 (用于 HTTPS)**
-
-    生产环境强烈建议使用 HTTPS。以下命令将生成自签名证书，用于快速测试。
-
-    ```bash
-    mkdir -p certs
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout certs/privkey.pem \
-      -out certs/fullchain.pem \
-      -subj "/CN=localhost"
-    ```
-    > 对于公网部署，建议使用像 Caddy 或 Traefik 这样的反向代理来自动管理 Let's Encrypt 证书。
-
-4.  **启动服务**
+3.  **启动服务**
 
     ```bash
     docker compose up -d --build
     ```
 
-5.  **访问应用**
+4.  **访问应用**
 
-    服务启动后，您可以通过浏览器访问 `https://localhost:32443`。由于使用的是自签名证书，首次访问时浏览器会提示安全警告，请选择信任即可。
+    服务启动后，您可以通过浏览器访问 `http://localhost:32000`。
+    > 如需公网 HTTPS，建议在容器外使用 Caddy、Traefik 或 Nginx 统一终止 TLS 并反向代理到 `32000`。
 
 ### 🛠️ 方式二：从源代码构建
 
