@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 
 from app.auth_service import create_initial_admin
-from app.config import settings
+from app.config import settings, validate_settings
 from app.api.api import api_router
 from app.db import init_db, engine
 from app.scheduler_service import scheduler_service
@@ -22,6 +22,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup():
+    validate_settings()
     init_db()
     with Session(engine) as session:
         create_initial_admin(session)
