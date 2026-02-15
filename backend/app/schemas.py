@@ -98,6 +98,50 @@ class RankHistoryRead(BaseModel):
         from_attributes = True
 
 
+class CompetitorDomainCreate(BaseModel):
+    domain: str
+
+
+class CompetitorDomainRead(BaseModel):
+    id: int
+    project_id: int
+    domain: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VisibilityHistoryRead(BaseModel):
+    keyword_id: Optional[int]
+    keyword_term: str
+    source_domain: str
+    rank: Optional[int]
+    visibility_score: float
+    result_type: str
+    serp_features: List[str]
+    competitor_positions: dict
+    checked_at: datetime
+
+
+class VisibilityGroupRead(BaseModel):
+    group: str
+    visibility_score: float
+
+
+class VisibilityTrendPointRead(BaseModel):
+    date: str
+    visibility_score: float
+
+
+class VisibilityResponse(BaseModel):
+    project_id: int
+    overall_visibility: float
+    groups: List[VisibilityGroupRead]
+    trend: List[VisibilityTrendPointRead]
+    serp_feature_coverage: dict[str, float]
+
+
 class ContentPerformanceItemRead(BaseModel):
     url: str
     keyword_count: int

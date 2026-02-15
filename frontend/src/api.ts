@@ -114,6 +114,44 @@ export interface RankHistoryItem {
 }
 
 
+
+export interface CompetitorDomainItem {
+  id: number;
+  project_id: number;
+  domain: string;
+  created_at: string;
+}
+
+export interface VisibilityGroup {
+  group: string;
+  visibility_score: number;
+}
+
+export interface VisibilityTrendPoint {
+  date: string;
+  visibility_score: number;
+}
+
+export interface VisibilityResponse {
+  project_id: number;
+  overall_visibility: number;
+  groups: VisibilityGroup[];
+  trend: VisibilityTrendPoint[];
+  serp_feature_coverage: Record<string, number>;
+}
+
+export interface VisibilityHistoryItem {
+  keyword_id?: number;
+  keyword_term: string;
+  source_domain: string;
+  rank?: number;
+  visibility_score: number;
+  result_type: string;
+  serp_features: string[];
+  competitor_positions: Record<string, number | null>;
+  checked_at: string;
+}
+
 export interface ContentPerformanceItem {
   url: string;
   keyword_count: number;
@@ -195,5 +233,30 @@ export async function getProjectBacklinks(projectId: string | number): Promise<B
 
 export async function getProjectBacklinkChanges(projectId: string | number): Promise<BacklinkChangesResponse> {
   const res = await api.get<BacklinkChangesResponse>(`/projects/${projectId}/backlinks/changes`);
+  return res.data;
+}
+
+
+export async function getProjectCompetitors(projectId: string | number): Promise<CompetitorDomainItem[]> {
+  const res = await api.get<CompetitorDomainItem[]>(`/projects/${projectId}/competitors`);
+  return res.data;
+}
+
+export async function addProjectCompetitor(projectId: string | number, domain: string): Promise<CompetitorDomainItem> {
+  const res = await api.post<CompetitorDomainItem>(`/projects/${projectId}/competitors`, { domain });
+  return res.data;
+}
+
+export async function deleteProjectCompetitor(projectId: string | number, competitorId: number): Promise<void> {
+  await api.delete(`/projects/${projectId}/competitors/${competitorId}`);
+}
+
+export async function runProjectKeywordCompare(projectId: string | number): Promise<VisibilityHistoryItem[]> {
+  const res = await api.post<VisibilityHistoryItem[]>(`/projects/${projectId}/keywords/check-all-compare`);
+  return res.data;
+}
+
+export async function getProjectVisibility(projectId: string | number): Promise<VisibilityResponse> {
+  const res = await api.get<VisibilityResponse>(`/projects/${projectId}/visibility`);
   return res.data;
 }

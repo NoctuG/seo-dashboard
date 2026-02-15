@@ -15,11 +15,13 @@ from app.schemas import (
     AuthorityPoint,
     BacklinkSummaryResponse,
     BacklinkChangesResponse,
+    VisibilityResponse,
 )
 from app.crawler.crawler import crawler_service
 from app.analytics_service import analytics_service
 from app.content_performance_service import content_performance_service
 from app.backlink_service import backlink_service
+from app.visibility_service import visibility_service
 
 router = APIRouter()
 
@@ -143,6 +145,16 @@ def get_content_performance(
         window=window,
         sort=sort,
     )
+
+
+
+@router.get("/{project_id}/visibility", response_model=VisibilityResponse)
+def get_project_visibility(project_id: int, session: Session = Depends(get_session)):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    return visibility_service.get_project_visibility(session=session, project_id=project_id)
 
 
 def _sync_backlink_snapshot(session: Session, project_id: int, domain: str):
