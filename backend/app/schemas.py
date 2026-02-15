@@ -1,16 +1,20 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.models import CrawlStatus, IssueSeverity, IssueStatus
 
 class ProjectCreate(BaseModel):
     name: str
     domain: str
+    brand_keywords: List[str] = Field(default_factory=list)
+    brand_regex: Optional[str] = None
 
 class ProjectRead(BaseModel):
     id: int
     name: str
     domain: str
+    brand_keywords: List[str] = Field(default_factory=list)
+    brand_regex: Optional[str] = None
     created_at: datetime
 
     class Config:

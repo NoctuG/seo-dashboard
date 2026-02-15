@@ -18,6 +18,8 @@ export interface Project {
   id: number;
   name: string;
   domain: string;
+  brand_keywords: string[];
+  brand_regex?: string;
   created_at: string;
 }
 
@@ -69,6 +71,27 @@ export interface AnalyticsData {
     bounce_rate: number;
     conversions: number;
   };
+  quality_metrics: {
+    engaged_sessions: number | null;
+    avg_engagement_time: number | null;
+    pages_per_session: number | null;
+    key_events: number | null;
+  };
+  brand_rules: {
+    keywords: string[];
+    regex: string | null;
+  };
+  brand_split: {
+    brand: { sessions: number; conversions: number };
+    non_brand: { sessions: number; conversions: number };
+  };
+  daily_brand_segments: Array<{
+    date: string;
+    brand_sessions: number;
+    non_brand_sessions: number;
+    brand_conversions: number;
+    non_brand_conversions: number;
+  }>;
   audience: {
     top_countries: Array<{ country: string; sessions: number }>;
     devices: Array<{ device: string; sessions: number }>;
