@@ -6,10 +6,11 @@ from babel.numbers import format_decimal
 import csv
 import io
 import json
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Literal, Tuple
 
 from sqlmodel import Session, select
 
+from app.email_service import email_service
 from app.models import Project, ReportTemplate, ReportDeliveryLog
 
 
@@ -137,6 +138,73 @@ class ReportService:
         if fmt == "pdf":
             return self.render_pdf(payload), "application/pdf"
         raise ValueError("Unsupported format")
+
+    def _build_report_email_content(self, payload: Dict[str, Any], export_format: str) -> tuple[str, str, str]:
+        project_name = payload.get("project", {}).get("name", "Unknown Project")
+        template_name = payload.get("template", {}).get("name", "Report")
+        generated_at = payload.get("generated_at", datetime.utcnow().isoformat())
+        lower_format = export_format.lower()
+
+        subject = f"[{project_name}] {template_name} ({lower_format.upper()})"
+        text_body = (
+            f"Your scheduled SEO report is ready.\n\n"
+            f"Project: {project_name}\n"
+            f"Template: {template_name}\n"
+            f"Format: {lower_format.upper()}\n"
+            f"Generated at (UTC): {generated_at}\n"
+        )
+        filename = f"seo-report-{project_name.lower().replace(' ', '-')}-{payload.get('template', {}).get('id', 'template')}.{lower_format}"
+        return subject, text_body, filename
+
+    def format_delivery_error(self, error: Exception) -> str:
+        details = " ".join(str(error).split())
+        message = f"{error.__class__.__name__}: {details}" if details else error.__class__.__name__
+        return message[:500]
+
+    def create_delivery_log(
+        self,
+        session: Session,
+        *,
+        project_id: int,
+        template_id: int | None,
+        schedule_id: int | None,
+        recipient_email: str | None,
+        export_format: str,
+        retries: int,
+        status: Literal["success", "failed"],
+        error_message: str | None = None,
+    ) -> ReportDeliveryLog:
+        log = ReportDeliveryLog(
+            project_id=project_id,
+            template_id=template_id,
+            schedule_id=schedule_id,
+            format=export_format.lower(),
+            status=status,
+            retries=retries,
+            recipient_email=recipient_email,
+            error_message=error_message,
+            created_at=datetime.utcnow(),
+        )
+        session.add(log)
+        session.commit()
+        return log
+
+    def send_report_email(
+        self,
+        *,
+        recipient_email: str,
+        payload: Dict[str, Any],
+        report_content: bytes,
+        media_type: str,
+        export_format: str,
+    ) -> None:
+        subject, text_body, filename = self._build_report_email_content(payload, export_format)
+        email_service.send_email(
+            to_email=recipient_email,
+            subject=subject,
+            text_body=text_body,
+            attachments=[(filename, report_content, media_type)],
+        )
 
 
 report_service = ReportService()

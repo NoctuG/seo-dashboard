@@ -11,6 +11,10 @@ class Settings:
     PROJECT_NAME: str = "SEO Tool"
     API_V1_STR: str = "/api/v1"
 
+    # Logging
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    LOG_FORMAT: str = os.getenv("LOG_FORMAT", "json")  # json or plain
+
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/seo_tool.db")
 
@@ -34,7 +38,8 @@ class Settings:
     SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_FROM: str = os.getenv("SMTP_FROM", "")
-    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", os.getenv("SMTP_USE_TLS", "true")).lower() == "true"
+    SMTP_USE_TLS: bool = SMTP_TLS
 
     # AI settings (OpenAI-compatible)
     AI_BASE_URL: str = os.getenv("AI_BASE_URL", "")

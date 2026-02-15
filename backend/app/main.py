@@ -1,5 +1,8 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.requests import Request
 from sqlmodel import Session
 
 from app.auth_service import create_initial_admin
@@ -26,10 +29,28 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup():
+    configure_logging(settings.LOG_LEVEL, settings.LOG_FORMAT)
+    logger.info("Logging initialized")
     init_db()
     with Session(engine) as session:
         create_initial_admin(session)
     scheduler_service.start()
+
+
+@app.middleware("http")
+async def add_trace_id(request: Request, call_next):
+    trace_id = request.headers.get("X-Trace-Id") or generate_trace_id()
+    trace_token = TRACE_ID_CONTEXT.set(trace_id)
+    path_token = REQUEST_PATH_CONTEXT.set(request.url.path)
+
+    try:
+        response = await call_next(request)
+    finally:
+        TRACE_ID_CONTEXT.reset(trace_token)
+        REQUEST_PATH_CONTEXT.reset(path_token)
+
+    response.headers["X-Trace-Id"] = trace_id
+    return response
 
 
 app.include_router(api_router, prefix="/api/v1")
