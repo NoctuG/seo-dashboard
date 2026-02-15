@@ -16,6 +16,9 @@ class Parser:
         h1 = soup.find('h1')
         h1_text = h1.get_text().strip() if h1 else None
 
+        viewport_meta = soup.find('meta', attrs={'name': 'viewport'})
+        viewport = viewport_meta['content'].strip() if viewport_meta and viewport_meta.get('content') else None
+
         # Duplicate detection (simple hash of body text to ignore dynamic parts if possible, but full html for now)
         # Better: hash only text content
         text_content = soup.get_text()
@@ -73,6 +76,7 @@ class Parser:
             'title': title,
             'description': description,
             'h1': h1_text,
+            'viewport': viewport,
             'content_hash': content_hash,
             'internal_links': internal_links,
             'external_links': external_links,

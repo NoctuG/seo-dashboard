@@ -136,7 +136,7 @@ class CrawlerService:
                     html_content = response.text
 
                     parse_result = parser.parse(html_content, url)
-                    issues = analyzer.analyze(parse_result, status_code)
+                    issues = analyzer.analyze(parse_result, status_code, load_time)
 
                     page = Page(
                         crawl_id=crawl.id,
