@@ -6,7 +6,7 @@ from fastapi.requests import Request
 from sqlmodel import Session
 
 from app.auth_service import create_initial_admin
-from app.config import settings
+from app.config import settings, validate_settings
 from app.api.api import api_router
 from app.db import init_db, engine
 from app.rate_limit import limiter, rate_limit_exceeded_handler
@@ -29,8 +29,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup():
-    configure_logging(settings.LOG_LEVEL, settings.LOG_FORMAT)
-    logger.info("Logging initialized")
+    validate_settings()
     init_db()
     with Session(engine) as session:
         create_initial_admin(session)
