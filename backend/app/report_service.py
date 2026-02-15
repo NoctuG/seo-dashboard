@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+from babel.dates import format_datetime
+from babel.numbers import format_decimal
 import csv
 import io
 import json
@@ -44,6 +46,7 @@ class ReportService:
                 "id": template.id,
                 "name": template.name,
                 "time_range": template.time_range,
+                "locale": template.locale,
                 "indicators": indicators,
                 "brand_styles": brand_styles,
             },
@@ -54,31 +57,46 @@ class ReportService:
             },
         }
 
+    def _format_value(self, value: Any, locale: str) -> str:
+        if isinstance(value, (int, float)):
+            return format_decimal(value, locale=locale)
+        if isinstance(value, str):
+            try:
+                parsed = datetime.fromisoformat(value)
+                return format_datetime(parsed, locale=locale)
+            except ValueError:
+                return value
+        return str(value)
+
     def render_csv(self, payload: Dict[str, Any]) -> bytes:
         output = io.StringIO()
         writer = csv.writer(output)
-        self._write_csv_section(writer, "project", payload.get("project", {}))
-        self._write_csv_section(writer, "template", payload.get("template", {}))
-        self._write_csv_section(writer, "ops", payload.get("ops", {}))
-        writer.writerow(["generated_at", payload.get("generated_at")])
+        locale = payload.get("template", {}).get("locale", "en-US")
+        self._write_csv_section(writer, "project", payload.get("project", {}), locale)
+        self._write_csv_section(writer, "template", payload.get("template", {}), locale)
+        self._write_csv_section(writer, "ops", payload.get("ops", {}), locale)
+        writer.writerow(["generated_at", self._format_value(payload.get("generated_at"), locale)])
         return output.getvalue().encode("utf-8")
 
-    def _write_csv_section(self, writer: csv.writer, section_name: str, data: Dict[str, Any]) -> None:
+    def _write_csv_section(self, writer: csv.writer, section_name: str, data: Dict[str, Any], locale: str) -> None:
         for key, value in data.items():
-            writer.writerow([section_name, key, self._stringify(value)])
+            writer.writerow([section_name, key, self._stringify(value, locale)])
 
-    def _stringify(self, value: Any) -> str:
-        if isinstance(value, (dict, list, tuple)):
-            return json.dumps(value, ensure_ascii=False)
-        return str(value)
+    def _stringify(self, value: Any, locale: str) -> str:
+        if isinstance(value, dict):
+            return json.dumps({k: self._format_value(v, locale) for k, v in value.items()}, ensure_ascii=False)
+        if isinstance(value, (list, tuple)):
+            return json.dumps([self._format_value(v, locale) for v in value], ensure_ascii=False)
+        return self._format_value(value, locale)
 
     def render_pdf(self, payload: Dict[str, Any]) -> bytes:
+        locale = payload.get("template", {}).get("locale", "en-US")
         lines = [
             f"Report: {payload['template']['name']}",
             f"Project: {payload['project']['name']} ({payload['project']['domain']})",
             f"Time range: {payload['template']['time_range']}",
             f"Indicators: {', '.join(payload['template']['indicators']) or '-'}",
-            f"Generated at: {payload['generated_at']}",
+            f"Generated at: {self._format_value(payload['generated_at'], locale)}",
         ]
         return self._minimal_pdf(lines)
 

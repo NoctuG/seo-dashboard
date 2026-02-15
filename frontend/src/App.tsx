@@ -10,10 +10,12 @@ import AiAssistant from './pages/AiAssistant';
 import ProjectReports from './pages/ProjectReports';
 import Login from './pages/Login';
 import { useAuth } from './auth';
+import { useTranslation } from 'react-i18next';
 
 function Protected({ children }: { children: ReactElement }) {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return <div className="p-8">Loading...</div>;
+  const { t } = useTranslation();
+  if (loading) return <div className="p-8">{t('app.loading')}</div>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return children;
 }

@@ -22,6 +22,13 @@ from app.api.deps import require_project_role
 router = APIRouter()
 
 
+
+def _resolve_geo_language(project: Project, keyword: Keyword) -> tuple[str, str]:
+    gl = (keyword.market or project.default_gl or "us").strip().lower()
+    hl = (keyword.locale or project.default_hl or "en").strip().lower()
+    return gl, hl
+
+
 @router.get("/{project_id}/competitors", response_model=List[CompetitorDomainRead])
 def list_competitors(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     project = session.get(Project, project_id)
@@ -101,6 +108,8 @@ def create_keyword(
         project_id=project_id,
         term=payload.term,
         target_url=payload.target_url,
+        locale=payload.locale,
+        market=payload.market,
     )
     session.add(keyword)
     session.commit()
@@ -137,7 +146,8 @@ def check_rank(
 
     project = session.get(Project, project_id)
     competitors = session.exec(select(CompetitorDomain).where(CompetitorDomain.project_id == project_id)).all()
-    result = check_keyword_rank(keyword.term, project.domain, [c.domain for c in competitors])
+    gl, hl = _resolve_geo_language(project, keyword)
+    result = check_keyword_rank(keyword.term, project.domain, [c.domain for c in competitors], gl=gl, hl=hl)
 
     keyword.current_rank = result.rank
     keyword.last_checked = datetime.utcnow()
@@ -146,6 +156,8 @@ def check_rank(
         keyword_id=keyword.id,
         rank=result.rank,
         url=result.url,
+        gl=gl,
+        hl=hl,
     )
     session.add(history)
     session.add(keyword)
@@ -169,7 +181,8 @@ def check_all_ranks(
     ).all()
 
     for keyword in keywords:
-        result = check_keyword_rank(keyword.term, project.domain)
+        gl, hl = _resolve_geo_language(project, keyword)
+        result = check_keyword_rank(keyword.term, project.domain, gl=gl, hl=hl)
         keyword.current_rank = result.rank
         keyword.last_checked = datetime.utcnow()
 
@@ -177,6 +190,8 @@ def check_all_ranks(
             keyword_id=keyword.id,
             rank=result.rank,
             url=result.url,
+            gl=gl,
+            hl=hl,
         )
         session.add(history)
         session.add(keyword)
@@ -204,12 +219,13 @@ def check_all_compare(
     rows = []
     now = datetime.utcnow()
     for keyword in keywords:
-        result = check_keyword_rank(keyword.term, project.domain, competitor_domains)
+        gl, hl = _resolve_geo_language(project, keyword)
+        result = check_keyword_rank(keyword.term, project.domain, competitor_domains, gl=gl, hl=hl)
 
         keyword.current_rank = result.rank
         keyword.last_checked = now
         session.add(keyword)
-        session.add(RankHistory(keyword_id=keyword.id, rank=result.rank, url=result.url, checked_at=now))
+        session.add(RankHistory(keyword_id=keyword.id, rank=result.rank, url=result.url, gl=gl, hl=hl, checked_at=now))
 
         base_row = visibility_service.create_visibility_row(
             project_id=project_id,
