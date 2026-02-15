@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Home, KeyRound, LogOut, Sparkles, Users } from 'lucide-react';
+import { Home, KeyRound, LogOut, Settings, Sparkles, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './auth';
 
@@ -41,6 +41,11 @@ export default function Layout() {
                     {user?.is_superuser && (
                     <Link to="/users" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
                         <Users size={20} /> Users
+                    </Link>
+                    )}
+                    {user?.is_superuser && (
+                    <Link to="/settings" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                        <Settings size={20} /> 系统设置
                     </Link>
                     )}
                     <Link to="/change-password" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">

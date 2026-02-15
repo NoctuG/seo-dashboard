@@ -39,6 +39,16 @@ class AuditActionType(str, Enum):
     ADMIN_BOOTSTRAP = "admin_bootstrap"
     BACKUP_CREATE = "backup_create"
     BACKUP_RESTORE = "backup_restore"
+    SETTINGS_UPDATE = "settings_update"
+
+
+class SystemSettings(SQLModel, table=True):
+    id: Optional[int] = Field(default=1, primary_key=True)
+    smtp_json: str = "{}"
+    analytics_json: str = "{}"
+    ai_json: str = "{}"
+    crawler_json: str = "{}"
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class Project(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

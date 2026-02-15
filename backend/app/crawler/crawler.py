@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 from sqlmodel import Session
 
-from app.config import settings
+from app.runtime_settings import get_runtime_settings
 from app.db import engine
 from app.models import Crawl, Page, Link, Issue, CrawlStatus, IssueStatus, PagePerformanceSnapshot
 from app.crawler.fetcher import Fetcher
@@ -103,7 +103,8 @@ class CrawlerService:
             if base_domain.startswith('www.'):
                 base_domain = base_domain[4:]
 
-            crawl_max_pages = max_pages or settings.DEFAULT_CRAWL_MAX_PAGES
+            runtime = get_runtime_settings(session)
+            crawl_max_pages = max_pages or runtime.default_crawl_max_pages
             crawl_max_pages = max(1, crawl_max_pages)
 
             queue: List[str] = [start_url]
