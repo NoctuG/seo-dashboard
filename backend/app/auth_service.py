@@ -38,14 +38,22 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hmac.compare_digest(digest, expected_digest)
 
 
-def create_access_token(subject: str, user_id: int, full_name: str, is_superuser: bool) -> str:
+def _create_token(
+    subject: str,
+    user_id: int,
+    full_name: str,
+    is_superuser: bool,
+    expires_minutes: int,
+    token_type: str,
+) -> str:
     now = datetime.now(timezone.utc)
-    expire = now + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+    expire = now + timedelta(minutes=expires_minutes)
     payload = {
         "sub": subject,
         "uid": user_id,
         "name": full_name,
         "superuser": is_superuser,
+        "type": token_type,
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp()),
     }
@@ -55,6 +63,14 @@ def create_access_token(subject: str, user_id: int, full_name: str, is_superuser
     signing_input = f"{header_b64}.{payload_b64}".encode()
     signature = hmac.new(settings.JWT_SECRET_KEY.encode(), signing_input, hashlib.sha256).digest()
     return f"{header_b64}.{payload_b64}.{_b64url_encode(signature)}"
+
+
+def create_access_token(subject: str, user_id: int, full_name: str, is_superuser: bool) -> str:
+    return _create_token(subject, user_id, full_name, is_superuser, settings.JWT_EXPIRE_MINUTES, "access")
+
+
+def create_refresh_token(subject: str, user_id: int, full_name: str, is_superuser: bool) -> str:
+    return _create_token(subject, user_id, full_name, is_superuser, settings.JWT_REFRESH_EXPIRE_MINUTES, "refresh")
 
 
 def decode_token(token: str) -> dict[str, Any]:
@@ -70,6 +86,20 @@ def decode_token(token: str) -> dict[str, Any]:
     payload = json.loads(_b64url_decode(payload_b64).decode())
     if int(payload.get("exp", 0)) < int(datetime.now(timezone.utc).timestamp()):
         raise ValueError("token expired")
+    return payload
+
+
+def decode_access_token(token: str) -> dict[str, Any]:
+    payload = decode_token(token)
+    if payload.get("type") not in (None, "access"):
+        raise ValueError("invalid token type")
+    return payload
+
+
+def decode_refresh_token(token: str) -> dict[str, Any]:
+    payload = decode_token(token)
+    if payload.get("type") != "refresh":
+        raise ValueError("invalid token type")
     return payload
 
 

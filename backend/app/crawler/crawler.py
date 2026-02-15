@@ -13,6 +13,7 @@ from app.models import Crawl, Page, Link, Issue, CrawlStatus, IssueStatus, PageP
 from app.crawler.fetcher import Fetcher
 from app.crawler.parser import Parser
 from app.crawler.analyzer import Analyzer
+from app.crawler.events import crawl_event_broker
 from app.crawler.performance_adapter import performance_adapter
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,15 @@ class CrawlerService:
             crawl_max_pages = max_pages or runtime.default_crawl_max_pages
             crawl_max_pages = max(1, crawl_max_pages)
 
+            crawl_event_broker.publish(crawl.id, {
+                "type": "crawl_started",
+                "crawl_id": crawl.id,
+                "status": crawl.status,
+                "max_pages": crawl_max_pages,
+                "pages_processed": 0,
+                "error_count": 0,
+            })
+
             queue: List[str] = [start_url]
             visited: Set[str] = set()
 
@@ -123,6 +133,7 @@ class CrawlerService:
 
             pages_processed = 0
             issues_found = 0
+            error_count = 0
             internal_link_validation_cache: Dict[str, Tuple[Optional[int], int]] = {}
 
             try:
@@ -145,6 +156,16 @@ class CrawlerService:
                     response, load_time = fetcher.fetch(url)
                     if not response:
                         logger.warning(f"Failed to fetch {url}")
+                        error_count += 1
+                        crawl_event_broker.publish(crawl.id, {
+                            "type": "crawl_error",
+                            "crawl_id": crawl.id,
+                            "status": crawl.status,
+                            "current_url": url,
+                            "pages_processed": pages_processed,
+                            "max_pages": crawl_max_pages,
+                            "error_count": error_count,
+                        })
                         continue
 
                     status_code = response.status_code
@@ -256,12 +277,41 @@ class CrawlerService:
 
                     pages_processed += 1
                     session.commit()
+                    crawl_event_broker.publish(crawl.id, {
+                        "type": "crawl_progress",
+                        "crawl_id": crawl.id,
+                        "status": crawl.status,
+                        "current_url": url,
+                        "pages_processed": pages_processed,
+                        "max_pages": crawl_max_pages,
+                        "issues_found": issues_found,
+                        "error_count": error_count,
+                    })
 
                 crawl.status = CrawlStatus.COMPLETED
+                crawl_event_broker.publish(crawl.id, {
+                    "type": "crawl_completed",
+                    "crawl_id": crawl.id,
+                    "status": crawl.status,
+                    "pages_processed": pages_processed,
+                    "max_pages": crawl_max_pages,
+                    "issues_found": issues_found,
+                    "error_count": error_count,
+                })
 
             except Exception as e:
                 logger.exception(f"Crawl failed: {e}")
                 crawl.status = CrawlStatus.FAILED
+                error_count += 1
+                crawl_event_broker.publish(crawl.id, {
+                    "type": "crawl_failed",
+                    "crawl_id": crawl.id,
+                    "status": crawl.status,
+                    "pages_processed": pages_processed,
+                    "max_pages": crawl_max_pages,
+                    "issues_found": issues_found,
+                    "error_count": error_count,
+                })
             finally:
                 crawl.end_time = datetime.utcnow()
                 crawl.total_pages = pages_processed
