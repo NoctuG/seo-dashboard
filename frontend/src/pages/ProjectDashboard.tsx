@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { api } from '../api';
-import type { DashboardStats } from '../api';
+import { api, getProjectContentPerformance } from '../api';
+import type { DashboardStats, ContentPerformanceResponse, ContentPerformanceItem } from '../api';
 import { Play, AlertTriangle, Info, AlertOctagon, TrendingUp, TrendingDown, Activity, MousePointerClick } from 'lucide-react';
 
 export default function ProjectDashboard() {
@@ -10,10 +10,20 @@ export default function ProjectDashboard() {
     const [loading, setLoading] = useState(true);
     const [maxPages, setMaxPages] = useState(50);
     const [sitemapUrl, setSitemapUrl] = useState('');
+    const [contentPerformance, setContentPerformance] = useState<ContentPerformanceResponse | null>(null);
+    const [window, setWindow] = useState<'7d' | '30d' | '90d'>('30d');
+    const [sort, setSort] = useState<'traffic' | 'conversion_rate' | 'decay'>('traffic');
 
     useEffect(() => {
-        if (id) fetchDashboard();
+        if (id) {
+            fetchDashboard();
+            fetchContentPerformance();
+        }
     }, [id]);
+
+    useEffect(() => {
+        if (id) fetchContentPerformance();
+    }, [id, window, sort]);
 
     const fetchDashboard = async () => {
         try {
@@ -23,6 +33,17 @@ export default function ProjectDashboard() {
             console.error(error);
         } finally {
             setLoading(false);
+        }
+    };
+
+
+    const fetchContentPerformance = async () => {
+        if (!id) return;
+        try {
+            const data = await getProjectContentPerformance(id, window, sort);
+            setContentPerformance(data);
+        } catch (error) {
+            console.error(error);
         }
     };
 
@@ -45,6 +66,30 @@ export default function ProjectDashboard() {
 
     const { last_crawl, issues_breakdown, analytics } = stats;
     const hasGrowth = analytics.period.growth_pct >= 0;
+
+
+    const renderContentList = (title: string, items: ContentPerformanceItem[]) => (
+        <div className="bg-white p-6 rounded shadow">
+            <h3 className="font-semibold mb-3">{title}</h3>
+            <ul className="space-y-3 text-sm">
+                {items.length === 0 && <li className="text-gray-500">No data</li>}
+                {items.map((item) => (
+                    <li key={`${title}-${item.url}`} className="border-b pb-2">
+                        <a href={item.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all">
+                            {item.url}
+                        </a>
+                        <div className="text-xs text-gray-600 mt-1 flex flex-wrap gap-3">
+                            <span>Sessions: {item.sessions}</span>
+                            <span>CVR: {item.conversion_rate}%</span>
+                            <span>7d: {item.change_7d}%</span>
+                            {item.decay_flag && <span className="text-red-600">Decay</span>}
+                        </div>
+                        {item.suggested_action && <p className="text-xs text-orange-700 mt-1">{item.suggested_action}</p>}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
 
     return (
         <div>
@@ -192,6 +237,28 @@ export default function ProjectDashboard() {
                         ))}
                     </tbody>
                 </table>
+            </div>
+
+
+            <div className="mb-4 flex flex-wrap gap-3 items-center">
+                <h2 className="text-xl font-bold mr-3">Content Performance</h2>
+                <select value={window} onChange={(e) => setWindow(e.target.value as '7d' | '30d' | '90d')} className="border rounded px-3 py-2 text-sm">
+                    <option value="7d">7 days</option>
+                    <option value="30d">30 days</option>
+                    <option value="90d">90 days</option>
+                </select>
+                <select value={sort} onChange={(e) => setSort(e.target.value as 'traffic' | 'conversion_rate' | 'decay')} className="border rounded px-3 py-2 text-sm">
+                    <option value="traffic">Sort: Traffic</option>
+                    <option value="conversion_rate">Sort: Conversion Rate</option>
+                    <option value="decay">Sort: Decay</option>
+                </select>
+                <Link to={`/projects/${id}/pages`} className="text-sm text-blue-600 hover:underline">View page details</Link>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                {renderContentList('热门内容', contentPerformance?.top_content ?? [])}
+                {renderContentList('高转化页面', contentPerformance?.top_conversion ?? [])}
+                {renderContentList('衰减页面', contentPerformance?.decaying_content ?? [])}
             </div>
 
             {last_crawl ? (

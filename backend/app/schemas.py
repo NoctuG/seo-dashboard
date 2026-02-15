@@ -96,3 +96,26 @@ class RankHistoryRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ContentPerformanceItemRead(BaseModel):
+    url: str
+    keyword_count: int
+    avg_rank: Optional[float]
+    estimated_click_contribution: float
+    sessions: int
+    conversions: int
+    conversion_rate: float
+    change_7d: float
+    change_30d: float
+    decay_flag: bool
+    suggested_action: Optional[str] = None
+
+
+class ContentPerformanceResponse(BaseModel):
+    window: str
+    sort: str
+    items: List[ContentPerformanceItemRead]
+    top_content: List[ContentPerformanceItemRead]
+    top_conversion: List[ContentPerformanceItemRead]
+    decaying_content: List[ContentPerformanceItemRead]

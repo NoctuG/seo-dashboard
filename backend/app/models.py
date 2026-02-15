@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 from sqlmodel import Field, SQLModel, Relationship
+from sqlalchemy import Index
 from enum import Enum
 
 class CrawlStatus(str, Enum):
@@ -91,6 +92,10 @@ class Keyword(SQLModel, table=True):
 
 
 class RankHistory(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_rankhistory_keyword_checked_at", "keyword_id", "checked_at"),
+    )
+
     id: Optional[int] = Field(default=None, primary_key=True)
     keyword_id: int = Field(foreign_key="keyword.id")
     rank: Optional[int] = None
@@ -98,3 +103,16 @@ class RankHistory(SQLModel, table=True):
     checked_at: datetime = Field(default_factory=datetime.utcnow)
 
     keyword: Keyword = Relationship(back_populates="rank_history")
+
+
+class PageTrafficSnapshot(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_pagetraffic_project_url_date", "project_id", "url", "date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    url: str = Field(index=True)
+    date: date
+    sessions: int = 0
+    conversions: int = 0
