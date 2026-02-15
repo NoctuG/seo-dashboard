@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 import xml.etree.ElementTree as ET
@@ -19,6 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class CrawlerService:
+    def _verify_internal_link(self, fetcher: Fetcher, target_url: str) -> Tuple[Optional[int], int]:
+        try:
+            response = fetcher.session.head(target_url, timeout=8, allow_redirects=True)
+            status_code = response.status_code
+            if status_code >= 400 or status_code == 405:
+                response = fetcher.session.get(target_url, timeout=8, allow_redirects=True)
+                status_code = response.status_code
+            return status_code, len(response.history)
+        except Exception as exc:
+            logger.warning(f"Failed to verify internal link {target_url}: {exc}")
+            return None, 0
+
     def _normalize_url(self, url: str) -> str:
         return url.rstrip('/')
 
@@ -110,6 +122,7 @@ class CrawlerService:
 
             pages_processed = 0
             issues_found = 0
+            internal_link_validation_cache: Dict[str, Tuple[Optional[int], int]] = {}
 
             try:
                 while queue and pages_processed < crawl_max_pages:
@@ -139,6 +152,7 @@ class CrawlerService:
                     parse_result = parser.parse(html_content, url)
                     parse_result["url"] = str(response.url)
                     parse_result["response_headers"] = dict(response.headers)
+                    parse_result["redirect_hops"] = len(response.history)
 
                     perf_metrics = performance_adapter.collect(url)
                     parse_result["lcp_ms"] = perf_metrics.lcp_ms
@@ -175,6 +189,9 @@ class CrawlerService:
                     if current_domain.startswith('www.'):
                         current_domain = current_domain[4:]
 
+                    invalid_internal_links = []
+                    internal_links_with_redirect_chain = []
+
                     for link_data in parse_result.get('internal_links', []):
                         target_url = link_data['url']
                         link = Link(
@@ -189,9 +206,29 @@ class CrawlerService:
                         if target_domain.startswith('www.'):
                             target_domain = target_domain[4:]
 
+                        cached_result = internal_link_validation_cache.get(target_url)
+                        if cached_result is None:
+                            cached_result = self._verify_internal_link(fetcher, target_url)
+                            internal_link_validation_cache[target_url] = cached_result
+
+                        validated_status, redirect_hops = cached_result
+                        if validated_status is None or validated_status >= 400:
+                            invalid_internal_links.append({
+                                "url": target_url,
+                                "status_code": validated_status,
+                            })
+                        if redirect_hops >= 2:
+                            internal_links_with_redirect_chain.append({
+                                "url": target_url,
+                                "redirect_hops": redirect_hops,
+                            })
+
                         target_normalized = self._normalize_url(target_url)
                         if target_domain == current_domain and target_normalized not in visited:
                             queue.append(target_url)
+
+                    parse_result["invalid_internal_links"] = invalid_internal_links
+                    parse_result["internal_links_with_redirect_chain"] = internal_links_with_redirect_chain
 
                     for link_data in parse_result.get('external_links', []):
                         link = Link(
@@ -209,7 +246,9 @@ class CrawlerService:
                             issue_type=issue_data['type'],
                             severity=issue_data['severity'],
                             status=IssueStatus.OPEN,
-                            description=issue_data['description']
+                            description=issue_data['description'],
+                            category=issue_data.get('category', 'technical_seo'),
+                            fix_template=issue_data.get('fix_template'),
                         )
                         session.add(issue)
                         issues_found += 1

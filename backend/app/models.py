@@ -20,6 +20,11 @@ class IssueStatus(str, Enum):
     IGNORED = "ignored"
     RESOLVED = "resolved"
 
+class IssueCategory(str, Enum):
+    TECHNICAL_SEO = "technical_seo"
+    ACCESSIBILITY = "accessibility"
+    CONTENT = "content"
+
 class Project(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
@@ -94,9 +99,11 @@ class Issue(SQLModel, table=True):
     crawl_id: int = Field(foreign_key="crawl.id")
     page_id: Optional[int] = Field(default=None, foreign_key="page.id")
     issue_type: str
+    category: IssueCategory = Field(default=IssueCategory.TECHNICAL_SEO)
     severity: IssueSeverity
     status: IssueStatus = Field(default=IssueStatus.OPEN)
     description: Optional[str] = None
+    fix_template: Optional[str] = None
 
     crawl: Crawl = Relationship(back_populates="issues")
     page: Optional[Page] = Relationship(back_populates="issues")

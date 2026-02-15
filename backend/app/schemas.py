@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from app.models import CrawlStatus, IssueSeverity, IssueStatus
+from app.models import CrawlStatus, IssueCategory, IssueSeverity, IssueStatus
 
 class ProjectCreate(BaseModel):
     name: str
@@ -56,9 +56,11 @@ class IssueRead(BaseModel):
     crawl_id: int
     page_id: Optional[int]
     issue_type: str
+    category: IssueCategory
     severity: IssueSeverity
     status: IssueStatus
     description: Optional[str]
+    fix_template: Optional[str]
 
     class Config:
         from_attributes = True

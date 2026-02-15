@@ -17,6 +17,15 @@ class Parser:
         h1 = soup.find('h1')
         h1_text = h1.get_text().strip() if h1 else None
 
+        heading_outline = []
+        for heading in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+            heading_outline.append(
+                {
+                    'level': int(heading.name[1]),
+                    'text': heading.get_text().strip(),
+                }
+            )
+
         viewport_meta = soup.find('meta', attrs={'name': 'viewport'})
         viewport = viewport_meta['content'].strip() if viewport_meta and viewport_meta.get('content') else None
 
@@ -103,6 +112,7 @@ class Parser:
             'title': title,
             'description': description,
             'h1': h1_text,
+            'heading_outline': heading_outline,
             'viewport': viewport,
             'canonical': canonical,
             'robots_meta': sorted(robots_directives),
