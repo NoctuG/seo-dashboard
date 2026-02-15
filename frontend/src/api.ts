@@ -113,6 +113,41 @@ export interface RankHistoryItem {
   checked_at: string;
 }
 
+
+export interface ContentPerformanceItem {
+  url: string;
+  keyword_count: number;
+  avg_rank?: number;
+  estimated_click_contribution: number;
+  sessions: number;
+  conversions: number;
+  conversion_rate: number;
+  change_7d: number;
+  change_30d: number;
+  decay_flag: boolean;
+  suggested_action?: string;
+}
+
+export interface ContentPerformanceResponse {
+  window: '7d' | '30d' | '90d';
+  sort: 'traffic' | 'conversion_rate' | 'decay';
+  items: ContentPerformanceItem[];
+  top_content: ContentPerformanceItem[];
+  top_conversion: ContentPerformanceItem[];
+  decaying_content: ContentPerformanceItem[];
+}
+
+export async function getProjectContentPerformance(
+  projectId: string | number,
+  window: '7d' | '30d' | '90d' = '30d',
+  sort: 'traffic' | 'conversion_rate' | 'decay' = 'traffic',
+): Promise<ContentPerformanceResponse> {
+  const res = await api.get<ContentPerformanceResponse>(`/projects/${projectId}/content-performance`, {
+    params: { window, sort },
+  });
+  return res.data;
+}
+
 export interface AiAnalyzeResponse {
   result: string;
 }

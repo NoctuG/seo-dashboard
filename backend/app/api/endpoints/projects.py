@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 
 from app.db import get_session
 from app.models import Project, Crawl, Issue, CrawlStatus
-from app.schemas import ProjectCreate, ProjectRead, CrawlRead
+from app.schemas import ProjectCreate, ProjectRead, CrawlRead, ContentPerformanceResponse
 from app.crawler.crawler import crawler_service
 from app.analytics_service import analytics_service
+from app.content_performance_service import content_performance_service
 
 router = APIRouter()
 
@@ -111,3 +112,22 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session)):
         },
         "analytics": analytics,
     }
+
+
+@router.get("/{project_id}/content-performance", response_model=ContentPerformanceResponse)
+def get_content_performance(
+    project_id: int,
+    window: Literal["7d", "30d", "90d"] = "30d",
+    sort: Literal["traffic", "conversion_rate", "decay"] = "traffic",
+    session: Session = Depends(get_session),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    return content_performance_service.get_project_content_performance(
+        session=session,
+        project_id=project_id,
+        window=window,
+        sort=sort,
+    )
