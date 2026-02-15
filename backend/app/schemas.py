@@ -205,3 +205,28 @@ class BacklinkChangesResponse(BaseModel):
     new_links: List[BacklinkChangeItem]
     lost_links: List[BacklinkChangeItem]
     notes: List[str]
+
+
+class RoiCostBreakdown(BaseModel):
+    monthly_human_cost: float
+    monthly_tool_cost: float
+    monthly_outsourcing_cost: float
+    monthly_content_cost: float
+    monthly_total_cost: float
+    currency: str
+
+
+class RoiFormulaBreakdownResponse(BaseModel):
+    project_id: int
+    provider: str
+    time_range: str
+    attribution_model: str
+    assisted_conversions: float
+    conversions: float
+    revenue: float
+    pipeline_value: float
+    gain: float
+    cost: RoiCostBreakdown
+    roi: float
+    roi_pct: float
+    formula: dict[str, str]

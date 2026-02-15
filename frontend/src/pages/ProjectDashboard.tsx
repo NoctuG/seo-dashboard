@@ -6,6 +6,7 @@ import {
   getProjectBacklinks,
   getProjectBacklinkChanges,
   getProjectContentPerformance,
+  getProjectRoi,
 } from '../api';
 import type {
   DashboardStats,
@@ -14,6 +15,7 @@ import type {
   AuthorityResponse,
   BacklinkResponse,
   BacklinkChangesResponse,
+  RoiBreakdownResponse,
 } from '../api';
 import {
   Play,
@@ -26,7 +28,9 @@ import {
   MousePointerClick,
   Shield,
   Link as LinkIcon,
+  BadgePercent,
 } from 'lucide-react';
+import RoiAttributionNote from '../components/RoiAttributionNote';
 import {
   ResponsiveContainer,
   LineChart,
@@ -38,6 +42,8 @@ import {
   BarChart,
   Bar,
   Legend,
+  AreaChart,
+  Area,
 } from 'recharts';
 
 export default function ProjectDashboard() {
@@ -53,18 +59,26 @@ export default function ProjectDashboard() {
   const [backlinks, setBacklinks] = useState<BacklinkResponse | null>(null);
   const [changes, setChanges] = useState<BacklinkChangesResponse | null>(null);
   const [brandWindow, setBrandWindow] = useState<'7d' | '30d' | '90d'>('30d');
+  const [roiRange, setRoiRange] = useState<'30d' | '90d' | '12m'>('30d');
+  const [attributionModel, setAttributionModel] = useState<'linear' | 'first_click' | 'last_click'>('linear');
+  const [roi, setRoi] = useState<RoiBreakdownResponse | null>(null);
 
   useEffect(() => {
     if (id) {
       fetchDashboard();
       fetchContentPerformance();
       fetchBacklinkData();
+      fetchRoiData();
     }
   }, [id]);
 
   useEffect(() => {
     if (id) fetchContentPerformance();
   }, [id, window, sort]);
+
+  useEffect(() => {
+    if (id) fetchRoiData();
+  }, [id, roiRange, attributionModel]);
 
   const fetchDashboard = async () => {
     try {
@@ -88,6 +102,17 @@ export default function ProjectDashboard() {
       setAuthority(authorityData);
       setBacklinks(backlinkData);
       setChanges(changesData);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+
+  const fetchRoiData = async () => {
+    if (!id) return;
+    try {
+      const roiData = await getProjectRoi(id, roiRange, attributionModel);
+      setRoi(roiData);
     } catch (error) {
       console.error(error);
     }
@@ -301,6 +326,63 @@ export default function ProjectDashboard() {
         </table>
       </div>
 
+      <div className="bg-white p-6 rounded shadow mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h3 className="font-semibold flex items-center gap-2"><BadgePercent size={18}/>SEO ROI</h3>
+          <div className="flex gap-2">
+            <select value={roiRange} onChange={(e) => setRoiRange(e.target.value as '30d' | '90d' | '12m')} className="border rounded px-3 py-1 text-sm">
+              <option value="30d">30天</option>
+              <option value="90d">90天</option>
+              <option value="12m">12个月</option>
+            </select>
+            <select value={attributionModel} onChange={(e) => setAttributionModel(e.target.value as 'linear' | 'first_click' | 'last_click')} className="border rounded px-3 py-1 text-sm">
+              <option value="linear">Linear</option>
+              <option value="first_click">First Click</option>
+              <option value="last_click">Last Click</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          <div className="rounded bg-slate-50 p-4">
+            <p className="text-xs text-gray-500">收益 (Gain)</p>
+            <p className="text-2xl font-bold">{roi?.gain ?? 0}</p>
+          </div>
+          <div className="rounded bg-slate-50 p-4">
+            <p className="text-xs text-gray-500">成本 (Cost)</p>
+            <p className="text-2xl font-bold">{roi ? roi.cost.monthly_total_cost : 0}</p>
+          </div>
+          <div className="rounded bg-slate-50 p-4">
+            <p className="text-xs text-gray-500">辅助转化</p>
+            <p className="text-2xl font-bold">{roi?.assisted_conversions ?? 0}</p>
+          </div>
+          <div className="rounded bg-slate-50 p-4">
+            <p className="text-xs text-gray-500">ROI %</p>
+            <p className={`text-2xl font-bold ${(roi?.roi_pct ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{roi?.roi_pct ?? 0}%</p>
+          </div>
+        </div>
+
+        <div className="h-64 mb-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={[
+                { name: 'Revenue', value: roi?.revenue ?? analytics.totals.revenue },
+                { name: 'Pipeline', value: roi?.pipeline_value ?? analytics.totals.pipeline_value },
+                { name: 'Cost', value: roi?.cost.monthly_total_cost ?? 0 },
+              ]}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Area type="monotone" dataKey="value" stroke="#2563eb" fill="#93c5fd" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        <RoiAttributionNote attributionModel={attributionModel} provider={roi?.provider ?? analytics.provider} />
+      </div>
+
       <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded shadow">
           <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2"><Activity size={16}/>Daily Avg</h3>
@@ -322,7 +404,6 @@ export default function ProjectDashboard() {
           <p className="text-3xl font-bold">{analytics.totals.conversions}</p>
         </div>
       </div>
-
       <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-6">
         {qualityCards.map((card) => (
           <div key={card.label} className="bg-white p-6 rounded shadow">

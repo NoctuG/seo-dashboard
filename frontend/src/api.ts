@@ -70,6 +70,10 @@ export interface AnalyticsData {
     sessions: number;
     bounce_rate: number;
     conversions: number;
+    assisted_conversions: number;
+    revenue: number;
+    pipeline_value: number;
+    roi: number | null;
   };
   quality_metrics: {
     engaged_sessions: number | null;
@@ -281,5 +285,40 @@ export async function runProjectKeywordCompare(projectId: string | number): Prom
 
 export async function getProjectVisibility(projectId: string | number): Promise<VisibilityResponse> {
   const res = await api.get<VisibilityResponse>(`/projects/${projectId}/visibility`);
+  return res.data;
+}
+
+
+export interface RoiBreakdownResponse {
+  project_id: number;
+  provider: string;
+  time_range: '30d' | '90d' | '12m';
+  attribution_model: 'linear' | 'first_click' | 'last_click';
+  assisted_conversions: number;
+  conversions: number;
+  revenue: number;
+  pipeline_value: number;
+  gain: number;
+  cost: {
+    monthly_human_cost: number;
+    monthly_tool_cost: number;
+    monthly_outsourcing_cost: number;
+    monthly_content_cost: number;
+    monthly_total_cost: number;
+    currency: string;
+  };
+  roi: number;
+  roi_pct: number;
+  formula: Record<string, string>;
+}
+
+export async function getProjectRoi(
+  projectId: string | number,
+  timeRange: '30d' | '90d' | '12m' = '30d',
+  attributionModel: 'linear' | 'first_click' | 'last_click' = 'linear',
+): Promise<RoiBreakdownResponse> {
+  const res = await api.get<RoiBreakdownResponse>(`/projects/${projectId}/roi`, {
+    params: { time_range: timeRange, attribution_model: attributionModel },
+  });
   return res.data;
 }

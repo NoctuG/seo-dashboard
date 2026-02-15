@@ -5,7 +5,7 @@ import json
 from datetime import date
 
 from app.db import get_session
-from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot
+from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig
 from app.schemas import (
     ProjectCreate,
     ProjectRead,
@@ -16,6 +16,8 @@ from app.schemas import (
     BacklinkSummaryResponse,
     BacklinkChangesResponse,
     VisibilityResponse,
+    RoiFormulaBreakdownResponse,
+    RoiCostBreakdown,
 )
 from app.crawler.crawler import crawler_service
 from app.analytics_service import analytics_service
@@ -118,7 +120,14 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session)):
 
     statement = select(Crawl).where(Crawl.project_id == project_id).order_by(Crawl.start_time.desc())
     last_crawl = session.exec(statement).first()
-    analytics = analytics_service.get_project_analytics(project_id, project.domain, project.brand_keywords_json, project.brand_regex)
+    cost_config = session.exec(select(SeoCostConfig).where(SeoCostConfig.project_id == project_id)).first()
+    analytics = analytics_service.get_project_analytics(
+        project_id,
+        project.domain,
+        project.brand_keywords_json,
+        project.brand_regex,
+        cost_config.dict() if cost_config else None,
+    )
 
     if not last_crawl:
         return {
@@ -150,6 +159,78 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session)):
         "analytics": analytics,
     }
 
+
+@router.get("/{project_id}/roi", response_model=RoiFormulaBreakdownResponse)
+def get_project_roi(
+    project_id: int,
+    time_range: Literal["30d", "90d", "12m"] = "30d",
+    attribution_model: Literal["linear", "first_click", "last_click"] = "linear",
+    session: Session = Depends(get_session),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    cost_config = session.exec(select(SeoCostConfig).where(SeoCostConfig.project_id == project_id)).first()
+    if not cost_config:
+        cost_config = SeoCostConfig(project_id=project_id)
+        session.add(cost_config)
+        session.commit()
+        session.refresh(cost_config)
+
+    analytics = analytics_service.get_project_analytics(
+        project_id,
+        project.domain,
+        project.brand_keywords_json,
+        project.brand_regex,
+        cost_config.dict(),
+    )
+
+    months = {"30d": 1, "90d": 3, "12m": 12}[time_range]
+    attribution_weight = {"linear": 0.6, "first_click": 0.45, "last_click": 0.8}[attribution_model]
+
+    revenue = float(analytics["totals"].get("revenue", 0) or 0) * months
+    pipeline_value = float(analytics["totals"].get("pipeline_value", 0) or 0) * months
+    assisted_conversions = float(analytics["totals"].get("assisted_conversions", 0) or 0) * months
+    direct_conversions = float(analytics["totals"].get("conversions", 0) or 0) * months
+
+    gain = revenue + (pipeline_value - revenue) * attribution_weight
+
+    monthly_total_cost = (
+        cost_config.monthly_human_cost
+        + cost_config.monthly_tool_cost
+        + cost_config.monthly_outsourcing_cost
+        + cost_config.monthly_content_cost
+    )
+    total_cost = monthly_total_cost * months
+    roi = ((gain - total_cost) / total_cost) if total_cost > 0 else 0
+
+    return RoiFormulaBreakdownResponse(
+        project_id=project_id,
+        provider=analytics.get("provider", "sample"),
+        time_range=time_range,
+        attribution_model=attribution_model,
+        assisted_conversions=round(assisted_conversions, 2),
+        conversions=round(direct_conversions, 2),
+        revenue=round(revenue, 2),
+        pipeline_value=round(pipeline_value, 2),
+        gain=round(gain, 2),
+        cost=RoiCostBreakdown(
+            monthly_human_cost=cost_config.monthly_human_cost,
+            monthly_tool_cost=cost_config.monthly_tool_cost,
+            monthly_outsourcing_cost=cost_config.monthly_outsourcing_cost,
+            monthly_content_cost=cost_config.monthly_content_cost,
+            monthly_total_cost=round(monthly_total_cost, 2),
+            currency=cost_config.currency,
+        ),
+        roi=round(roi, 4),
+        roi_pct=round(roi * 100, 2),
+        formula={
+            "gain": "gain = revenue + (pipeline_value - revenue) * attribution_weight",
+            "cost": "cost = monthly_total_cost * months",
+            "roi": "roi = (gain - cost) / cost",
+        },
+    )
 
 @router.get("/{project_id}/content-performance", response_model=ContentPerformanceResponse)
 def get_content_performance(
