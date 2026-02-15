@@ -48,6 +48,9 @@ class Settings:
     LIGHTHOUSE_API_URL: str = os.getenv("LIGHTHOUSE_API_URL", "")
     WEB_VITALS_API_URL: str = os.getenv("WEB_VITALS_API_URL", "")
 
+    # backup
+    BACKUP_DIR: str = os.getenv("BACKUP_DIR", "/data/backups")
+
     # CORS
     @staticmethod
     def _parse_allowed_origins(raw_value: str) -> list[str]:

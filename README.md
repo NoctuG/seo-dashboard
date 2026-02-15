@@ -89,6 +89,28 @@
   - `VITE_API_USERNAME`、`VITE_API_PASSWORD`（当后端启用身份验证时使用）
 - 可分别参考 `backend/.env.example` 和 `frontend/.env.example` 创建配置文件。
 
+
+### 手动备份与恢复（Superuser）
+
+> 需要先登录拿到 Bearer Token，并确保后端配置了 `BACKUP_DIR`（默认 `/data/backups`）。
+
+1. 触发备份（返回备份文件路径）：
+   ```bash
+   curl -X POST http://localhost:8000/api/v1/admin/backup \
+     -H "Authorization: Bearer <SUPERUSER_TOKEN>"
+   ```
+
+2. 使用返回路径进行恢复（需要显式确认）：
+   ```bash
+   curl -X POST http://localhost:8000/api/v1/admin/restore \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <SUPERUSER_TOKEN>" \
+     -d '{
+       "backup_file": "/data/backups/seo-backup-20260101-010203.db",
+       "confirm_phrase": "RESTORE"
+     }'
+   ```
+
 ### AI 功能
 
 - 侧边栏新增 **AI 助手** 页面。

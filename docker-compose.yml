@@ -4,6 +4,7 @@ services:
     restart: unless-stopped
     volumes:
       - db-data:/data
+      - backup-data:/data/backups  # SQLite 备份目录映射（可挂载到宿主机）
     env_file:
       - ./backend/.env
     environment:
@@ -34,3 +35,5 @@ services:
 
 volumes:
   db-data:
+
+  backup-data:
