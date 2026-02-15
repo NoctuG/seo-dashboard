@@ -485,6 +485,30 @@ export interface KeywordItem {
 }
 
 
+
+export type KeywordScheduleFrequency = "daily" | "weekly";
+
+export interface KeywordRankSchedule {
+  id: number;
+  project_id: number;
+  frequency: KeywordScheduleFrequency;
+  day_of_week?: number | null;
+  hour: number;
+  timezone: string;
+  active: boolean;
+  last_run_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KeywordRankSchedulePayload {
+  frequency: KeywordScheduleFrequency;
+  day_of_week?: number | null;
+  hour: number;
+  timezone: string;
+  active: boolean;
+}
+
 export interface KeywordResearchRequest {
   seed_term: string;
   locale?: string;
@@ -716,6 +740,39 @@ export async function deleteProjectCompetitor(
   await api.delete(`/projects/${projectId}/competitors/${competitorId}`);
 }
 
+
+
+export async function getKeywordRankSchedule(
+  projectId: string | number,
+): Promise<KeywordRankSchedule | null> {
+  const res = await api.get<KeywordRankSchedule | null>(
+    `/projects/${projectId}/keyword-rank-schedule`,
+  );
+  return res.data;
+}
+
+export async function upsertKeywordRankSchedule(
+  projectId: string | number,
+  payload: KeywordRankSchedulePayload,
+): Promise<KeywordRankSchedule> {
+  const res = await api.post<KeywordRankSchedule>(
+    `/projects/${projectId}/keyword-rank-schedule`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function toggleKeywordRankSchedule(
+  projectId: string | number,
+  active: boolean,
+): Promise<KeywordRankSchedule> {
+  const res = await api.post<KeywordRankSchedule>(
+    `/projects/${projectId}/keyword-rank-schedule/toggle`,
+    null,
+    { params: { active } },
+  );
+  return res.data;
+}
 
 export async function runKeywordResearch(
   projectId: string | number,
