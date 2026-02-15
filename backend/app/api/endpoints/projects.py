@@ -191,12 +191,19 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session)):
     indexability_anomalies = [
         {"issue_type": issue_type, "count": count}
         for issue_type, count in issue_counter.items()
-        if issue_type in {"noindex_detected", "nofollow_detected", "missing_canonical"}
+        if issue_type in {
+            "technical_seo.noindex_detected",
+            "technical_seo.nofollow_detected",
+            "technical_seo.missing_canonical",
+        }
     ]
     structured_data_errors = [
         {"issue_type": issue_type, "count": count}
         for issue_type, count in issue_counter.items()
-        if issue_type in {"structured_data_invalid", "structured_data_missing"}
+        if issue_type in {
+            "technical_seo.structured_data_invalid",
+            "technical_seo.structured_data_missing",
+        }
     ]
 
     return {

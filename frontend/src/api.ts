@@ -50,9 +50,11 @@ export interface Issue {
   crawl_id: number;
   page_id?: number;
   issue_type: string;
+  category: 'technical_seo' | 'accessibility' | 'content';
   severity: 'critical' | 'warning' | 'info';
   status: 'open' | 'ignored' | 'resolved';
   description?: string;
+  fix_template?: string;
 }
 
 
