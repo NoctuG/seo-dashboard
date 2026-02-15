@@ -42,6 +42,51 @@ export interface UserProfile {
   is_superuser: boolean;
 }
 
+
+
+export interface ManagedUser {
+  id: number;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  is_superuser: boolean;
+}
+
+export interface CreateUserPayload {
+  email: string;
+  full_name?: string;
+  password: string;
+  is_active?: boolean;
+  is_superuser?: boolean;
+}
+
+export interface UpdateUserPayload {
+  email?: string;
+  full_name?: string;
+  password?: string;
+  is_active?: boolean;
+  is_superuser?: boolean;
+}
+
+export async function getUsers(): Promise<ManagedUser[]> {
+  const res = await api.get<ManagedUser[]>('/users');
+  return res.data;
+}
+
+export async function createUser(payload: CreateUserPayload): Promise<ManagedUser> {
+  const res = await api.post<ManagedUser>('/users', payload);
+  return res.data;
+}
+
+export async function updateUser(id: number, payload: UpdateUserPayload): Promise<ManagedUser> {
+  const res = await api.patch<ManagedUser>(`/users/${id}`, payload);
+  return res.data;
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  await api.delete(`/users/${id}`);
+}
+
 export interface ProjectPermissions {
   role: 'admin' | 'viewer';
 }

@@ -9,6 +9,7 @@ import ProjectKeywords from './pages/ProjectKeywords';
 import AiAssistant from './pages/AiAssistant';
 import ProjectReports from './pages/ProjectReports';
 import Login from './pages/Login';
+import Users from './pages/Users';
 import { useAuth } from './auth';
 import { useTranslation } from 'react-i18next';
 
@@ -40,6 +41,7 @@ function App() {
           <Route path="projects/:id/keywords" element={<ProjectKeywords />} />
           <Route path="projects/:id/reports" element={<ProjectReports />} />
           <Route path="ai" element={<AiAssistant />} />
+          <Route path="users" element={<Users />} />
         </Route>
       </Routes>
     </BrowserRouter>
