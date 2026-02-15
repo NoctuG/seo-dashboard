@@ -2,10 +2,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Issue, Crawl } from '../api';
+import PaginationControls from '../components/PaginationControls';
+
+type PaginatedResponse<T> = {
+    items: T[];
+    total: number;
+    page: number;
+    page_size: number;
+};
+
+const PAGE_SIZE = 20;
 
 export default function ProjectIssues() {
     const { id } = useParams<{ id: string }>();
     const [issues, setIssues] = useState<Issue[]>([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [selectedIssueIds, setSelectedIssueIds] = useState<number[]>([]);
     const [categoryFilter, setCategoryFilter] = useState<'all' | Issue['category']>('all');
@@ -13,19 +25,27 @@ export default function ProjectIssues() {
     const [statusFilter, setStatusFilter] = useState<'all' | Issue['status']>('all');
 
     useEffect(() => {
-        if (id) fetchIssues();
-    }, [id]);
+        if (id) fetchIssues(page);
+    }, [id, page]);
 
-    const fetchIssues = async () => {
+    const fetchIssues = async (targetPage: number) => {
         try {
-            const crawlsRes = await api.get<Crawl[]>(`/projects/${id}/crawls`);
-            if (crawlsRes.data.length === 0) {
+            const crawlsRes = await api.get<PaginatedResponse<Crawl>>(`/projects/${id}/crawls`, {
+                params: { page: 1, page_size: 1 },
+            });
+            if (crawlsRes.data.items.length === 0) {
+                setIssues([]);
+                setTotal(0);
                 setLoading(false);
                 return;
             }
-            const latestCrawl = crawlsRes.data[0];
-            const issuesRes = await api.get<Issue[]>(`/crawls/${latestCrawl.id}/issues`);
-            setIssues(issuesRes.data);
+            const latestCrawl = crawlsRes.data.items[0];
+            const issuesRes = await api.get<PaginatedResponse<Issue>>(`/crawls/${latestCrawl.id}/issues`, {
+                params: { page: targetPage, page_size: PAGE_SIZE },
+            });
+            setIssues(issuesRes.data.items);
+            setTotal(issuesRes.data.total);
+            setPage(issuesRes.data.page);
         } catch (error) {
             console.error(error);
         } finally {
@@ -43,7 +63,7 @@ export default function ProjectIssues() {
     }, [issues, categoryFilter, severityFilter, statusFilter]);
 
     const toggleIssueSelection = (issueId: number) => {
-        setSelectedIssueIds(prev => prev.includes(issueId) ? prev.filter(id => id !== issueId) : [...prev, issueId]);
+        setSelectedIssueIds(prev => prev.includes(issueId) ? prev.filter(selectedId => selectedId !== issueId) : [...prev, issueId]);
     };
 
     const selectAllFiltered = () => {
@@ -142,6 +162,7 @@ export default function ProjectIssues() {
                         ))}
                     </tbody>
                 </table>
+                <PaginationControls page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
             </div>
         </div>
     );
