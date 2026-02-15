@@ -1,5 +1,14 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { getAuthToken, getCurrentUser, login, setAuthToken, type UserProfile } from './api';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getCurrentUser,
+  getRefreshToken,
+  login,
+  registerAuthFailureHandler,
+  setAuthTokens,
+  type UserProfile,
+} from './api';
 
 type AuthContextValue = {
   user: UserProfile | null;
@@ -15,9 +24,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const signOut = useCallback(() => {
+    clearAuthTokens();
+    setUser(null);
+  }, []);
+
+  useEffect(() => {
+    registerAuthFailureHandler(signOut);
+    return () => registerAuthFailureHandler(null);
+  }, [signOut]);
+
   useEffect(() => {
     const init = async () => {
-      if (!getAuthToken()) {
+      if (!getAccessToken() || !getRefreshToken()) {
+        signOut();
         setLoading(false);
         return;
       }
@@ -25,14 +45,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const me = await getCurrentUser();
         setUser(me);
       } catch {
-        setAuthToken(null);
-        setUser(null);
+        signOut();
       } finally {
         setLoading(false);
       }
     };
     init();
-  }, []);
+  }, [signOut]);
 
   const value = useMemo(
     () => ({
@@ -40,17 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isAuthenticated: !!user,
       signIn: async (email: string, password: string) => {
-        const token = await login(email, password);
-        setAuthToken(token.access_token);
+        const tokens = await login(email, password);
+        setAuthTokens({
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+        });
         const me = await getCurrentUser();
         setUser(me);
       },
-      signOut: () => {
-        setAuthToken(null);
-        setUser(null);
-      },
+      signOut,
     }),
-    [user, loading]
+    [user, loading, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
