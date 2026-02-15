@@ -1,8 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { api } from '../api';
-import type { KeywordItem, RankHistoryItem } from '../api';
-import { Plus, Trash2, RefreshCw, TrendingUp, Search } from 'lucide-react';
+import {
+    addProjectCompetitor,
+    api,
+    deleteProjectCompetitor,
+    getProjectCompetitors,
+    getProjectVisibility,
+    runProjectKeywordCompare,
+} from '../api';
+import type {
+    CompetitorDomainItem,
+    KeywordItem,
+    RankHistoryItem,
+    VisibilityHistoryItem,
+    VisibilityResponse,
+} from '../api';
+import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield } from 'lucide-react';
 import {
     LineChart,
     Line,
@@ -11,6 +24,8 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
+    BarChart,
+    Bar,
 } from 'recharts';
 
 export default function ProjectKeywords() {
@@ -21,14 +36,23 @@ export default function ProjectKeywords() {
     const [targetUrl, setTargetUrl] = useState('');
     const [checking, setChecking] = useState<number | null>(null);
     const [checkingAll, setCheckingAll] = useState(false);
+    const [comparing, setComparing] = useState(false);
 
-    // History chart state
     const [selectedKeyword, setSelectedKeyword] = useState<KeywordItem | null>(null);
     const [history, setHistory] = useState<RankHistoryItem[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
 
+    const [competitors, setCompetitors] = useState<CompetitorDomainItem[]>([]);
+    const [competitorInput, setCompetitorInput] = useState('');
+    const [compareHistory, setCompareHistory] = useState<VisibilityHistoryItem[]>([]);
+    const [visibility, setVisibility] = useState<VisibilityResponse | null>(null);
+
     useEffect(() => {
-        if (id) fetchKeywords();
+        if (id) {
+            fetchKeywords();
+            fetchCompetitors();
+            fetchVisibility();
+        }
     }, [id]);
 
     const fetchKeywords = async () => {
@@ -42,6 +66,24 @@ export default function ProjectKeywords() {
         }
     };
 
+    const fetchCompetitors = async () => {
+        if (!id) return;
+        try {
+            setCompetitors(await getProjectCompetitors(id));
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const fetchVisibility = async () => {
+        if (!id) return;
+        try {
+            setVisibility(await getProjectVisibility(id));
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     const addKeyword = async () => {
         if (!term.trim()) return;
         try {
@@ -52,6 +94,27 @@ export default function ProjectKeywords() {
             setTerm('');
             setTargetUrl('');
             fetchKeywords();
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const addCompetitor = async () => {
+        if (!id || !competitorInput.trim()) return;
+        try {
+            await addProjectCompetitor(id, competitorInput.trim());
+            setCompetitorInput('');
+            fetchCompetitors();
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const removeCompetitor = async (competitorId: number) => {
+        if (!id) return;
+        try {
+            await deleteProjectCompetitor(id, competitorId);
+            fetchCompetitors();
         } catch (error) {
             console.error(error);
         }
@@ -100,12 +163,25 @@ export default function ProjectKeywords() {
         }
     };
 
+    const runCompare = async () => {
+        if (!id) return;
+        setComparing(true);
+        try {
+            const rows = await runProjectKeywordCompare(id);
+            setCompareHistory(rows);
+            fetchKeywords();
+            fetchVisibility();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setComparing(false);
+        }
+    };
+
     const fetchHistory = async (keywordId: number) => {
         setHistoryLoading(true);
         try {
-            const res = await api.get<RankHistoryItem[]>(
-                `/projects/${id}/keywords/${keywordId}/history`
-            );
+            const res = await api.get<RankHistoryItem[]>(`/projects/${id}/keywords/${keywordId}/history`);
             setHistory(res.data);
         } catch (error) {
             console.error(error);
@@ -124,70 +200,143 @@ export default function ProjectKeywords() {
         rank: h.rank ?? null,
     }));
 
+    const serpCoverageData = useMemo(
+        () =>
+            Object.entries(visibility?.serp_feature_coverage ?? {}).map(([name, ratio]) => ({
+                name,
+                value: Number((ratio * 100).toFixed(1)),
+            })),
+        [visibility]
+    );
+
     if (loading) return <div>Loading...</div>;
 
     return (
-        <div>
-            <div className="flex justify-between items-center mb-6">
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold flex items-center gap-2">
                     <TrendingUp size={24} /> 关键词排名跟踪
                 </h1>
-                {keywords.length > 0 && (
+                <div className="flex gap-2">
+                    {keywords.length > 0 && (
+                        <button
+                            onClick={checkAllRanks}
+                            disabled={checkingAll}
+                            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 disabled:opacity-50"
+                        >
+                            <RefreshCw size={18} className={checkingAll ? 'animate-spin' : ''} />
+                            {checkingAll ? '查询中...' : '查询全部排名'}
+                        </button>
+                    )}
                     <button
-                        onClick={checkAllRanks}
-                        disabled={checkingAll}
-                        className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 disabled:opacity-50"
+                        onClick={runCompare}
+                        disabled={comparing || keywords.length === 0}
+                        className="bg-indigo-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50"
                     >
-                        <RefreshCw size={18} className={checkingAll ? 'animate-spin' : ''} />
-                        {checkingAll ? '查询中...' : '查询全部排名'}
+                        <BarChart3 size={18} className={comparing ? 'animate-pulse' : ''} />
+                        {comparing ? '对比中...' : '批量对比本站/竞品'}
                     </button>
-                )}
+                </div>
             </div>
 
-            {/* Add keyword form */}
+            <div className="bg-white p-4 rounded shadow">
+                <h2 className="text-lg font-semibold mb-3">竞争对手管理</h2>
+                <div className="flex gap-3 items-end mb-3">
+                    <label className="flex flex-col gap-1 text-sm flex-1">
+                        <span className="text-gray-600">竞争对手域名</span>
+                        <input
+                            type="text"
+                            value={competitorInput}
+                            onChange={(e) => setCompetitorInput(e.target.value)}
+                            placeholder="例如：competitor.com"
+                            className="border rounded px-3 py-2"
+                            onKeyDown={(e) => e.key === 'Enter' && addCompetitor()}
+                        />
+                    </label>
+                    <button
+                        onClick={addCompetitor}
+                        disabled={!competitorInput.trim()}
+                        className="bg-slate-800 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-slate-900 disabled:opacity-50"
+                    >
+                        <Plus size={18} /> 添加竞争对手
+                    </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {competitors.length === 0 ? (
+                        <span className="text-sm text-gray-500">暂无竞争对手配置。</span>
+                    ) : (
+                        competitors.map((item) => (
+                            <span key={item.id} className="inline-flex items-center gap-2 bg-slate-100 rounded-full px-3 py-1 text-sm">
+                                {item.domain}
+                                <button onClick={() => removeCompetitor(item.id)} className="text-red-500 hover:text-red-700">
+                                    <Trash2 size={14} />
+                                </button>
+                            </span>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-4 rounded shadow">
+                    <h2 className="text-lg font-semibold mb-3 flex items-center gap-2"><Shield size={18} /> SOV 趋势</h2>
+                    {!visibility || visibility.trend.length === 0 ? (
+                        <p className="text-sm text-gray-500">暂无可见度历史数据，请先执行批量对比。</p>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={240}>
+                            <LineChart data={visibility.trend}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis domain={[0, 1]} />
+                                <Tooltip />
+                                <Line dataKey="visibility_score" stroke="#4f46e5" strokeWidth={2} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+
+                <div className="bg-white p-4 rounded shadow">
+                    <h2 className="text-lg font-semibold mb-3">SERP 特性覆盖率</h2>
+                    {serpCoverageData.length === 0 ? (
+                        <p className="text-sm text-gray-500">暂无 SERP 特性覆盖数据。</p>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={240}>
+                            <BarChart data={serpCoverageData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                <YAxis unit="%" />
+                                <Tooltip formatter={(v) => [`${v}%`, '覆盖率']} />
+                                <Bar dataKey="value" fill="#0ea5e9" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+            </div>
+
             <div className="bg-white p-4 rounded shadow mb-6">
                 <h2 className="text-lg font-semibold mb-3">添加关键词</h2>
                 <div className="flex gap-3 items-end">
                     <label className="flex flex-col gap-1 text-sm flex-1">
                         <span className="text-gray-600">关键词 *</span>
-                        <input
-                            type="text"
-                            value={term}
-                            onChange={(e) => setTerm(e.target.value)}
-                            placeholder="例如：SEO 优化工具"
-                            className="border rounded px-3 py-2"
-                            onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
-                        />
+                        <input type="text" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="例如：SEO 优化工具" className="border rounded px-3 py-2" onKeyDown={(e) => e.key === 'Enter' && addKeyword()} />
                     </label>
                     <label className="flex flex-col gap-1 text-sm flex-1">
                         <span className="text-gray-600">目标 URL（可选）</span>
-                        <input
-                            type="url"
-                            value={targetUrl}
-                            onChange={(e) => setTargetUrl(e.target.value)}
-                            placeholder="https://example.com/page"
-                            className="border rounded px-3 py-2"
-                            onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
-                        />
+                        <input type="url" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} placeholder="https://example.com/page" className="border rounded px-3 py-2" onKeyDown={(e) => e.key === 'Enter' && addKeyword()} />
                     </label>
-                    <button
-                        onClick={addKeyword}
-                        disabled={!term.trim()}
-                        className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50"
-                    >
+                    <button onClick={addKeyword} disabled={!term.trim()} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50">
                         <Plus size={18} /> 添加
                     </button>
                 </div>
             </div>
 
-            {/* Keywords table */}
             {keywords.length === 0 ? (
                 <div className="bg-white p-8 rounded shadow text-center text-gray-500">
                     <Search size={48} className="mx-auto mb-3 text-gray-300" />
                     <p>尚未添加关键词，请在上方添加要跟踪的关键词。</p>
                 </div>
             ) : (
-                <div className="bg-white rounded shadow overflow-hidden mb-6">
+                <div className="bg-white rounded shadow overflow-hidden">
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 border-b">
                             <tr>
@@ -200,65 +349,15 @@ export default function ProjectKeywords() {
                         </thead>
                         <tbody className="divide-y">
                             {keywords.map((kw) => (
-                                <tr
-                                    key={kw.id}
-                                    className={`hover:bg-gray-50 cursor-pointer ${selectedKeyword?.id === kw.id ? 'bg-blue-50' : ''}`}
-                                    onClick={() => selectKeyword(kw)}
-                                >
+                                <tr key={kw.id} className={`hover:bg-gray-50 cursor-pointer ${selectedKeyword?.id === kw.id ? 'bg-blue-50' : ''}`} onClick={() => selectKeyword(kw)}>
                                     <td className="px-4 py-3 font-medium">{kw.term}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">
-                                        {kw.target_url || '-'}
-                                    </td>
-                                    <td className="px-4 py-3 text-center">
-                                        {kw.current_rank != null ? (
-                                            <span
-                                                className={`inline-block px-2 py-1 rounded text-sm font-semibold ${
-                                                    kw.current_rank <= 3
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : kw.current_rank <= 10
-                                                          ? 'bg-blue-100 text-blue-800'
-                                                          : kw.current_rank <= 30
-                                                            ? 'bg-yellow-100 text-yellow-800'
-                                                            : 'bg-red-100 text-red-800'
-                                                }`}
-                                            >
-                                                #{kw.current_rank}
-                                            </span>
-                                        ) : (
-                                            <span className="text-gray-400">未检测</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-gray-500">
-                                        {kw.last_checked
-                                            ? new Date(kw.last_checked).toLocaleString()
-                                            : '-'}
-                                    </td>
+                                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{kw.target_url || '-'}</td>
+                                    <td className="px-4 py-3 text-center">{kw.current_rank != null ? `#${kw.current_rank}` : '未检测'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">{kw.last_checked ? new Date(kw.last_checked).toLocaleString() : '-'}</td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    checkRank(kw.id);
-                                                }}
-                                                disabled={checking === kw.id}
-                                                className="text-green-600 hover:text-green-800 p-1 disabled:opacity-50"
-                                                title="查询排名"
-                                            >
-                                                <RefreshCw
-                                                    size={16}
-                                                    className={checking === kw.id ? 'animate-spin' : ''}
-                                                />
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    deleteKeyword(kw.id);
-                                                }}
-                                                className="text-red-500 hover:text-red-700 p-1"
-                                                title="删除"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); checkRank(kw.id); }} disabled={checking === kw.id} className="text-green-600 hover:text-green-800 p-1 disabled:opacity-50"><RefreshCw size={16} className={checking === kw.id ? 'animate-spin' : ''} /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteKeyword(kw.id); }} className="text-red-500 hover:text-red-700 p-1"><Trash2 size={16} /></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -268,55 +367,37 @@ export default function ProjectKeywords() {
                 </div>
             )}
 
-            {/* Ranking history chart */}
             {selectedKeyword && (
                 <div className="bg-white p-6 rounded shadow">
-                    <h2 className="text-lg font-semibold mb-4">
-                        排名趋势：{selectedKeyword.term}
-                    </h2>
+                    <h2 className="text-lg font-semibold mb-4">排名趋势：{selectedKeyword.term}</h2>
                     {historyLoading ? (
                         <div className="text-center py-8 text-gray-500">加载中...</div>
                     ) : history.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
-                            暂无排名历史数据，请先点击查询排名。
-                        </div>
+                        <div className="text-center py-8 text-gray-500">暂无排名历史数据，请先点击查询排名。</div>
                     ) : (
                         <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis
-                                    dataKey="date"
-                                    tick={{ fontSize: 12 }}
-                                />
-                                <YAxis
-                                    reversed
-                                    domain={[1, 'auto']}
-                                    tick={{ fontSize: 12 }}
-                                    label={{
-                                        value: '排名',
-                                        angle: -90,
-                                        position: 'insideLeft',
-                                        style: { fontSize: 12 },
-                                    }}
-                                />
-                                <Tooltip
-                                    formatter={(value) => {
-                                        const rank = typeof value === 'number' ? value : null;
-                                        return rank != null ? [`#${rank}`, '排名'] : ['未上榜', '排名'];
-                                    }}
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="rank"
-                                    stroke="#2563eb"
-                                    strokeWidth={2}
-                                    dot={{ r: 4 }}
-                                    activeDot={{ r: 6 }}
-                                    connectNulls
-                                />
+                                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                <YAxis reversed domain={[1, 'auto']} tick={{ fontSize: 12 }} />
+                                <Tooltip formatter={(value) => (typeof value === 'number' ? [`#${value}`, '排名'] : ['未上榜', '排名'])} />
+                                <Line type="monotone" dataKey="rank" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls />
                             </LineChart>
                         </ResponsiveContainer>
                     )}
+                </div>
+            )}
+
+            {compareHistory.length > 0 && (
+                <div className="bg-white p-4 rounded shadow">
+                    <h2 className="text-lg font-semibold mb-3">最近一次对比样本（前 10 条）</h2>
+                    <div className="space-y-2 text-sm">
+                        {compareHistory.slice(0, 10).map((item, idx) => (
+                            <div key={`${item.keyword_term}-${item.source_domain}-${idx}`} className="border rounded p-2">
+                                <strong>{item.keyword_term}</strong> · {item.source_domain} · 排名 {item.rank ?? '-'} · SOV {item.visibility_score}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>

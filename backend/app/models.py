@@ -28,6 +28,7 @@ class Project(SQLModel, table=True):
 
     crawls: List["Crawl"] = Relationship(back_populates="project")
     keywords: List["Keyword"] = Relationship(back_populates="project")
+    competitor_domains: List["CompetitorDomain"] = Relationship(back_populates="project")
 
 class Crawl(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -103,6 +104,33 @@ class RankHistory(SQLModel, table=True):
     checked_at: datetime = Field(default_factory=datetime.utcnow)
 
     keyword: Keyword = Relationship(back_populates="rank_history")
+
+
+class CompetitorDomain(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    domain: str = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    project: Project = Relationship(back_populates="competitor_domains")
+
+
+class VisibilityHistory(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_visibilityhistory_project_checked_at", "project_id", "checked_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    keyword_id: Optional[int] = Field(default=None, foreign_key="keyword.id", index=True)
+    keyword_term: str
+    source_domain: str = Field(index=True)
+    rank: Optional[int] = None
+    visibility_score: float = 0
+    result_type: str = "organic"
+    serp_features_json: str = "[]"
+    competitor_positions_json: str = "{}"
+    checked_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class PageTrafficSnapshot(SQLModel, table=True):
