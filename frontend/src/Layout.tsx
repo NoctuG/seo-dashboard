@@ -1,12 +1,51 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { Home, KeyRound, LogOut, Settings, Sparkles, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './auth';
 
+type VersionPayload = {
+    version: string;
+};
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+
 export default function Layout() {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
     const { t, i18n } = useTranslation();
+    const [serverVersion, setServerVersion] = useState<string | null>(null);
+
+    const displayVersion = useMemo(() => {
+        if (serverVersion) {
+            return serverVersion;
+        }
+        return typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'unknown';
+    }, [serverVersion]);
+
+    useEffect(() => {
+        let active = true;
+
+        const loadVersion = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/version`);
+                if (!response.ok) {
+                    return;
+                }
+                const payload = (await response.json()) as VersionPayload;
+                if (active && payload.version) {
+                    setServerVersion(payload.version);
+                }
+            } catch {
+                // Fallback to frontend injected version.
+            }
+        };
+
+        void loadVersion();
+        return () => {
+            active = false;
+        };
+    }, []);
 
     const handleLogout = () => {
         signOut();
@@ -51,13 +90,9 @@ export default function Layout() {
                     <Link to="/change-password" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
                         <KeyRound size={20} /> 修改密码
                     </Link>
-                    {user?.is_superuser && (
-                    <Link to="/settings" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
-                        <Settings size={20} /> 系统设置
-                    </Link>
-                    )}
                 </nav>
-                <div className="p-4 border-t">
+                <div className="p-4 border-t space-y-2">
+                    <p className="text-xs text-gray-500 text-center">Version: {displayVersion}</p>
                     <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 border rounded px-3 py-2 hover:bg-gray-100">
                         <LogOut size={16} /> {t('layout.logout')}
                     </button>
