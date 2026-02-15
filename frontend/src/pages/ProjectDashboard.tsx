@@ -199,7 +199,7 @@ export default function ProjectDashboard() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <div className="flex items-center gap-3"><h1 className="text-2xl font-bold">Dashboard</h1><Link to={`/projects/${id}/reports`} className="text-sm text-blue-600 underline">Reports</Link></div>
         <button onClick={startCrawl} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700">
           <Play size={18} /> Start New Crawl
         </button>

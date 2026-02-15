@@ -1,0 +1,124 @@
+from __future__ import annotations
+
+from datetime import datetime
+import csv
+import io
+import json
+from typing import Any, Dict, Iterable, List, Tuple
+
+from sqlmodel import Session, select
+
+from app.models import Project, ReportTemplate, ReportDeliveryLog
+
+
+class ReportService:
+    def build_report_payload(self, session: Session, project_id: int, template: ReportTemplate) -> Dict[str, Any]:
+        project = session.get(Project, project_id)
+        if not project:
+            raise ValueError("Project not found")
+
+        try:
+            indicators = json.loads(template.indicators_json or "[]")
+        except json.JSONDecodeError:
+            indicators = []
+
+        try:
+            brand_styles = json.loads(template.brand_styles_json or "{}")
+        except json.JSONDecodeError:
+            brand_styles = {}
+
+        latest_logs = session.exec(
+            select(ReportDeliveryLog)
+            .where(ReportDeliveryLog.project_id == project_id)
+            .order_by(ReportDeliveryLog.created_at.desc())
+            .limit(5)
+        ).all()
+
+        return {
+            "project": {
+                "id": project.id,
+                "name": project.name,
+                "domain": project.domain,
+            },
+            "template": {
+                "id": template.id,
+                "name": template.name,
+                "time_range": template.time_range,
+                "indicators": indicators,
+                "brand_styles": brand_styles,
+            },
+            "generated_at": datetime.utcnow().isoformat(),
+            "ops": {
+                "recent_delivery_count": len(latest_logs),
+                "recent_failures": len([log for log in latest_logs if log.status == "failed"]),
+            },
+        }
+
+    def render_csv(self, payload: Dict[str, Any]) -> bytes:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        self._write_csv_section(writer, "project", payload.get("project", {}))
+        self._write_csv_section(writer, "template", payload.get("template", {}))
+        self._write_csv_section(writer, "ops", payload.get("ops", {}))
+        writer.writerow(["generated_at", payload.get("generated_at")])
+        return output.getvalue().encode("utf-8")
+
+    def _write_csv_section(self, writer: csv.writer, section_name: str, data: Dict[str, Any]) -> None:
+        for key, value in data.items():
+            writer.writerow([section_name, key, self._stringify(value)])
+
+    def _stringify(self, value: Any) -> str:
+        if isinstance(value, (dict, list, tuple)):
+            return json.dumps(value, ensure_ascii=False)
+        return str(value)
+
+    def render_pdf(self, payload: Dict[str, Any]) -> bytes:
+        lines = [
+            f"Report: {payload['template']['name']}",
+            f"Project: {payload['project']['name']} ({payload['project']['domain']})",
+            f"Time range: {payload['template']['time_range']}",
+            f"Indicators: {', '.join(payload['template']['indicators']) or '-'}",
+            f"Generated at: {payload['generated_at']}",
+        ]
+        return self._minimal_pdf(lines)
+
+    def _minimal_pdf(self, lines: Iterable[str]) -> bytes:
+        escaped = "\\n".join(line.replace("(", "\\(").replace(")", "\\)") for line in lines)
+        content_stream = f"BT /F1 12 Tf 50 760 Td ({escaped}) Tj ET".encode("latin-1", errors="ignore")
+
+        objects = [
+            b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+            b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
+            b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n",
+            b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n",
+            f"5 0 obj << /Length {len(content_stream)} >> stream\n".encode("latin-1") + content_stream + b"\nendstream endobj\n",
+        ]
+
+        buffer = io.BytesIO()
+        buffer.write(b"%PDF-1.4\n")
+        offsets: List[int] = [0]
+        for obj in objects:
+            offsets.append(buffer.tell())
+            buffer.write(obj)
+
+        xref_start = buffer.tell()
+        buffer.write(f"xref\n0 {len(objects) + 1}\n".encode("latin-1"))
+        buffer.write(b"0000000000 65535 f \n")
+        for offset in offsets[1:]:
+            buffer.write(f"{offset:010d} 00000 n \n".encode("latin-1"))
+
+        buffer.write(
+            f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_start}\n%%EOF".encode("latin-1")
+        )
+        return buffer.getvalue()
+
+    def render(self, payload: Dict[str, Any], export_format: str) -> Tuple[bytes, str]:
+        fmt = export_format.lower()
+        if fmt == "csv":
+            return self.render_csv(payload), "text/csv"
+        if fmt == "pdf":
+            return self.render_pdf(payload), "application/pdf"
+        raise ValueError("Unsupported format")
+
+
+report_service = ReportService()

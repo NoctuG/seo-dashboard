@@ -337,3 +337,83 @@ export async function getProjectRoi(
   });
   return res.data;
 }
+
+export interface ReportTemplate {
+  id: number;
+  project_id: number;
+  name: string;
+  indicators: string[];
+  brand_styles: Record<string, string>;
+  time_range: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportSchedule {
+  id: number;
+  project_id: number;
+  template_id: number;
+  cron_expression: string;
+  timezone: string;
+  recipient_email: string;
+  active: boolean;
+  retry_limit: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportDeliveryLog {
+  id: number;
+  project_id: number;
+  template_id?: number;
+  schedule_id?: number;
+  format: string;
+  status: string;
+  retries: number;
+  recipient_email?: string;
+  error_message?: string;
+  created_at: string;
+}
+
+export async function getReportTemplates(projectId: string | number): Promise<ReportTemplate[]> {
+  const res = await api.get<ReportTemplate[]>(`/projects/${projectId}/reports/templates`);
+  return res.data;
+}
+
+export async function createReportTemplate(
+  projectId: string | number,
+  payload: Pick<ReportTemplate, 'name' | 'indicators' | 'brand_styles' | 'time_range'>,
+): Promise<ReportTemplate> {
+  const res = await api.post<ReportTemplate>(`/projects/${projectId}/reports/templates`, payload);
+  return res.data;
+}
+
+export async function exportProjectReport(
+  projectId: string | number,
+  payload: { template_id: number; format: 'csv' | 'pdf' },
+): Promise<Blob> {
+  const res = await api.post(`/projects/${projectId}/reports/export`, payload, { responseType: 'blob' });
+  return res.data;
+}
+
+export async function getReportSchedules(projectId: string | number): Promise<ReportSchedule[]> {
+  const res = await api.get<ReportSchedule[]>(`/projects/${projectId}/reports/schedules`);
+  return res.data;
+}
+
+export async function createReportSchedule(
+  projectId: string | number,
+  payload: Pick<ReportSchedule, 'template_id' | 'cron_expression' | 'timezone' | 'recipient_email' | 'active' | 'retry_limit'>,
+): Promise<ReportSchedule> {
+  const res = await api.post<ReportSchedule>(`/projects/${projectId}/reports/schedules`, payload);
+  return res.data;
+}
+
+export async function deleteReportSchedule(projectId: string | number, scheduleId: number): Promise<void> {
+  await api.delete(`/projects/${projectId}/reports/schedules/${scheduleId}`);
+}
+
+export async function getReportLogs(projectId: string | number): Promise<ReportDeliveryLog[]> {
+  const res = await api.get<ReportDeliveryLog[]>(`/projects/${projectId}/reports/logs`);
+  return res.data;
+}
