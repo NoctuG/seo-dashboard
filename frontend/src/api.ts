@@ -1,30 +1,8 @@
 import axios, { AxiosError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
-const ACCESS_TOKEN_STORAGE_KEY = 'seo.auth.accessToken';
-const REFRESH_TOKEN_STORAGE_KEY = 'seo.auth.refreshToken';
-
-type TokenPair = {
-  accessToken: string;
-  refreshToken: string;
-};
-
-type AuthFailureHandler = () => void;
-
-let accessToken: string | null = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-let refreshToken: string | null = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
-let authFailureHandler: AuthFailureHandler | null = null;
-let refreshPromise: Promise<TokenPair> | null = null;
-
-function persistTokens(tokens: TokenPair | null) {
-  if (tokens) {
-    accessToken = tokens.accessToken;
-    refreshToken = tokens.refreshToken;
-    localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, tokens.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, tokens.refreshToken);
-    return;
-  }
+export const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const TOKEN_STORAGE_KEY = 'seo.auth.token';
 
   accessToken = null;
   refreshToken = null;
