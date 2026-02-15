@@ -153,6 +153,12 @@ class Settings:
     AHREFS_API_KEY: str = os.getenv("AHREFS_API_KEY", "")
     MAJESTIC_API_KEY: str = os.getenv("MAJESTIC_API_KEY", "")
 
+    # Keyword research providers
+    KEYWORD_RESEARCH_PROVIDER: str = os.getenv("KEYWORD_RESEARCH_PROVIDER", "sample")  # sample, dataforseo, semrush
+    DATAFORSEO_LOGIN: str = os.getenv("DATAFORSEO_LOGIN", "")
+    DATAFORSEO_PASSWORD: str = os.getenv("DATAFORSEO_PASSWORD", "")
+    SEMRUSH_API_KEY: str = os.getenv("SEMRUSH_API_KEY", "")
+
     # Web analytics settings
     ANALYTICS_PROVIDER: str = os.getenv("ANALYTICS_PROVIDER", "sample")  # sample, ga4, matomo
     ANALYTICS_MEANINGFUL_GROWTH_PCT: float = float(os.getenv("ANALYTICS_MEANINGFUL_GROWTH_PCT", "10"))
@@ -209,6 +215,17 @@ def validate_settings(current_settings: Settings | SimpleNamespace = settings) -
         errors.append("AHREFS_API_KEY is required when BACKLINK_PROVIDER=ahrefs.")
     if backlink_provider == "majestic" and not (getattr(current_settings, "MAJESTIC_API_KEY", "") or "").strip():
         errors.append("MAJESTIC_API_KEY is required when BACKLINK_PROVIDER=majestic.")
+
+    keyword_provider = (getattr(current_settings, "KEYWORD_RESEARCH_PROVIDER", "sample") or "sample").lower()
+    if keyword_provider not in {"sample", "dataforseo", "semrush"}:
+        errors.append("KEYWORD_RESEARCH_PROVIDER must be one of: sample, dataforseo, semrush.")
+    if keyword_provider == "dataforseo":
+        if not (getattr(current_settings, "DATAFORSEO_LOGIN", "") or "").strip():
+            errors.append("DATAFORSEO_LOGIN is required when KEYWORD_RESEARCH_PROVIDER=dataforseo.")
+        if not (getattr(current_settings, "DATAFORSEO_PASSWORD", "") or "").strip():
+            errors.append("DATAFORSEO_PASSWORD is required when KEYWORD_RESEARCH_PROVIDER=dataforseo.")
+    if keyword_provider == "semrush" and not (getattr(current_settings, "SEMRUSH_API_KEY", "") or "").strip():
+        errors.append("SEMRUSH_API_KEY is required when KEYWORD_RESEARCH_PROVIDER=semrush.")
 
     analytics_provider = (getattr(current_settings, "ANALYTICS_PROVIDER", "sample") or "sample").lower()
     if analytics_provider not in {"sample", "ga4", "matomo"}:

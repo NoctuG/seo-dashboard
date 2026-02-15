@@ -484,6 +484,39 @@ export interface KeywordItem {
   last_checked?: string;
 }
 
+
+export interface KeywordResearchRequest {
+  seed_term: string;
+  locale?: string;
+  market?: string;
+  limit?: number;
+}
+
+export interface KeywordResearchItem {
+  keyword: string;
+  search_volume: number;
+  cpc: number;
+  difficulty: number;
+  intent: string;
+  provider_raw: Record<string, unknown>;
+}
+
+export interface KeywordResearchResponse {
+  provider: string;
+  items: KeywordResearchItem[];
+}
+
+export interface KeywordBulkCreateRequest {
+  keywords: string[];
+  locale?: string;
+  market?: string;
+}
+
+export interface KeywordBulkCreateResponse {
+  created: KeywordItem[];
+  skipped_existing: string[];
+}
+
 export interface RankHistoryItem {
   id: number;
   keyword_id: number;
@@ -655,9 +688,12 @@ export async function getProjectBacklinkChanges(
 
 export async function getProjectCompetitors(
   projectId: string | number,
-): Promise<CompetitorDomainItem[]> {
-  const res = await api.get<CompetitorDomainItem[]>(
+  page = 1,
+  pageSize = 20,
+): Promise<PaginatedResponse<CompetitorDomainItem>> {
+  const res = await api.get<PaginatedResponse<CompetitorDomainItem>>(
     `/projects/${projectId}/competitors`,
+    { params: { page, page_size: pageSize } },
   );
   return res.data;
 }
@@ -678,6 +714,29 @@ export async function deleteProjectCompetitor(
   competitorId: number,
 ): Promise<void> {
   await api.delete(`/projects/${projectId}/competitors/${competitorId}`);
+}
+
+
+export async function runKeywordResearch(
+  projectId: string | number,
+  payload: KeywordResearchRequest,
+): Promise<KeywordResearchResponse> {
+  const res = await api.post<KeywordResearchResponse>(
+    `/projects/${projectId}/keyword-research`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function bulkCreateProjectKeywords(
+  projectId: string | number,
+  payload: KeywordBulkCreateRequest,
+): Promise<KeywordBulkCreateResponse> {
+  const res = await api.post<KeywordBulkCreateResponse>(
+    `/projects/${projectId}/keywords/bulk-create`,
+    payload,
+  );
+  return res.data;
 }
 
 export async function runProjectKeywordCompare(
