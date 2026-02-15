@@ -4,6 +4,7 @@ import Projects from './pages/Projects';
 import ProjectDashboard from './pages/ProjectDashboard';
 import ProjectPages from './pages/ProjectPages';
 import ProjectIssues from './pages/ProjectIssues';
+import ProjectKeywords from './pages/ProjectKeywords';
 import AiAssistant from './pages/AiAssistant';
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
           <Route path="projects/:id" element={<ProjectDashboard />} />
           <Route path="projects/:id/pages" element={<ProjectPages />} />
           <Route path="projects/:id/issues" element={<ProjectIssues />} />
+          <Route path="projects/:id/keywords" element={<ProjectKeywords />} />
           <Route path="ai" element={<AiAssistant />} />
         </Route>
       </Routes>

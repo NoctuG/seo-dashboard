@@ -68,3 +68,31 @@ class LinkRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class KeywordCreate(BaseModel):
+    term: str
+    target_url: Optional[str] = None
+
+
+class KeywordRead(BaseModel):
+    id: int
+    project_id: int
+    term: str
+    target_url: Optional[str]
+    current_rank: Optional[int]
+    last_checked: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class RankHistoryRead(BaseModel):
+    id: int
+    keyword_id: int
+    rank: Optional[int]
+    url: Optional[str]
+    checked_at: datetime
+
+    class Config:
+        from_attributes = True

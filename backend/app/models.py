@@ -87,3 +87,14 @@ class Keyword(SQLModel, table=True):
     last_checked: Optional[datetime] = None
 
     project: Project = Relationship(back_populates="keywords")
+    rank_history: List["RankHistory"] = Relationship(back_populates="keyword")
+
+
+class RankHistory(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    keyword_id: int = Field(foreign_key="keyword.id")
+    rank: Optional[int] = None
+    url: Optional[str] = None
+    checked_at: datetime = Field(default_factory=datetime.utcnow)
+
+    keyword: Keyword = Relationship(back_populates="rank_history")

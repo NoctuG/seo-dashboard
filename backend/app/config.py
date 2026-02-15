@@ -25,4 +25,8 @@ class Settings:
     # Crawl settings
     DEFAULT_CRAWL_MAX_PAGES: int = int(os.getenv("DEFAULT_CRAWL_MAX_PAGES", "50"))
 
+    # SERP API settings
+    SERP_API_KEY: str = os.getenv("SERP_API_KEY", "")
+    SERP_API_PROVIDER: str = os.getenv("SERP_API_PROVIDER", "serpapi")  # serpapi or valueserp
+
 settings = Settings()

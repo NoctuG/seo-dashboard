@@ -72,6 +72,9 @@ export default function ProjectDashboard() {
             <button onClick={startCrawl} className="bg-blue-600 text-white px-4 py-2 rounded mt-2 flex items-center gap-2">
                 <Play size={18} /> Start Crawl
             </button>
+            <div className="mt-4">
+                <Link to={`/projects/${id}/keywords`} className="text-blue-600 hover:underline">Keyword Rankings</Link>
+            </div>
         </div>
     );
 
@@ -149,6 +152,7 @@ export default function ProjectDashboard() {
                 <div className="mt-4 flex gap-4">
                     <Link to={`/projects/${id}/pages`} className="text-blue-600 hover:underline">View Pages</Link>
                     <Link to={`/projects/${id}/issues`} className="text-blue-600 hover:underline">View Issues</Link>
+                    <Link to={`/projects/${id}/keywords`} className="text-blue-600 hover:underline">Keyword Rankings</Link>
                 </div>
             </div>
         </div>
