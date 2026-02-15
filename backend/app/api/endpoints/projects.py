@@ -26,19 +26,42 @@ from app.visibility_service import visibility_service
 router = APIRouter()
 
 
+def _project_to_read(project: Project) -> ProjectRead:
+    try:
+        brand_keywords = json.loads(project.brand_keywords_json or "[]")
+        if not isinstance(brand_keywords, list):
+            brand_keywords = []
+    except json.JSONDecodeError:
+        brand_keywords = []
+
+    return ProjectRead(
+        id=project.id,
+        name=project.name,
+        domain=project.domain,
+        brand_keywords=brand_keywords,
+        brand_regex=project.brand_regex,
+        created_at=project.created_at,
+    )
+
+
 @router.post("/", response_model=ProjectRead)
 def create_project(project: ProjectCreate, session: Session = Depends(get_session)):
-    db_project = Project.model_validate(project)
+    db_project = Project(
+        name=project.name,
+        domain=project.domain,
+        brand_keywords_json=json.dumps(project.brand_keywords, ensure_ascii=False),
+        brand_regex=project.brand_regex,
+    )
     session.add(db_project)
     session.commit()
     session.refresh(db_project)
-    return db_project
+    return _project_to_read(db_project)
 
 
 @router.get("/", response_model=List[ProjectRead])
 def read_projects(skip: int = 0, limit: int = 100, session: Session = Depends(get_session)):
     projects = session.exec(select(Project).offset(skip).limit(limit)).all()
-    return projects
+    return [_project_to_read(project) for project in projects]
 
 
 @router.get("/{project_id}", response_model=ProjectRead)
@@ -46,7 +69,7 @@ def read_project(project_id: int, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    return project
+    return _project_to_read(project)
 
 
 @router.delete("/{project_id}")
@@ -95,7 +118,7 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session)):
 
     statement = select(Crawl).where(Crawl.project_id == project_id).order_by(Crawl.start_time.desc())
     last_crawl = session.exec(statement).first()
-    analytics = analytics_service.get_project_analytics(project_id, project.domain)
+    analytics = analytics_service.get_project_analytics(project_id, project.domain, project.brand_keywords_json, project.brand_regex)
 
     if not last_crawl:
         return {

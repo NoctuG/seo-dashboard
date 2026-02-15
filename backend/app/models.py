@@ -24,6 +24,8 @@ class Project(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     domain: str
+    brand_keywords_json: str = "[]"
+    brand_regex: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     crawls: List["Crawl"] = Relationship(back_populates="project")

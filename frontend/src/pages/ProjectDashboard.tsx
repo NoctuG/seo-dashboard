@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   api,
@@ -35,6 +35,9 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  BarChart,
+  Bar,
+  Legend,
 } from 'recharts';
 
 export default function ProjectDashboard() {
@@ -49,6 +52,7 @@ export default function ProjectDashboard() {
   const [authority, setAuthority] = useState<AuthorityResponse | null>(null);
   const [backlinks, setBacklinks] = useState<BacklinkResponse | null>(null);
   const [changes, setChanges] = useState<BacklinkChangesResponse | null>(null);
+  const [brandWindow, setBrandWindow] = useState<'7d' | '30d' | '90d'>('30d');
 
   useEffect(() => {
     if (id) {
@@ -118,6 +122,31 @@ export default function ProjectDashboard() {
 
   const { last_crawl, issues_breakdown, analytics } = stats;
   const hasGrowth = analytics.period.growth_pct >= 0;
+
+  const brandWindowDays = brandWindow === '7d' ? 7 : brandWindow === '30d' ? 30 : 90;
+  const brandSeries = useMemo(() => {
+    const rows = [...(analytics.daily_brand_segments || [])];
+    return rows.slice(Math.max(rows.length - brandWindowDays, 0));
+  }, [analytics.daily_brand_segments, brandWindowDays]);
+
+  const brandSummary = useMemo(() => {
+    return brandSeries.reduce(
+      (acc, row) => ({
+        brandSessions: acc.brandSessions + row.brand_sessions,
+        nonBrandSessions: acc.nonBrandSessions + row.non_brand_sessions,
+        brandConversions: acc.brandConversions + row.brand_conversions,
+        nonBrandConversions: acc.nonBrandConversions + row.non_brand_conversions,
+      }),
+      { brandSessions: 0, nonBrandSessions: 0, brandConversions: 0, nonBrandConversions: 0 },
+    );
+  }, [brandSeries]);
+
+  const qualityCards = [
+    { label: 'Engaged Sessions', value: analytics.quality_metrics.engaged_sessions },
+    { label: 'Avg Engagement Time (s)', value: analytics.quality_metrics.avg_engagement_time },
+    { label: 'Pages / Session', value: analytics.quality_metrics.pages_per_session },
+    { label: 'Key Events', value: analytics.quality_metrics.key_events },
+  ];
 
   const renderContentList = (title: string, items: ContentPerformanceItem[]) => (
     <div className="bg-white p-6 rounded shadow">
@@ -291,6 +320,47 @@ export default function ProjectDashboard() {
         <div className="bg-white p-6 rounded shadow">
           <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2"><MousePointerClick size={16}/>Conversions</h3>
           <p className="text-3xl font-bold">{analytics.totals.conversions}</p>
+        </div>
+      </div>
+
+      <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+        {qualityCards.map((card) => (
+          <div key={card.label} className="bg-white p-6 rounded shadow">
+            <h3 className="text-gray-500 text-sm uppercase">{card.label}</h3>
+            <p className="text-3xl font-bold">{card.value ?? '—'}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white p-6 rounded shadow mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold">Brand vs Non-brand</h3>
+          <select
+            value={brandWindow}
+            onChange={(e) => setBrandWindow(e.target.value as '7d' | '30d' | '90d')}
+            className="border rounded px-3 py-1 text-sm"
+          >
+            <option value="7d">7 days</option>
+            <option value="30d">30 days</option>
+            <option value="90d">90 days</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3 text-sm">
+          <div>Brand Sessions: <span className="font-semibold">{brandSummary.brandSessions}</span> · Conversions: <span className="font-semibold">{brandSummary.brandConversions}</span></div>
+          <div>Non-brand Sessions: <span className="font-semibold">{brandSummary.nonBrandSessions}</span> · Conversions: <span className="font-semibold">{brandSummary.nonBrandConversions}</span></div>
+        </div>
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={brandSeries}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="brand_sessions" fill="#2563eb" name="Brand Sessions" />
+              <Bar dataKey="non_brand_sessions" fill="#94a3b8" name="Non-brand Sessions" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
