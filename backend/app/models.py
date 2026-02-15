@@ -37,6 +37,8 @@ class AuditActionType(str, Enum):
     PROJECT_DELETE = "project_delete"
     CRAWL_START = "crawl_start"
     ADMIN_BOOTSTRAP = "admin_bootstrap"
+    BACKUP_CREATE = "backup_create"
+    BACKUP_RESTORE = "backup_restore"
 
 class Project(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
