@@ -5,6 +5,9 @@ import './i18n';
 import App from './App.tsx';
 import { AuthProvider } from './auth';
 import ErrorBoundary from './components/ErrorBoundary';
+import { applyThemePreference, getStoredThemePreference } from './theme';
+
+applyThemePreference(getStoredThemePreference());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

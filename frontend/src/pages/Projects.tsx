@@ -4,21 +4,37 @@ import type { Project } from '../api';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useAuth } from '../auth';
+import PaginationControls from '../components/PaginationControls';
+
+type PaginatedResponse<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+const PAGE_SIZE = 20;
 
 export default function Projects() {
     const [projects, setProjects] = useState<Project[]>([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
     const [isCreating, setIsCreating] = useState(false);
     const [newProject, setNewProject] = useState({ name: '', domain: '' });
     const { user } = useAuth();
 
     useEffect(() => {
-        fetchProjects();
-    }, []);
+        fetchProjects(page);
+    }, [page]);
 
-    const fetchProjects = async () => {
+    const fetchProjects = async (targetPage: number) => {
         try {
-            const res = await api.get('/projects');
-            setProjects(res.data);
+            const res = await api.get<PaginatedResponse<Project>>('/projects', {
+                params: { page: targetPage, page_size: PAGE_SIZE },
+            });
+            setProjects(res.data.items);
+            setTotal(res.data.total);
+            setPage(res.data.page);
         } catch (error) {
             console.error(error);
         }
@@ -30,7 +46,7 @@ export default function Projects() {
             await api.post('/projects', newProject);
             setIsCreating(false);
             setNewProject({ name: '', domain: '' });
-            fetchProjects();
+            fetchProjects(page);
         } catch (error) {
             console.error(error);
         }
@@ -81,14 +97,17 @@ export default function Projects() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projects.map(p => (
-                    <Link to={`/projects/${p.id}`} key={p.id} className="block bg-white p-6 rounded shadow hover:shadow-md transition">
-                        <h3 className="text-lg font-semibold">{p.name}</h3>
-                        <p className="text-gray-500">{p.domain}</p>
-                        <p className="text-sm text-gray-400 mt-4">Created {new Date(p.created_at).toLocaleDateString()}</p>
-                    </Link>
-                ))}
+            <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {projects.map(p => (
+                        <Link to={`/projects/${p.id}`} key={p.id} className="block bg-white p-6 rounded shadow hover:shadow-md transition">
+                            <h3 className="text-lg font-semibold">{p.name}</h3>
+                            <p className="text-gray-500">{p.domain}</p>
+                            <p className="text-sm text-gray-400 mt-4">Created {new Date(p.created_at).toLocaleDateString()}</p>
+                        </Link>
+                    ))}
+                </div>
+                <PaginationControls page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
             </div>
         </div>
     );

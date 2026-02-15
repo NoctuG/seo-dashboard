@@ -60,6 +60,10 @@ export function getRefreshToken() {
   return refreshToken;
 }
 
+export function getAuthToken() {
+  return accessToken;
+}
+
 export function registerAuthFailureHandler(handler: AuthFailureHandler | null) {
   authFailureHandler = handler;
 }
@@ -478,6 +482,13 @@ export interface VisibilityResponse {
   groups: VisibilityGroup[];
   trend: VisibilityTrendPoint[];
   serp_feature_coverage: Record<string, number>;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 export interface VisibilityHistoryItem {

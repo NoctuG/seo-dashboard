@@ -204,7 +204,7 @@ export default function ProjectDashboard() {
     <div className="bg-white p-6 rounded shadow">
       <h3 className="font-semibold mb-3">{title}</h3>
       <ul className="space-y-3 text-sm">
-        {items.length === 0 && <li className="text-gray-500">No data</li>}
+        {items.length === 0 && <li className="text-slate-600 dark:text-slate-300">No data</li>}
         {items.map((item) => (
           <li key={`${title}-${item.url}`} className="border-b pb-2">
             <a
@@ -215,11 +215,11 @@ export default function ProjectDashboard() {
             >
               {item.url}
             </a>
-            <div className="text-xs text-gray-600 mt-1 flex flex-wrap gap-3">
+            <div className="text-xs text-slate-700 dark:text-slate-300 mt-1 flex flex-wrap gap-3">
               <span>Sessions: {item.sessions}</span>
               <span>CVR: {item.conversion_rate}%</span>
               <span>7d: {item.change_7d}%</span>
-              {item.decay_flag && <span className="text-red-600">Decay</span>}
+              {item.decay_flag && <span className="text-red-700 dark:text-red-300">Decay</span>}
             </div>
             {item.suggested_action && (
               <p className="text-xs text-orange-700 mt-1">
@@ -233,7 +233,7 @@ export default function ProjectDashboard() {
   );
 
   return (
-    <div>
+    <div className="text-slate-900 dark:text-slate-100">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -256,23 +256,23 @@ export default function ProjectDashboard() {
 
       <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
         <label className="flex flex-col gap-2 text-sm">
-          <span className="text-gray-700">Max pages</span>
+          <span className="text-slate-700 dark:text-slate-200">Max pages</span>
           <input
             type="number"
             min={1}
             value={maxPages}
             onChange={(e) => setMaxPages(Number(e.target.value) || 1)}
-            className="border rounded px-3 py-2"
+            className="border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800"
           />
         </label>
         <label className="flex flex-col gap-2 text-sm">
-          <span className="text-gray-700">Sitemap URL (optional)</span>
+          <span className="text-slate-700 dark:text-slate-200">Sitemap URL (optional)</span>
           <input
             type="url"
             placeholder="https://example.com/sitemap.xml"
             value={sitemapUrl}
             onChange={(e) => setSitemapUrl(e.target.value)}
-            className="border rounded px-3 py-2"
+            className="border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800"
           />
         </label>
       </div>
@@ -294,8 +294,8 @@ export default function ProjectDashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded shadow">
-          <h3 className="text-gray-500 text-sm uppercase">Total Pages</h3>
+        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
+          <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Total Pages</h3>
           <p className="text-3xl font-bold">{stats.total_pages}</p>
         </div>
         <div className="bg-white p-6 rounded shadow border-l-4 border-red-500">
@@ -327,7 +327,7 @@ export default function ProjectDashboard() {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded shadow mb-8">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">Technical Health</h2>
           <span className="text-sm text-gray-600">
@@ -362,7 +362,7 @@ export default function ProjectDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-          <div className="border rounded p-4">
+          <div className="border border-slate-200 dark:border-slate-700 rounded p-4">
             <h3 className="font-medium mb-2">Index Coverage Anomalies</h3>
             <ul className="text-sm space-y-1">
               {stats.technical_health.indexability_anomalies.length === 0 && (
@@ -376,7 +376,7 @@ export default function ProjectDashboard() {
               ))}
             </ul>
           </div>
-          <div className="border rounded p-4">
+          <div className="border border-slate-200 dark:border-slate-700 rounded p-4">
             <h3 className="font-medium mb-2">Structured Data Errors</h3>
             <ul className="text-sm space-y-1">
               {stats.technical_health.structured_data_errors.length === 0 && (
@@ -390,7 +390,7 @@ export default function ProjectDashboard() {
               ))}
             </ul>
           </div>
-          <div className="border rounded p-4 h-48">
+          <div className="border border-slate-200 dark:border-slate-700 rounded p-4 h-48">
             <h3 className="font-medium mb-2">Pass Rate Trend</h3>
             <ResponsiveContainer width="100%" height="85%">
               <LineChart data={stats.technical_health.trend}>
@@ -429,14 +429,14 @@ export default function ProjectDashboard() {
             {backlinks?.backlinks_total ?? 0}
           </p>
         </div>
-        <div className="bg-white p-6 rounded shadow">
-          <h3 className="text-gray-500 text-sm uppercase">Ref Domains</h3>
+        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
+          <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Ref Domains</h3>
           <p className="text-3xl font-bold">{backlinks?.ref_domains ?? 0}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white p-6 rounded shadow h-72">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 h-72">
           <h3 className="font-semibold mb-3">Authority Trend</h3>
           <ResponsiveContainer width="100%" height="90%">
             <LineChart data={authority?.history ?? []}>
@@ -454,7 +454,7 @@ export default function ProjectDashboard() {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white p-6 rounded shadow h-72">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 h-72">
           <h3 className="font-semibold mb-3">Backlink Trend</h3>
           <ResponsiveContainer width="100%" height="90%">
             <LineChart data={backlinks?.history ?? []}>
@@ -479,7 +479,7 @@ export default function ProjectDashboard() {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded shadow mb-8 overflow-x-auto">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8 overflow-x-auto">
         <h3 className="font-semibold mb-3">最近新增 / 失效外链</h3>
         <table className="w-full text-sm">
           <thead>
@@ -517,7 +517,7 @@ export default function ProjectDashboard() {
         </table>
       </div>
 
-      <div className="bg-white p-6 rounded shadow mb-8">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h3 className="font-semibold flex items-center gap-2">
             <BadgePercent size={18} />
@@ -553,7 +553,7 @@ export default function ProjectDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div className="rounded bg-slate-50 p-4">
-            <p className="text-xs text-gray-500">收益 (Gain)</p>
+            <p className="text-xs text-slate-600 dark:text-slate-300">收益 (Gain)</p>
             <p className="text-2xl font-bold">{roi?.gain ?? 0}</p>
           </div>
           <div className="rounded bg-slate-50 p-4">
@@ -621,8 +621,8 @@ export default function ProjectDashboard() {
           </h3>
           <p className="text-3xl font-bold">{analytics.period.daily_average}</p>
         </div>
-        <div className="bg-white p-6 rounded shadow">
-          <h3 className="text-gray-500 text-sm uppercase">Monthly Sessions</h3>
+        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
+          <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Monthly Sessions</h3>
           <p className="text-3xl font-bold">{analytics.period.monthly_total}</p>
         </div>
         <div className="bg-white p-6 rounded shadow">
@@ -651,7 +651,7 @@ export default function ProjectDashboard() {
         ))}
       </div>
 
-      <div className="bg-white p-6 rounded shadow mb-8">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">Brand vs Non-brand</h3>
           <select
@@ -752,7 +752,7 @@ export default function ProjectDashboard() {
       </div>
 
       {last_crawl ? (
-        <div className="bg-white p-6 rounded shadow">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
           <h2 className="text-xl font-bold mb-4">Last Crawl Status</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -806,7 +806,7 @@ export default function ProjectDashboard() {
           </div>
         </div>
       ) : (
-        <div className="bg-white p-6 rounded shadow">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
           <h2 className="text-xl font-bold mb-4">Last Crawl Status</h2>
           <p className="text-gray-600">
             No crawl data yet. Start a crawl to populate technical SEO metrics.

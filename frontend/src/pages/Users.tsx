@@ -72,16 +72,16 @@ export default function Users() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-900 dark:text-slate-100">
       <h1 className="text-2xl font-bold">User Management</h1>
 
-      <form onSubmit={handleCreate} className="bg-white p-6 rounded shadow max-w-2xl">
+      <form onSubmit={handleCreate} className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 max-w-2xl">
         <h2 className="text-lg font-semibold mb-4">Create User</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="text-sm">
             Email
             <input
-              className="mt-1 w-full border rounded px-3 py-2"
+              className="mt-1 w-full border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800"
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -91,7 +91,7 @@ export default function Users() {
           <label className="text-sm">
             Full Name
             <input
-              className="mt-1 w-full border rounded px-3 py-2"
+              className="mt-1 w-full border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800"
               value={form.full_name}
               onChange={(e) => setForm({ ...form, full_name: e.target.value })}
             />
@@ -99,7 +99,7 @@ export default function Users() {
           <label className="text-sm">
             Password
             <input
-              className="mt-1 w-full border rounded px-3 py-2"
+              className="mt-1 w-full border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800"
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -125,16 +125,16 @@ export default function Users() {
             </label>
           </div>
         </div>
-        <button className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" type="submit">
+        <button className="mt-4 bg-blue-700 dark:bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-800 dark:hover:bg-blue-500" type="submit">
           Create
         </button>
       </form>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
 
-      <div className="bg-white rounded shadow overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded shadow border border-slate-200 dark:border-slate-700 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
             <tr>
               <th className="p-3 text-left">Email</th>
               <th className="p-3 text-left">Name</th>
@@ -145,26 +145,26 @@ export default function Users() {
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="border-b last:border-b-0">
+              <tr key={user.id} className="border-b border-slate-200 dark:border-slate-700 last:border-b-0">
                 <td className="p-3">{user.email}</td>
                 <td className="p-3">{user.full_name || '-'}</td>
                 <td className="p-3">{user.is_active ? 'Yes' : 'No'}</td>
                 <td className="p-3">{user.is_superuser ? 'Yes' : 'No'}</td>
                 <td className="p-3 space-x-2">
                   <button
-                    className="border rounded px-2 py-1 hover:bg-gray-100"
+                    className="border border-slate-300 dark:border-slate-600 rounded px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800"
                     onClick={() => handleToggle(user, 'is_active')}
                   >
                     Toggle Active
                   </button>
                   <button
-                    className="border rounded px-2 py-1 hover:bg-gray-100"
+                    className="border border-slate-300 dark:border-slate-600 rounded px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800"
                     onClick={() => handleToggle(user, 'is_superuser')}
                   >
                     Toggle Admin
                   </button>
                   <button
-                    className="border rounded px-2 py-1 text-red-600 hover:bg-red-50"
+                    className="border border-red-300 dark:border-red-700 rounded px-2 py-1 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
                     onClick={() => handleDelete(user.id)}
                   >
                     Delete
@@ -174,7 +174,7 @@ export default function Users() {
             ))}
           </tbody>
         </table>
-        {!loading && users.length === 0 && <p className="p-4 text-sm text-gray-500">No users yet.</p>}
+        {!loading && users.length === 0 && <p className="p-4 text-sm text-slate-600 dark:text-slate-300">No users yet.</p>}
       </div>
     </div>
   );

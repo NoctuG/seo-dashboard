@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Generic, List, Optional, TypeVar
 from pydantic import BaseModel, Field
 from app.models import CrawlStatus, IssueCategory, IssueSeverity, IssueStatus
 
@@ -10,6 +10,16 @@ class ProjectCreate(BaseModel):
     brand_regex: Optional[str] = None
     default_gl: str = "us"
     default_hl: str = "en"
+
+
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    page: int
+    page_size: int
 
 
 class ProjectSettingsUpdate(BaseModel):
