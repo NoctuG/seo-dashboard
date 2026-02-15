@@ -197,8 +197,6 @@ class CrawlerService:
                     parse_result["fcp_ms"] = perf_metrics.fcp_ms
                     parse_result["cls"] = perf_metrics.cls
 
-                    issues = analyzer.analyze(parse_result, status_code, load_time)
-
                     page = Page(
                         crawl_id=crawl.id,
                         url=url,
@@ -276,6 +274,10 @@ class CrawlerService:
                             anchor_text=link_data['text']
                         )
                         session.add(link)
+
+                    # Run analyzer after all parse_result fields are populated,
+                    # including internal link validation and redirect chain data.
+                    issues = analyzer.analyze(parse_result, status_code, load_time)
 
                     for issue_data in issues:
                         issue = Issue(
