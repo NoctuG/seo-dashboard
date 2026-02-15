@@ -26,8 +26,10 @@ const resources = {
         users: 'Users',
         systemSettings: 'System Settings',
         changePassword: 'Change Password',
+        twoFactorAuth: 'Two-Factor Auth',
         logout: 'Sign out',
         language: 'Language',
+        theme: 'Theme',
         langZhCN: '简体中文',
         langEnUS: 'English',
       },
@@ -152,7 +154,7 @@ const resources = {
       common: { loading: '加载中...', create: '创建', cancel: '取消', delete: '删除', yes: '是', no: '否' },
       app: { loading: '加载中...' },
       layout: {
-        title: 'SEO 工具', projects: '项目', aiAssistant: 'AI 助手', users: '用户管理', systemSettings: '系统设置', changePassword: '修改密码', logout: '退出登录', language: '语言', langZhCN: '简体中文', langEnUS: 'English',
+        title: 'SEO 工具', projects: '项目', aiAssistant: 'AI 助手', users: '用户管理', systemSettings: '系统设置', changePassword: '修改密码', twoFactorAuth: '双重认证', logout: '退出登录', language: '语言', theme: '主题', langZhCN: '简体中文', langEnUS: 'English',
       },
       login: {
         title: '登录 SEO Dashboard', email: '邮箱', password: '密码', submit: '登录', loading: '登录中...', forgotPassword: '忘记密码？', errors: { failed: '登录失败，请检查邮箱和密码。' },
