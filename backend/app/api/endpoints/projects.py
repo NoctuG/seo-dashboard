@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 from typing import List, Dict, Any, Optional, Literal
 import json
 from datetime import date, datetime
@@ -28,6 +28,7 @@ from app.schemas import (
     ReportExportRequest,
     ReportDeliveryLogRead,
     ProjectSettingsUpdate,
+    PaginatedResponse,
 )
 from app.crawler.crawler import crawler_service
 from app.analytics_service import analytics_service
@@ -38,6 +39,7 @@ from app.report_service import report_service
 from app.scheduler_service import scheduler_service
 from app.api.deps import get_current_user, require_project_role, write_audit_log
 from app.config import settings
+from app.metrics import update_crawl_status
 from app.rate_limit import limiter
 
 router = APIRouter()
@@ -86,14 +88,32 @@ def create_project(project: ProjectCreate, session: Session = Depends(get_sessio
     return _project_to_read(db_project)
 
 
-@router.get("/", response_model=List[ProjectRead])
-def read_projects(skip: int = 0, limit: int = 100, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+@router.get("/", response_model=PaginatedResponse[ProjectRead])
+def read_projects(page: int = 1, page_size: int = 20, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 100)
+    offset = (page - 1) * page_size
+
     if user.is_superuser:
-        projects = session.exec(select(Project).offset(skip).limit(limit)).all()
+        total = session.exec(select(func.count()).select_from(Project)).one()
+        projects = session.exec(select(Project).offset(offset).limit(page_size)).all()
     else:
         memberships = session.exec(select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)).all()
-        projects = session.exec(select(Project).where(Project.id.in_(memberships)).offset(skip).limit(limit)).all() if memberships else []
-    return [_project_to_read(project) for project in projects]
+        if memberships:
+            total = session.exec(
+                select(func.count()).select_from(Project).where(Project.id.in_(memberships))
+            ).one()
+            projects = session.exec(select(Project).where(Project.id.in_(memberships)).offset(offset).limit(page_size)).all()
+        else:
+            total = 0
+            projects = []
+
+    return {
+        "items": [_project_to_read(project) for project in projects],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @router.get("/{project_id}", response_model=ProjectRead)
@@ -157,6 +177,7 @@ def start_crawl(
     session.add(crawl)
     session.commit()
     session.refresh(crawl)
+    update_crawl_status(None, CrawlStatus.PENDING.value)
 
     background_tasks.add_task(crawler_service.run_crawl, crawl.id, max_pages, sitemap_url)
     write_audit_log(session, AuditActionType.CRAWL_START, user.id, "crawl", crawl.id, {"project_id": project_id})
@@ -164,10 +185,27 @@ def start_crawl(
     return crawl
 
 
-@router.get("/{project_id}/crawls", response_model=List[CrawlRead])
-def read_crawls(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
-    crawls = session.exec(select(Crawl).where(Crawl.project_id == project_id).order_by(Crawl.start_time.desc())).all()
-    return crawls
+@router.get("/{project_id}/crawls", response_model=PaginatedResponse[CrawlRead])
+def read_crawls(
+    project_id: int,
+    page: int = 1,
+    page_size: int = 20,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 100)
+    offset = (page - 1) * page_size
+
+    total = session.exec(select(func.count()).select_from(Crawl).where(Crawl.project_id == project_id)).one()
+    crawls = session.exec(
+        select(Crawl)
+        .where(Crawl.project_id == project_id)
+        .order_by(Crawl.start_time.desc())
+        .offset(offset)
+        .limit(page_size)
+    ).all()
+    return {"items": crawls, "total": total, "page": page, "page_size": page_size}
 
 
 @router.get("/{project_id}/dashboard", response_model=Dict[str, Any])

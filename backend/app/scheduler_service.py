@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 
 from app.db import engine
 from app.models import ReportSchedule, ReportTemplate
+from app.metrics import SCHEDULER_JOBS_TOTAL, SCHEDULER_RELOADS_TOTAL, SCHEDULER_RETRIES_TOTAL
 from app.report_service import report_service
 
 
@@ -25,6 +26,7 @@ class SchedulerService:
     def reload_jobs(self) -> None:
         if not self.scheduler.running:
             return
+        SCHEDULER_RELOADS_TOTAL.inc()
         self.scheduler.remove_all_jobs()
         with Session(engine) as session:
             schedules = session.exec(select(ReportSchedule).where(ReportSchedule.active == True)).all()  # noqa: E712
@@ -56,9 +58,11 @@ class SchedulerService:
         with Session(engine) as session:
             schedule = session.get(ReportSchedule, schedule_id)
             if not schedule or not schedule.active:
+                SCHEDULER_JOBS_TOTAL.labels(result="skipped").inc()
                 return
             template = session.get(ReportTemplate, schedule.template_id)
             if not template:
+                SCHEDULER_JOBS_TOTAL.labels(result="failed").inc()
                 report_service.create_delivery_log(
                     session,
                     project_id=schedule.project_id,
@@ -94,8 +98,8 @@ class SchedulerService:
                         retries=retries,
                         status="success",
                     )
-                    session.add(log)
                     session.commit()
+                    SCHEDULER_JOBS_TOTAL.labels(result="success").inc()
                     report_service.dispatch_report_generated(
                         session,
                         project_id=schedule.project_id,
@@ -106,7 +110,9 @@ class SchedulerService:
                     return
                 except Exception as exc:  # noqa: BLE001
                     retries += 1
+                    SCHEDULER_RETRIES_TOTAL.inc()
                     if retries > schedule.retry_limit:
+                        SCHEDULER_JOBS_TOTAL.labels(result="failed").inc()
                         report_service.create_delivery_log(
                             session,
                             project_id=schedule.project_id,

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from app.core.error_codes import ErrorCode
 from app.db import get_session
@@ -15,6 +15,7 @@ from app.schemas import (
     KeywordRead,
     RankHistoryRead,
     VisibilityHistoryRead,
+    PaginatedResponse,
 )
 from app.serp_service import check_keyword_rank
 from app.visibility_service import visibility_service
@@ -30,17 +31,32 @@ def _resolve_geo_language(project: Project, keyword: Keyword) -> tuple[str, str]
     return gl, hl
 
 
-@router.get("/{project_id}/competitors", response_model=List[CompetitorDomainRead])
-def list_competitors(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
+@router.get("/{project_id}/competitors", response_model=PaginatedResponse[CompetitorDomainRead])
+def list_competitors(
+    project_id: int,
+    page: int = 1,
+    page_size: int = 20,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
-    return session.exec(
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 100)
+    offset = (page - 1) * page_size
+
+    query = (
         select(CompetitorDomain)
         .where(CompetitorDomain.project_id == project_id)
         .order_by(CompetitorDomain.created_at.desc())
-    ).all()
+    )
+    total = session.exec(
+        select(func.count()).select_from(CompetitorDomain).where(CompetitorDomain.project_id == project_id)
+    ).one()
+    items = session.exec(query.offset(offset).limit(page_size)).all()
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/{project_id}/competitors", response_model=CompetitorDomainRead)
@@ -82,16 +98,27 @@ def delete_competitor(project_id: int, competitor_id: int, session: Session = De
     return {"ok": True}
 
 
-@router.get("/{project_id}/keywords", response_model=List[KeywordRead])
-def list_keywords(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
+@router.get("/{project_id}/keywords", response_model=PaginatedResponse[KeywordRead])
+def list_keywords(
+    project_id: int,
+    page: int = 1,
+    page_size: int = 20,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 100)
+    offset = (page - 1) * page_size
+
+    total = session.exec(select(func.count()).select_from(Keyword).where(Keyword.project_id == project_id)).one()
     keywords = session.exec(
-        select(Keyword).where(Keyword.project_id == project_id)
+        select(Keyword).where(Keyword.project_id == project_id).offset(offset).limit(page_size)
     ).all()
-    return keywords
+    return {"items": keywords, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/{project_id}/keywords", response_model=KeywordRead)

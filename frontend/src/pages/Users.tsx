@@ -106,11 +106,11 @@ export default function Users() {
         <button className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" type="submit">{t('common.create')}</button>
       </form>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
 
-      <div className="bg-white rounded shadow overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded shadow border border-slate-200 dark:border-slate-700 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
             <tr>
               <th className="p-3 text-left">{t('users.email')}</th>
               <th className="p-3 text-left">{t('users.name')}</th>
@@ -121,7 +121,7 @@ export default function Users() {
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="border-b last:border-b-0">
+              <tr key={user.id} className="border-b border-slate-200 dark:border-slate-700 last:border-b-0">
                 <td className="p-3">{user.email}</td>
                 <td className="p-3">{user.full_name || '-'}</td>
                 <td className="p-3">{user.is_active ? t('common.yes') : t('common.no')}</td>

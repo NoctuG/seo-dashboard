@@ -5,6 +5,16 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import type { Project } from '../api';
 import { useAuth } from '../auth';
+import PaginationControls from '../components/PaginationControls';
+
+type PaginatedResponse<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+const PAGE_SIZE = 20;
 
 export default function Projects() {
   const { t } = useTranslation();

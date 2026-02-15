@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Generic, List, Optional, TypeVar
 from pydantic import BaseModel, Field
 from app.models import CrawlStatus, IssueCategory, IssueSeverity, IssueStatus
 
@@ -10,6 +10,16 @@ class ProjectCreate(BaseModel):
     brand_regex: Optional[str] = None
     default_gl: str = "us"
     default_hl: str = "en"
+
+
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    page: int
+    page_size: int
 
 
 class ProjectSettingsUpdate(BaseModel):
@@ -345,3 +355,25 @@ class WebhookConfigRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ApiKeyCreate(BaseModel):
+    name: str
+    scopes: List[str] = Field(default_factory=list)
+    expires_at: Optional[datetime] = None
+
+
+class ApiKeyRead(BaseModel):
+    id: int
+    project_id: int
+    name: str
+    key_prefix: str
+    scopes: List[str] = Field(default_factory=list)
+    expires_at: Optional[datetime]
+    revoked_at: Optional[datetime]
+    created_by_user_id: Optional[int]
+    created_at: datetime
+
+
+class ApiKeyCreateResponse(ApiKeyRead):
+    plain_key: str
