@@ -1,5 +1,6 @@
 import os
 import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from dotenv import load_dotenv
@@ -8,9 +9,55 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
+def _read_frontend_package_version() -> str | None:
+    package_json = BASE_DIR.parent / "frontend" / "package.json"
+    if not package_json.exists():
+        return None
+    try:
+        payload = json.loads(package_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    version = str(payload.get("version", "")).strip()
+    return version or None
+
+
+def _read_git_version() -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--always", "--dirty"],
+            cwd=BASE_DIR.parent,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    version = result.stdout.strip()
+    return version or None
+
+
+def _resolve_version() -> tuple[str, str]:
+    env_version = os.getenv("APP_VERSION", "").strip()
+    if env_version:
+        return env_version, "env"
+
+    package_version = _read_frontend_package_version()
+    if package_version:
+        return package_version, "frontend/package.json"
+
+    git_version = _read_git_version()
+    if git_version:
+        return git_version, "git"
+
+    return "0.0.0-dev", "fallback"
+
+
 class Settings:
     PROJECT_NAME: str = "SEO Tool"
     API_V1_STR: str = "/api/v1"
+    APP_VERSION, APP_VERSION_SOURCE = _resolve_version()
+    RELEASE_CHECK_ENABLED: bool = os.getenv("RELEASE_CHECK_ENABLED", "false").lower() == "true"
+    RELEASE_CHECK_URL: str = os.getenv("RELEASE_CHECK_URL", "")
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")

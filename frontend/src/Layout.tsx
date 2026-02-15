@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { Home, KeyRound, LogOut, MonitorCog, Settings, Sparkles, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -10,27 +10,48 @@ import {
     type ThemePreference,
 } from './theme';
 
+type VersionPayload = {
+    version: string;
+};
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+
 export default function Layout() {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
     const { t, i18n } = useTranslation();
-    const [themePreference, setThemePreference] = useState<ThemePreference>(() => getStoredThemePreference());
+    const [serverVersion, setServerVersion] = useState<string | null>(null);
+
+    const displayVersion = useMemo(() => {
+        if (serverVersion) {
+            return serverVersion;
+        }
+        return typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'unknown';
+    }, [serverVersion]);
 
     useEffect(() => {
-        applyThemePreference(themePreference);
-        saveThemePreference(themePreference);
-    }, [themePreference]);
+        let active = true;
 
-    useEffect(() => {
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleSystemThemeChange = () => {
-            if (themePreference === 'system') {
-                applyThemePreference('system');
+        const loadVersion = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/version`);
+                if (!response.ok) {
+                    return;
+                }
+                const payload = (await response.json()) as VersionPayload;
+                if (active && payload.version) {
+                    setServerVersion(payload.version);
+                }
+            } catch {
+                // Fallback to frontend injected version.
             }
         };
-        mediaQuery.addEventListener('change', handleSystemThemeChange);
-        return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
-    }, [themePreference]);
+
+        void loadVersion();
+        return () => {
+            active = false;
+        };
+    }, []);
 
     const handleLogout = () => {
         signOut();
@@ -89,14 +110,10 @@ export default function Layout() {
                     <Link to="/change-password" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
                         <KeyRound size={20} /> 修改密码
                     </Link>
-                    {user?.is_superuser && (
-                    <Link to="/settings" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
-                        <Settings size={20} /> 系统设置
-                    </Link>
-                    )}
                 </nav>
-                <div className="p-4 border-t border-slate-200 dark:border-slate-700">
-                    <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <div className="p-4 border-t space-y-2">
+                    <p className="text-xs text-gray-500 text-center">Version: {displayVersion}</p>
+                    <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 border rounded px-3 py-2 hover:bg-gray-100">
                         <LogOut size={16} /> {t('layout.logout')}
                     </button>
                 </div>
