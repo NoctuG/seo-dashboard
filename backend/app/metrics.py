@@ -53,6 +53,16 @@ SCHEDULER_RELOADS_TOTAL = Counter(
     "Total scheduler reload operations",
 )
 
+KEYWORD_RANK_SCHEDULE_RUNS_TOTAL = Counter(
+    "seo_dashboard_keyword_rank_schedule_runs_total",
+    "Total keyword rank schedule runs by result",
+    ["result"],
+)
+KEYWORD_RANK_SCHEDULE_DURATION_SECONDS = Histogram(
+    "seo_dashboard_keyword_rank_schedule_duration_seconds",
+    "Keyword rank schedule run duration in seconds",
+)
+
 DB_POOL_EVENTS_TOTAL = Counter(
     "seo_dashboard_db_pool_events_total",
     "Database connection pool events",

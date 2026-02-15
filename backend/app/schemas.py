@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Generic, List, Optional, TypeVar
 from pydantic import BaseModel, Field
-from app.models import CrawlStatus, IssueCategory, IssueSeverity, IssueStatus
+from app.models import CrawlStatus, IssueCategory, IssueSeverity, IssueStatus, KeywordScheduleFrequency
 
 class ProjectCreate(BaseModel):
     name: str
@@ -117,6 +117,30 @@ class KeywordRead(BaseModel):
 
 
 
+
+
+
+class KeywordRankScheduleBase(BaseModel):
+    frequency: KeywordScheduleFrequency = KeywordScheduleFrequency.DAILY
+    day_of_week: Optional[int] = Field(default=None, ge=0, le=6)
+    hour: int = Field(default=9, ge=0, le=23)
+    timezone: str = "UTC"
+    active: bool = True
+
+
+class KeywordRankScheduleUpsert(KeywordRankScheduleBase):
+    pass
+
+
+class KeywordRankScheduleRead(KeywordRankScheduleBase):
+    id: int
+    project_id: int
+    last_run_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 
 class KeywordResearchRequest(BaseModel):
     seed_term: str

@@ -8,6 +8,9 @@ import {
     getProjectVisibility,
     runProjectKeywordCompare,
     updateProjectSettings,
+    getKeywordRankSchedule,
+    upsertKeywordRankSchedule,
+    toggleKeywordRankSchedule,
 } from '../api';
 import type {
     CompetitorDomainItem,
@@ -17,6 +20,8 @@ import type {
     VisibilityResponse,
     Project,
     PaginatedResponse,
+    KeywordRankSchedule,
+    KeywordScheduleFrequency,
 } from '../api';
 import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield } from 'lucide-react';
 import { useProjectRole } from '../useProjectRole';
@@ -50,6 +55,7 @@ export default function ProjectKeywords() {
     const [selectedKeyword, setSelectedKeyword] = useState<KeywordItem | null>(null);
     const [history, setHistory] = useState<RankHistoryItem[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyWindow, setHistoryWindow] = useState<7 | 30 | 90>(30);
 
     const [competitors, setCompetitors] = useState<CompetitorDomainItem[]>([]);
     const [competitorTotal, setCompetitorTotal] = useState(0);
@@ -59,12 +65,22 @@ export default function ProjectKeywords() {
     const [visibility, setVisibility] = useState<VisibilityResponse | null>(null);
     const [projectSettings, setProjectSettings] = useState<Project | null>(null);
     const [marketFilter, setMarketFilter] = useState('all');
+    const [rankSchedule, setRankSchedule] = useState<KeywordRankSchedule | null>(null);
+    const [scheduleForm, setScheduleForm] = useState({
+        frequency: "daily" as KeywordScheduleFrequency,
+        day_of_week: 1,
+        hour: 9,
+        timezone: "UTC",
+        active: true,
+    });
+    const [savingSchedule, setSavingSchedule] = useState(false);
     const { isAdmin } = useProjectRole(id);
 
     useEffect(() => {
         if (id) {
             fetchVisibility();
             fetchProject();
+            fetchSchedule();
         }
     }, [id]);
 
@@ -122,6 +138,25 @@ export default function ProjectKeywords() {
         if (!id) return;
         try {
             setVisibility(await getProjectVisibility(id));
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const fetchSchedule = async () => {
+        if (!id) return;
+        try {
+            const schedule = await getKeywordRankSchedule(id);
+            setRankSchedule(schedule);
+            if (schedule) {
+                setScheduleForm({
+                    frequency: schedule.frequency,
+                    day_of_week: schedule.day_of_week ?? 1,
+                    hour: schedule.hour,
+                    timezone: schedule.timezone,
+                    active: schedule.active,
+                });
+            }
         } catch (error) {
             console.error(error);
         }
@@ -186,7 +221,7 @@ export default function ProjectKeywords() {
             await api.post(`/projects/${id}/keywords/${keywordId}/check`);
             fetchKeywords(keywordPage);
             if (selectedKeyword?.id === keywordId) {
-                fetchHistory(keywordId);
+                fetchHistory(keywordId, historyWindow);
             }
         } catch (error) {
             console.error(error);
@@ -201,7 +236,7 @@ export default function ProjectKeywords() {
             await api.post(`/projects/${id}/keywords/check-all`);
             fetchKeywords(keywordPage);
             if (selectedKeyword) {
-                fetchHistory(selectedKeyword.id);
+                fetchHistory(selectedKeyword.id, historyWindow);
             }
         } catch (error) {
             console.error(error);
@@ -219,6 +254,7 @@ export default function ProjectKeywords() {
             fetchKeywords(keywordPage);
             fetchVisibility();
             fetchProject();
+            fetchSchedule();
         } catch (error) {
             console.error(error);
         } finally {
@@ -226,10 +262,12 @@ export default function ProjectKeywords() {
         }
     };
 
-    const fetchHistory = async (keywordId: number) => {
+    const fetchHistory = async (keywordId: number, days: 7 | 30 | 90 = historyWindow) => {
         setHistoryLoading(true);
         try {
-            const res = await api.get<RankHistoryItem[]>(`/projects/${id}/keywords/${keywordId}/history`);
+            const res = await api.get<RankHistoryItem[]>(`/projects/${id}/keywords/${keywordId}/history`, {
+                params: { days, limit: 180 },
+            });
             setHistory(res.data);
         } catch (error) {
             console.error(error);
@@ -240,7 +278,47 @@ export default function ProjectKeywords() {
 
     const selectKeyword = (kw: KeywordItem) => {
         setSelectedKeyword(kw);
-        fetchHistory(kw.id);
+        fetchHistory(kw.id, historyWindow);
+    };
+
+    useEffect(() => {
+        if (selectedKeyword) {
+            fetchHistory(selectedKeyword.id, historyWindow);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [historyWindow]);
+
+    const saveSchedule = async () => {
+        if (!id) return;
+        setSavingSchedule(true);
+        try {
+            const saved = await upsertKeywordRankSchedule(id, {
+                frequency: scheduleForm.frequency,
+                day_of_week: scheduleForm.frequency === 'weekly' ? scheduleForm.day_of_week : null,
+                hour: scheduleForm.hour,
+                timezone: scheduleForm.timezone,
+                active: scheduleForm.active,
+            });
+            setRankSchedule(saved);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setSavingSchedule(false);
+        }
+    };
+
+    const toggleSchedule = async () => {
+        if (!id || !rankSchedule) return;
+        setSavingSchedule(true);
+        try {
+            const saved = await toggleKeywordRankSchedule(id, !rankSchedule.active);
+            setRankSchedule(saved);
+            setScheduleForm((prev) => ({ ...prev, active: saved.active }));
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setSavingSchedule(false);
+        }
     };
 
     const chartData = history.map((h) => ({
@@ -298,6 +376,79 @@ export default function ProjectKeywords() {
                 </div>
             </div>
 
+
+            <div className="bg-white p-4 rounded shadow">
+                <h2 className="text-lg font-semibold mb-3">自动检查设置</h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">频率</span>
+                        <select
+                            value={scheduleForm.frequency}
+                            onChange={(e) => setScheduleForm((prev) => ({ ...prev, frequency: e.target.value as KeywordScheduleFrequency }))}
+                            className="border rounded px-3 py-2"
+                        >
+                            <option value="daily">每天</option>
+                            <option value="weekly">每周</option>
+                        </select>
+                    </label>
+                    {scheduleForm.frequency === 'weekly' && (
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="text-gray-600">星期</span>
+                            <select
+                                value={scheduleForm.day_of_week}
+                                onChange={(e) => setScheduleForm((prev) => ({ ...prev, day_of_week: Number(e.target.value) }))}
+                                className="border rounded px-3 py-2"
+                            >
+                                <option value={0}>周一</option>
+                                <option value={1}>周二</option>
+                                <option value={2}>周三</option>
+                                <option value={3}>周四</option>
+                                <option value={4}>周五</option>
+                                <option value={5}>周六</option>
+                                <option value={6}>周日</option>
+                            </select>
+                        </label>
+                    )}
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">执行小时</span>
+                        <input
+                            type="number"
+                            min={0}
+                            max={23}
+                            value={scheduleForm.hour}
+                            onChange={(e) => setScheduleForm((prev) => ({ ...prev, hour: Number(e.target.value) }))}
+                            className="border rounded px-3 py-2"
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">时区</span>
+                        <input
+                            type="text"
+                            value={scheduleForm.timezone}
+                            onChange={(e) => setScheduleForm((prev) => ({ ...prev, timezone: e.target.value }))}
+                            className="border rounded px-3 py-2"
+                            placeholder="UTC / Asia/Shanghai"
+                        />
+                    </label>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                        上次自动检查：{rankSchedule?.last_run_at ? new Date(rankSchedule.last_run_at).toLocaleString() : '尚未执行'}
+                    </div>
+                    <div className="flex gap-2">
+                        {rankSchedule && isAdmin && (
+                            <button onClick={toggleSchedule} disabled={savingSchedule} className="px-3 py-2 rounded border">
+                                {rankSchedule.active ? '停用' : '启用'}
+                            </button>
+                        )}
+                        {isAdmin && (
+                            <button onClick={saveSchedule} disabled={savingSchedule} className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50">
+                                {savingSchedule ? '保存中...' : '保存设置'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
             <div className="bg-white p-4 rounded shadow">
                 <h2 className="text-lg font-semibold mb-3">竞争对手管理</h2>
                 <div className="flex gap-3 items-end mb-3">
@@ -478,7 +629,7 @@ export default function ProjectKeywords() {
 
             {selectedKeyword && (
                 <div className="bg-white p-6 rounded shadow">
-                    <h2 className="text-lg font-semibold mb-4">排名趋势：{selectedKeyword.term}</h2>
+                    <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">排名趋势：{selectedKeyword.term}</h2><div className="flex gap-2">{([7, 30, 90] as const).map((d) => (<button key={d} onClick={() => setHistoryWindow(d)} className={`px-3 py-1 rounded text-sm ${historyWindow === d ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>{d} 天</button>))}</div></div>
                     {historyLoading ? (
                         <div className="text-center py-8 text-gray-500">加载中...</div>
                     ) : history.length === 0 ? (

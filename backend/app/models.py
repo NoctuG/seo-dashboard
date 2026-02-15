@@ -333,6 +333,28 @@ class BacklinkSnapshot(SQLModel, table=True):
     provider: str = "sample"
 
 
+class KeywordScheduleFrequency(str, Enum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+
+
+class KeywordRankSchedule(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_keywordrankschedule_active_frequency", "active", "frequency"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True, unique=True)
+    frequency: KeywordScheduleFrequency = Field(default=KeywordScheduleFrequency.DAILY)
+    day_of_week: Optional[int] = Field(default=None, ge=0, le=6)
+    hour: int = Field(default=9, ge=0, le=23)
+    timezone: str = "UTC"
+    active: bool = True
+    last_run_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class ReportTemplate(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="project.id", index=True)

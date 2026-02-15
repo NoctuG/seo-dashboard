@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,7 +7,7 @@ from sqlmodel import Session, func, select
 
 from app.core.error_codes import ErrorCode
 from app.db import get_session
-from app.models import CompetitorDomain, Keyword, RankHistory, Project, ProjectRoleType, User
+from app.models import CompetitorDomain, Keyword, KeywordRankSchedule, KeywordScheduleFrequency, RankHistory, Project, ProjectRoleType, User
 from app.keyword_research_service import keyword_research_service
 from app.schemas import (
     CompetitorDomainCreate,
@@ -16,6 +16,8 @@ from app.schemas import (
     KeywordBulkCreateResponse,
     KeywordCreate,
     KeywordRead,
+    KeywordRankScheduleRead,
+    KeywordRankScheduleUpsert,
     KeywordResearchRequest,
     KeywordResearchResponse,
     RankHistoryRead,
@@ -25,6 +27,7 @@ from app.schemas import (
 from app.serp_service import check_keyword_rank
 from app.visibility_service import visibility_service
 from app.api.deps import require_project_role
+from app.scheduler_service import scheduler_service
 
 router = APIRouter()
 
@@ -124,6 +127,83 @@ def list_keywords(
         select(Keyword).where(Keyword.project_id == project_id).offset(offset).limit(page_size)
     ).all()
     return {"items": keywords, "total": total, "page": page, "page_size": page_size}
+
+
+def _validate_keyword_schedule(payload: KeywordRankScheduleUpsert) -> None:
+    if payload.frequency == KeywordScheduleFrequency.WEEKLY and payload.day_of_week is None:
+        raise HTTPException(status_code=400, detail="day_of_week is required for weekly frequency")
+
+
+@router.get("/{project_id}/keyword-rank-schedule", response_model=KeywordRankScheduleRead | None)
+def get_keyword_rank_schedule(
+    project_id: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    schedule = session.exec(
+        select(KeywordRankSchedule).where(KeywordRankSchedule.project_id == project_id)
+    ).first()
+    return schedule
+
+
+@router.post("/{project_id}/keyword-rank-schedule", response_model=KeywordRankScheduleRead)
+def create_or_update_keyword_rank_schedule(
+    project_id: int,
+    payload: KeywordRankScheduleUpsert,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    _validate_keyword_schedule(payload)
+
+    schedule = session.exec(
+        select(KeywordRankSchedule).where(KeywordRankSchedule.project_id == project_id)
+    ).first()
+    if not schedule:
+        schedule = KeywordRankSchedule(project_id=project_id)
+
+    values = payload.model_dump()
+    for field, value in values.items():
+        setattr(schedule, field, value)
+    if schedule.frequency == KeywordScheduleFrequency.DAILY:
+        schedule.day_of_week = None
+    schedule.updated_at = datetime.utcnow()
+
+    session.add(schedule)
+    session.commit()
+    session.refresh(schedule)
+    scheduler_service.reload_jobs()
+    return schedule
+
+
+@router.post("/{project_id}/keyword-rank-schedule/toggle", response_model=KeywordRankScheduleRead)
+def toggle_keyword_rank_schedule(
+    project_id: int,
+    active: bool,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
+):
+    schedule = session.exec(
+        select(KeywordRankSchedule).where(KeywordRankSchedule.project_id == project_id)
+    ).first()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="KEYWORD_RANK_SCHEDULE_NOT_FOUND")
+
+    schedule.active = active
+    schedule.updated_at = datetime.utcnow()
+    session.add(schedule)
+    session.commit()
+    session.refresh(schedule)
+    scheduler_service.reload_jobs()
+    return schedule
+
 
 
 @router.post("/{project_id}/keywords", response_model=KeywordRead)
@@ -397,7 +477,8 @@ def check_all_compare(
 def get_rank_history(
     project_id: int,
     keyword_id: int,
-    limit: int = 30,
+    limit: int = 90,
+    days: int | None = None,
     session: Session = Depends(get_session),
     _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
 ):
@@ -405,9 +486,12 @@ def get_rank_history(
     if not keyword or keyword.project_id != project_id:
         raise HTTPException(status_code=404, detail=ErrorCode.KEYWORD_NOT_FOUND)
 
+    query = select(RankHistory).where(RankHistory.keyword_id == keyword_id)
+    if days:
+        query = query.where(RankHistory.checked_at >= datetime.utcnow() - timedelta(days=days))
+
     history = session.exec(
-        select(RankHistory)
-        .where(RankHistory.keyword_id == keyword_id)
+        query
         .order_by(RankHistory.checked_at.asc())
         .limit(limit)
     ).all()
