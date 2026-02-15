@@ -19,3 +19,5 @@ api_router.include_router(users.router, prefix="/users", tags=["users"], depende
 api_router.include_router(admin_backup.router, prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_user)])
 
 api_router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"], dependencies=[Depends(get_current_user)])
+
+api_router.include_router(api_keys.router, prefix="/projects", tags=["api-keys"], dependencies=[Depends(get_current_user)])

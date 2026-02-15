@@ -161,6 +161,52 @@
 
 > ⚠️ 生产环境必须将 `ALLOWED_ORIGINS` 配置为真实业务域名列表，严禁使用 `*`，否则会带来严重的跨域安全风险。
 
+
+## Prometheus / Grafana 监控
+
+后端已提供 `GET /metrics`（Prometheus exposition format），可直接被 Prometheus 抓取。
+
+### Prometheus 抓取配置示例
+
+```yaml
+scrape_configs:
+  - job_name: seo-dashboard-backend
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - localhost:8000
+```
+
+> 若通过 Docker Compose 部署，请将 `targets` 替换为容器可达地址（例如 `backend:8000`）。
+
+### 已暴露的关键指标（节选）
+
+- 请求总数：`seo_dashboard_http_requests_total{method,path,status_code}`
+- 请求耗时：`seo_dashboard_http_request_duration_seconds{method,path}`
+- 爬虫任务状态：`seo_dashboard_crawl_task_status{status}`
+- 爬虫业务计数：
+  - `seo_dashboard_crawl_runs_total{status}`
+  - `seo_dashboard_crawl_pages_processed_total`
+  - `seo_dashboard_crawl_errors_total`
+  - `seo_dashboard_crawl_issues_found_total`
+- 调度器业务计数：
+  - `seo_dashboard_scheduler_jobs_total{result}`
+  - `seo_dashboard_scheduler_retries_total`
+  - `seo_dashboard_scheduler_reloads_total`
+- 数据库连接统计：
+  - `seo_dashboard_db_pool_events_total{event}`
+  - `seo_dashboard_db_pool_in_use`
+
+### Grafana 面板字段建议
+
+- **API QPS**：`sum(rate(seo_dashboard_http_requests_total[1m])) by (path, method)`
+- **P95 响应耗时**：`histogram_quantile(0.95, sum(rate(seo_dashboard_http_request_duration_seconds_bucket[5m])) by (le, path, method))`
+- **爬虫进行中任务数**：`seo_dashboard_crawl_task_status{status="running"}`
+- **爬虫失败率**：`sum(rate(seo_dashboard_crawl_runs_total{status="failed"}[5m])) / sum(rate(seo_dashboard_crawl_runs_total[5m]))`
+- **调度任务成功/失败趋势**：`sum(rate(seo_dashboard_scheduler_jobs_total[5m])) by (result)`
+- **数据库连接占用**：`seo_dashboard_db_pool_in_use` 与 `rate(seo_dashboard_db_pool_events_total{event="checkout"}[5m])` 联合观察
+
 ## 日志采集建议（ELK / Loki）
 
 后端启动后会统一输出结构化日志（JSON），每条日志包含以下字段，便于在日志平台中检索与聚合：
