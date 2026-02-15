@@ -256,6 +256,70 @@ export default function ProjectDashboard() {
         </div>
       </div>
 
+      <div className="bg-white p-6 rounded shadow mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Technical Health</h2>
+          <span className="text-sm text-gray-600">Pass Rate: {stats.technical_health.pass_rate}%</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="border rounded p-4">
+            <p className="text-xs uppercase text-gray-500">CWV Good</p>
+            <p className="text-2xl font-bold text-green-600">{stats.technical_health.cwv_scorecard.good}</p>
+          </div>
+          <div className="border rounded p-4">
+            <p className="text-xs uppercase text-gray-500">Needs Improvement</p>
+            <p className="text-2xl font-bold text-yellow-600">{stats.technical_health.cwv_scorecard.needs_improvement}</p>
+          </div>
+          <div className="border rounded p-4">
+            <p className="text-xs uppercase text-gray-500">CWV Poor</p>
+            <p className="text-2xl font-bold text-red-600">{stats.technical_health.cwv_scorecard.poor}</p>
+          </div>
+          <div className="border rounded p-4">
+            <p className="text-xs uppercase text-gray-500">Failed Items</p>
+            <p className="text-2xl font-bold">{stats.technical_health.failed_items}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <div className="border rounded p-4">
+            <h3 className="font-medium mb-2">Index Coverage Anomalies</h3>
+            <ul className="text-sm space-y-1">
+              {stats.technical_health.indexability_anomalies.length === 0 && <li className="text-gray-500">No anomalies</li>}
+              {stats.technical_health.indexability_anomalies.map((item) => (
+                <li key={item.issue_type} className="flex justify-between">
+                  <span>{item.issue_type}</span>
+                  <span className="font-semibold">{item.count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="border rounded p-4">
+            <h3 className="font-medium mb-2">Structured Data Errors</h3>
+            <ul className="text-sm space-y-1">
+              {stats.technical_health.structured_data_errors.length === 0 && <li className="text-gray-500">No errors</li>}
+              {stats.technical_health.structured_data_errors.map((item) => (
+                <li key={item.issue_type} className="flex justify-between">
+                  <span>{item.issue_type}</span>
+                  <span className="font-semibold">{item.count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="border rounded p-4 h-48">
+            <h3 className="font-medium mb-2">Pass Rate Trend</h3>
+            <ResponsiveContainer width="100%" height="85%">
+              <LineChart data={stats.technical_health.trend}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis domain={[0, 100]} />
+                <Tooltip />
+                <Line type="monotone" dataKey="pass_rate" stroke="#2563eb" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded shadow">
           <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2"><Shield size={16}/>Domain Authority</h3>

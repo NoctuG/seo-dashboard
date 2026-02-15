@@ -1,8 +1,9 @@
 import hashlib
-from typing import List, Tuple, Dict, Any
+import json
+from typing import Dict, Any
 from urllib.parse import urlparse, urljoin
+
 from bs4 import BeautifulSoup
-import re
 
 class Parser:
     def parse(self, html_content: str, base_url: str) -> Dict[str, Any]:
@@ -18,6 +19,32 @@ class Parser:
 
         viewport_meta = soup.find('meta', attrs={'name': 'viewport'})
         viewport = viewport_meta['content'].strip() if viewport_meta and viewport_meta.get('content') else None
+
+        canonical_tag = soup.find('link', attrs={'rel': lambda value: value and 'canonical' in value})
+        canonical = urljoin(base_url, canonical_tag['href'].strip()) if canonical_tag and canonical_tag.get('href') else None
+
+        robots_meta = soup.find('meta', attrs={'name': lambda value: value and value.lower() == 'robots'})
+        robots_content = robots_meta['content'].lower() if robots_meta and robots_meta.get('content') else ''
+        robots_directives = {
+            directive.strip() for directive in robots_content.split(',') if directive.strip()
+        }
+        noindex = 'noindex' in robots_directives
+        nofollow = 'nofollow' in robots_directives
+
+        schema_org_json_ld = []
+        structured_data_errors = []
+        for script in soup.find_all('script', attrs={'type': 'application/ld+json'}):
+            raw_payload = script.string or script.get_text()
+            if not raw_payload:
+                continue
+            try:
+                payload = json.loads(raw_payload)
+                entries = payload if isinstance(payload, list) else [payload]
+                for item in entries:
+                    if isinstance(item, dict):
+                        schema_org_json_ld.append(item)
+            except json.JSONDecodeError as exc:
+                structured_data_errors.append(f'Invalid JSON-LD: {exc.msg}')
 
         # Duplicate detection (simple hash of body text to ignore dynamic parts if possible, but full html for now)
         # Better: hash only text content
@@ -77,6 +104,12 @@ class Parser:
             'description': description,
             'h1': h1_text,
             'viewport': viewport,
+            'canonical': canonical,
+            'robots_meta': sorted(robots_directives),
+            'noindex': noindex,
+            'nofollow': nofollow,
+            'schema_org_json_ld': schema_org_json_ld,
+            'structured_data_errors': structured_data_errors,
             'content_hash': content_hash,
             'internal_links': internal_links,
             'external_links': external_links,

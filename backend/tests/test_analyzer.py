@@ -47,3 +47,31 @@ def test_analyzer_supports_custom_rules_for_extensibility():
     assert issues == [
         {"type": "accessibility", "severity": "info", "description": "Custom rule"}
     ]
+
+
+def test_analyzer_reports_technical_health_issues():
+    analyzer = Analyzer()
+    issues = analyzer.analyze(
+        {
+            "title": "A valid title",
+            "description": "desc",
+            "h1": "header",
+            "images_without_alt": [],
+            "viewport": "width=device-width",
+            "canonical": None,
+            "noindex": True,
+            "nofollow": True,
+            "schema_org_json_ld": [],
+            "structured_data_errors": ["Invalid JSON-LD: Expecting value"],
+            "url": "http://example.com",
+            "response_headers": {},
+            "lcp_ms": 4500,
+            "fcp_ms": 3500,
+            "cls": 0.3,
+        },
+        status_code=200,
+        load_time_ms=900,
+    )
+
+    issue_types = {issue["type"] for issue in issues}
+    assert {"poor_lcp", "poor_fcp", "poor_cls", "noindex_detected", "missing_canonical", "non_https"}.issubset(issue_types)

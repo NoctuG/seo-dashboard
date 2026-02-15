@@ -120,6 +120,19 @@ export interface DashboardStats {
     warning: number;
     info: number;
   };
+  technical_health: {
+    pass_rate: number;
+    failed_items: number;
+    trend: Array<{ crawl_id: number; date: string; pass_rate: number }>;
+    cwv_scorecard: {
+      good: number;
+      needs_improvement: number;
+      poor: number;
+      missing: number;
+    };
+    indexability_anomalies: Array<{ issue_type: string; count: number }>;
+    structured_data_errors: Array<{ issue_type: string; count: number }>;
+  };
   analytics: AnalyticsData;
 }
 
