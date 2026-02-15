@@ -64,6 +64,23 @@ export interface DashboardStats {
   };
 }
 
+export interface KeywordItem {
+  id: number;
+  project_id: number;
+  term: string;
+  target_url?: string;
+  current_rank?: number;
+  last_checked?: string;
+}
+
+export interface RankHistoryItem {
+  id: number;
+  keyword_id: number;
+  rank?: number;
+  url?: string;
+  checked_at: string;
+}
+
 export interface AiAnalyzeResponse {
   result: string;
 }
