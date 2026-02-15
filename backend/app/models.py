@@ -116,3 +116,31 @@ class PageTrafficSnapshot(SQLModel, table=True):
     date: date
     sessions: int = 0
     conversions: int = 0
+
+
+class DomainMetricSnapshot(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_domainmetric_project_date", "project_id", "date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    date: date
+    domain_authority: float = 0
+
+
+class BacklinkSnapshot(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_backlinksnapshot_project_date", "project_id", "date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    date: date
+    backlinks_total: int = 0
+    ref_domains: int = 0
+    anchor_distribution_json: str = "{}"
+    new_links_json: str = "[]"
+    lost_links_json: str = "[]"
+    notes_json: str = "[]"
+    provider: str = "sample"

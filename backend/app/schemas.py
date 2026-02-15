@@ -119,3 +119,41 @@ class ContentPerformanceResponse(BaseModel):
     top_content: List[ContentPerformanceItemRead]
     top_conversion: List[ContentPerformanceItemRead]
     decaying_content: List[ContentPerformanceItemRead]
+
+
+class AuthorityPoint(BaseModel):
+    date: datetime | str
+    domain_authority: float
+
+
+class AuthorityResponse(BaseModel):
+    project_id: int
+    provider: str
+    domain_authority: float
+    history: List[AuthorityPoint]
+    notes: List[str]
+
+
+class BacklinkSummaryResponse(BaseModel):
+    project_id: int
+    provider: str
+    backlinks_total: int
+    ref_domains: int
+    anchor_distribution: dict[str, int]
+    history: List[dict]
+    notes: List[str]
+
+
+class BacklinkChangeItem(BaseModel):
+    url: str
+    source: Optional[str] = None
+    anchor: Optional[str] = None
+    date: Optional[str] = None
+
+
+class BacklinkChangesResponse(BaseModel):
+    project_id: int
+    provider: str
+    new_links: List[BacklinkChangeItem]
+    lost_links: List[BacklinkChangeItem]
+    notes: List[str]

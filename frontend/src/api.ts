@@ -156,3 +156,44 @@ export async function analyzeSeoWithAi(content: string): Promise<AiAnalyzeRespon
   const res = await api.post<AiAnalyzeResponse>('/ai/analyze', { content });
   return res.data;
 }
+
+export interface AuthorityResponse {
+  project_id: number;
+  provider: string;
+  domain_authority: number;
+  history: Array<{ date: string; domain_authority: number }>;
+  notes: string[];
+}
+
+export interface BacklinkResponse {
+  project_id: number;
+  provider: string;
+  backlinks_total: number;
+  ref_domains: number;
+  anchor_distribution: Record<string, number>;
+  history: Array<{ date: string; backlinks_total: number; ref_domains: number }>;
+  notes: string[];
+}
+
+export interface BacklinkChangesResponse {
+  project_id: number;
+  provider: string;
+  new_links: Array<{ url: string; source?: string; anchor?: string; date?: string }>;
+  lost_links: Array<{ url: string; source?: string; anchor?: string; date?: string }>;
+  notes: string[];
+}
+
+export async function getProjectAuthority(projectId: string | number): Promise<AuthorityResponse> {
+  const res = await api.get<AuthorityResponse>(`/projects/${projectId}/authority`);
+  return res.data;
+}
+
+export async function getProjectBacklinks(projectId: string | number): Promise<BacklinkResponse> {
+  const res = await api.get<BacklinkResponse>(`/projects/${projectId}/backlinks`);
+  return res.data;
+}
+
+export async function getProjectBacklinkChanges(projectId: string | number): Promise<BacklinkChangesResponse> {
+  const res = await api.get<BacklinkChangesResponse>(`/projects/${projectId}/backlinks/changes`);
+  return res.data;
+}

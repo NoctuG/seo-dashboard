@@ -300,9 +300,10 @@ export default function ProjectKeywords() {
                                     }}
                                 />
                                 <Tooltip
-                                    formatter={(value: number | null) =>
-                                        value != null ? [`#${value}`, '排名'] : ['未上榜', '排名']
-                                    }
+                                    formatter={(value) => {
+                                        const rank = typeof value === 'number' ? value : null;
+                                        return rank != null ? [`#${rank}`, '排名'] : ['未上榜', '排名'];
+                                    }}
                                 />
                                 <Line
                                     type="monotone"
