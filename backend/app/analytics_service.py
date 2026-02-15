@@ -18,26 +18,27 @@ class AnalyticsService:
         domain: str,
         brand_keywords_json: str = "[]",
         brand_regex: Optional[str] = None,
+        cost_config: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         provider = (settings.ANALYTICS_PROVIDER or "sample").lower()
         rules = self._build_brand_rules(brand_keywords_json, brand_regex)
         if provider == "matomo":
             try:
-                return self._get_matomo_analytics(project_id, rules)
+                data = self._get_matomo_analytics(project_id, rules)
             except Exception as exc:  # pragma: no cover - graceful fallback
-                sample = self._build_sample_analytics(project_id, domain, rules)
-                sample["notes"].append(f"Matomo fetch failed, using sample data: {exc}")
-                return sample
+                data = self._build_sample_analytics(project_id, domain, rules)
+                data["notes"].append(f"Matomo fetch failed, using sample data: {exc}")
+            return self._attach_roi_metrics(data, cost_config)
 
         if provider == "ga4":
             try:
-                return self._get_ga4_analytics(project_id, rules)
+                data = self._get_ga4_analytics(project_id, rules)
             except Exception as exc:  # pragma: no cover - graceful fallback
-                sample = self._build_sample_analytics(project_id, domain, rules)
-                sample["notes"].append(f"GA4 fetch failed, using sample data: {exc}")
-                return sample
+                data = self._build_sample_analytics(project_id, domain, rules)
+                data["notes"].append(f"GA4 fetch failed, using sample data: {exc}")
+            return self._attach_roi_metrics(data, cost_config)
 
-        return self._build_sample_analytics(project_id, domain, rules)
+        return self._attach_roi_metrics(self._build_sample_analytics(project_id, domain, rules), cost_config)
 
     def _get_matomo_analytics(self, project_id: int, brand_rules: Dict[str, Any]) -> Dict[str, Any]:
         if not settings.MATOMO_BASE_URL or not settings.MATOMO_SITE_ID or not settings.MATOMO_TOKEN_AUTH:
@@ -67,6 +68,7 @@ class AnalyticsService:
 
         asset_map: Dict[str, Dict[str, float]] = {}
         daily_brand_segments = []
+        raw_revenue = 0.0
         for day, rows in sorted(assets_by_day.items()):
             day_brand_sessions = 0
             day_non_brand_sessions = 0
@@ -75,16 +77,18 @@ class AnalyticsService:
             for row in rows if isinstance(rows, list) else []:
                 page = row.get("label", "/")
                 sessions = int(row.get("nb_visits", 0))
-                conversions = int(row.get("goal_nb_conversions", 0))
+                conversions = float(row.get("goal_nb_conversions", 0))
+                matomo_revenue = float(row.get("goal_revenue", row.get("revenue", 0)) or 0)
+                raw_revenue += matomo_revenue
                 asset = asset_map.setdefault(page, {"sessions": 0.0, "conversions": 0.0})
                 asset["sessions"] += sessions
                 asset["conversions"] += conversions
                 if self._is_brand(page, brand_rules):
                     day_brand_sessions += sessions
-                    day_brand_conversions += conversions
+                    day_brand_conversions += int(conversions)
                 else:
                     day_non_brand_sessions += sessions
-                    day_non_brand_conversions += conversions
+                    day_non_brand_conversions += int(conversions)
 
             daily_brand_segments.append(
                 {
@@ -109,6 +113,15 @@ class AnalyticsService:
                     bounce_values.append(float(raw.strip("%")))
             bounce_rate = round(sum(bounce_values) / len(bounce_values), 2) if bounce_values else 0.0
 
+        conversions = int(sum(v["conversions"] for v in asset_map.values()))
+        assisted_conversions = round(conversions * 0.35, 2)
+        revenue, pipeline_value = self._normalize_provider_value(
+            provider="matomo",
+            raw_revenue=raw_revenue,
+            conversions=conversions,
+            assisted_conversions=assisted_conversions,
+        )
+
         notes = [
             "Matomo provider does not expose engaged_sessions/avg_engagement_time/pages_per_session/key_events in this integration; returning null.",
         ]
@@ -119,7 +132,11 @@ class AnalyticsService:
             "totals": {
                 "sessions": month_sessions,
                 "bounce_rate": bounce_rate,
-                "conversions": int(sum(v["conversions"] for v in asset_map.values())),
+                "conversions": conversions,
+                "assisted_conversions": assisted_conversions,
+                "revenue": revenue,
+                "pipeline_value": pipeline_value,
+                "roi": None,
             },
             "quality_metrics": {
                 "engaged_sessions": None,
@@ -132,11 +149,17 @@ class AnalyticsService:
             "daily_brand_segments": daily_brand_segments,
             "audience": {
                 "top_countries": [
-                    {"country": item.get("label", "Unknown"), "sessions": int(item.get("nb_visits", 0))}
+                    {
+                        "country": item.get("label", "Unknown"),
+                        "sessions": int(item.get("nb_visits", 0)),
+                    }
                     for item in countries[:5]
                 ],
                 "devices": [
-                    {"device": item.get("label", "Unknown"), "sessions": int(item.get("nb_visits", 0))}
+                    {
+                        "device": item.get("label", "Unknown"),
+                        "sessions": int(item.get("nb_visits", 0)),
+                    }
                     for item in devices[:5]
                 ],
             },
@@ -168,6 +191,7 @@ class AnalyticsService:
                 {"name": "userEngagementDuration"},
                 {"name": "screenPageViews"},
                 {"name": "keyEvents"},
+                {"name": "totalRevenue"},
             ],
             "dimensions": [{"name": "date"}, {"name": "country"}, {"name": "deviceCategory"}, {"name": "landingPagePlusQueryString"}],
             "limit": 10000,
@@ -189,11 +213,12 @@ class AnalyticsService:
         total_engagement_duration = 0.0
         total_screen_page_views = 0.0
         total_key_events = 0.0
+        raw_revenue = 0.0
 
         for row in rows:
             dims = [d.get("value", "") for d in row.get("dimensionValues", [])]
             mets = [m.get("value", "0") for m in row.get("metricValues", [])]
-            if len(dims) < 4 or len(mets) < 7:
+            if len(dims) < 4 or len(mets) < 8:
                 continue
             raw_date, country, device, page = dims
             day = datetime.strptime(raw_date, "%Y%m%d").date().isoformat()
@@ -204,6 +229,7 @@ class AnalyticsService:
             engagement_duration = float(mets[4] or 0)
             screen_page_views = float(mets[5] or 0)
             key_events = float(mets[6] or 0)
+            revenue = float(mets[7] or 0)
 
             daily_map[day] = daily_map.get(day, 0) + sessions
             country_map[country or "Unknown"] = country_map.get(country or "Unknown", 0) + sessions
@@ -214,6 +240,7 @@ class AnalyticsService:
             total_engagement_duration += engagement_duration
             total_screen_page_views += screen_page_views
             total_key_events += key_events
+            raw_revenue += revenue
 
             asset = asset_map.setdefault(page or "/", {"sessions": 0.0, "conversions": 0.0})
             asset["sessions"] += sessions
@@ -239,6 +266,15 @@ class AnalyticsService:
         top_assets = sorted(asset_map.items(), key=lambda x: x[1]["sessions"], reverse=True)[:5]
         daily_brand_segments = [{"date": day, **{k: int(v) for k, v in vals.items()}} for day, vals in sorted(daily_brand_map.items())]
 
+        conversions = int(sum(v["conversions"] for v in asset_map.values()))
+        assisted_conversions = round(total_key_events * 0.25, 2)
+        revenue, pipeline_value = self._normalize_provider_value(
+            provider="ga4",
+            raw_revenue=raw_revenue,
+            conversions=conversions,
+            assisted_conversions=assisted_conversions,
+        )
+
         return {
             "provider": "ga4",
             "source": "live",
@@ -246,7 +282,11 @@ class AnalyticsService:
             "totals": {
                 "sessions": month_sessions,
                 "bounce_rate": round(sum(bounce_values) / len(bounce_values), 2) if bounce_values else 0,
-                "conversions": int(sum(v["conversions"] for v in asset_map.values())),
+                "conversions": conversions,
+                "assisted_conversions": assisted_conversions,
+                "revenue": revenue,
+                "pipeline_value": pipeline_value,
+                "roi": None,
             },
             "quality_metrics": {
                 "engaged_sessions": total_engaged_sessions,
@@ -313,6 +353,13 @@ class AnalyticsService:
         current_month = sum(item["sessions"] for item in daily_sessions)
         previous_month = int(current_month * rng.uniform(0.78, 0.98))
         conversions = sum(item["brand_conversions"] + item["non_brand_conversions"] for item in daily_brand_segments)
+        assisted_conversions = round(conversions * 0.42, 2)
+        revenue, pipeline_value = self._normalize_provider_value(
+            provider="sample",
+            raw_revenue=0,
+            conversions=conversions,
+            assisted_conversions=assisted_conversions,
+        )
 
         pages = ["/", "/pricing", "/blog/technical-seo-checklist", "/blog/core-web-vitals-guide", "/contact"]
         top_assets = []
@@ -359,6 +406,10 @@ class AnalyticsService:
                 "sessions": current_month,
                 "bounce_rate": round(rng.uniform(28, 52), 2),
                 "conversions": conversions,
+                "assisted_conversions": assisted_conversions,
+                "revenue": revenue,
+                "pipeline_value": pipeline_value,
+                "roi": None,
             },
             "quality_metrics": {
                 "engaged_sessions": int(current_month * rng.uniform(0.45, 0.75)),
@@ -377,6 +428,42 @@ class AnalyticsService:
             "daily_sessions": daily_sessions,
             "notes": ["Analytics provider is not configured. Showing realistic sample data."],
         }
+
+    def _normalize_provider_value(
+        self,
+        provider: str,
+        raw_revenue: float,
+        conversions: float,
+        assisted_conversions: float,
+    ) -> tuple[float, float]:
+        if raw_revenue > 0:
+            revenue = raw_revenue
+        elif provider == "ga4":
+            revenue = conversions * 220
+        elif provider == "matomo":
+            revenue = conversions * 200
+        else:
+            revenue = conversions * 180
+        pipeline_value = revenue + assisted_conversions * 120
+        return round(revenue, 2), round(pipeline_value, 2)
+
+    def _attach_roi_metrics(self, payload: Dict[str, Any], cost_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        monthly_cost = self._monthly_cost(cost_config)
+        pipeline_value = float(payload.get("totals", {}).get("pipeline_value", 0) or 0)
+        roi = ((pipeline_value - monthly_cost) / monthly_cost) if monthly_cost > 0 else None
+        payload["totals"]["roi"] = round(roi, 4) if roi is not None else None
+        return payload
+
+    def _monthly_cost(self, cost_config: Optional[Dict[str, Any]]) -> float:
+        if not cost_config:
+            return 0
+        return round(
+            float(cost_config.get("monthly_human_cost", 0) or 0)
+            + float(cost_config.get("monthly_tool_cost", 0) or 0)
+            + float(cost_config.get("monthly_outsourcing_cost", 0) or 0)
+            + float(cost_config.get("monthly_content_cost", 0) or 0),
+            2,
+        )
 
     def _aggregate_brand_split(self, segments: List[Dict[str, Any]]) -> Dict[str, Dict[str, int]]:
         brand_sessions = sum(int(item.get("brand_sessions", 0)) for item in segments)

@@ -31,6 +31,25 @@ class Project(SQLModel, table=True):
     crawls: List["Crawl"] = Relationship(back_populates="project")
     keywords: List["Keyword"] = Relationship(back_populates="project")
     competitor_domains: List["CompetitorDomain"] = Relationship(back_populates="project")
+    seo_cost_config: Optional["SeoCostConfig"] = Relationship(
+        back_populates="project",
+        sa_relationship_kwargs={"uselist": False},
+    )
+
+
+class SeoCostConfig(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True, unique=True)
+    monthly_human_cost: float = 0
+    monthly_tool_cost: float = 0
+    monthly_outsourcing_cost: float = 0
+    monthly_content_cost: float = 0
+    currency: str = "USD"
+    attribution_model: str = "linear"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    project: Project = Relationship(back_populates="seo_cost_config")
 
 class Crawl(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
