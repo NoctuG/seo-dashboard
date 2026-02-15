@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -46,6 +47,34 @@ class Settings:
     # Performance providers (optional)
     LIGHTHOUSE_API_URL: str = os.getenv("LIGHTHOUSE_API_URL", "")
     WEB_VITALS_API_URL: str = os.getenv("WEB_VITALS_API_URL", "")
+
+    # CORS
+    @staticmethod
+    def _parse_allowed_origins(raw_value: str) -> list[str]:
+        default_origins = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
+
+        value = (raw_value or "").strip()
+        if not value:
+            return default_origins
+
+        if value.startswith("["):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list):
+                origins = [str(item).strip() for item in parsed if str(item).strip()]
+                return origins or default_origins
+
+        origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+        return origins or default_origins
+
+    ALLOWED_ORIGINS: list[str] = _parse_allowed_origins.__func__(os.getenv("ALLOWED_ORIGINS", ""))
 
     # SERP API settings
     SERP_API_KEY: str = os.getenv("SERP_API_KEY", "")

@@ -82,6 +82,7 @@
   - `ANALYTICS_MEANINGFUL_GROWTH_PCT`：用于判断增长信号的阈值百分比。
   - `GA4_PROPERTY_ID`、`GA4_ACCESS_TOKEN`：GA4 Data API 所需参数。
   - `MATOMO_BASE_URL`、`MATOMO_SITE_ID`、`MATOMO_TOKEN_AUTH`：Matomo API 所需参数。
+  - `ALLOWED_ORIGINS`：后端 CORS 白名单，支持逗号分隔（如 `https://app.example.com,https://admin.example.com`）或 JSON 数组。
 
 - 前端支持 `.env` 配置文件（位于 `frontend/.env`），可配置：
   - `VITE_API_URL`
@@ -129,3 +130,5 @@
 - **Traefik**：通过 Docker labels / IngressRoute 将域名路由到前端服务，配合 ACME 自动证书。
 
 在这种模式下，仍建议保持前端 API 基地址为同源 `/api/v1`，由入口代理统一转发到后端，避免 HTTPS 页面请求 HTTP API 导致 mixed content。
+
+> ⚠️ 生产环境必须将 `ALLOWED_ORIGINS` 配置为真实业务域名列表，严禁使用 `*`，否则会带来严重的跨域安全风险。
