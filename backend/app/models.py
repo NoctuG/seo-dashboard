@@ -25,8 +25,22 @@ class IssueCategory(str, Enum):
     ACCESSIBILITY = "accessibility"
     CONTENT = "content"
 
+
+class ProjectRoleType(str, Enum):
+    ADMIN = "admin"
+    VIEWER = "viewer"
+
+
+class AuditActionType(str, Enum):
+    LOGIN = "login"
+    PROJECT_CREATE = "project_create"
+    PROJECT_DELETE = "project_delete"
+    CRAWL_START = "crawl_start"
+    ADMIN_BOOTSTRAP = "admin_bootstrap"
+
 class Project(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     name: str
     domain: str
     brand_keywords_json: str = "[]"
@@ -40,6 +54,70 @@ class Project(SQLModel, table=True):
         back_populates="project",
         sa_relationship_kwargs={"uselist": False},
     )
+    organization: Optional["Organization"] = Relationship(back_populates="projects")
+    members: List["ProjectMember"] = Relationship(back_populates="project")
+
+
+class Organization(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True, unique=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    projects: List[Project] = Relationship(back_populates="organization")
+    members: List["OrganizationMember"] = Relationship(back_populates="organization")
+
+
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    full_name: str = ""
+    password_hash: str
+    is_active: bool = True
+    is_superuser: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    organizations: List["OrganizationMember"] = Relationship(back_populates="user")
+    project_memberships: List["ProjectMember"] = Relationship(back_populates="user")
+
+
+class Role(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: ProjectRoleType = Field(index=True, unique=True)
+    description: Optional[str] = None
+
+    project_memberships: List["ProjectMember"] = Relationship(back_populates="role")
+
+
+class OrganizationMember(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    organization: Organization = Relationship(back_populates="members")
+    user: User = Relationship(back_populates="organizations")
+
+
+class ProjectMember(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    role_id: int = Field(foreign_key="role.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    project: Project = Relationship(back_populates="members")
+    user: User = Relationship(back_populates="project_memberships")
+    role: Role = Relationship(back_populates="project_memberships")
+
+
+class AuditLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
+    action: AuditActionType = Field(index=True)
+    entity_type: str = Field(index=True)
+    entity_id: Optional[int] = Field(default=None, index=True)
+    metadata_json: str = "{}"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class SeoCostConfig(SQLModel, table=True):

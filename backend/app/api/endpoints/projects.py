@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from collections import Counter
 
 from app.db import get_session
-from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog
+from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog, ProjectMember, ProjectRoleType, Role, User, AuditActionType
 from app.schemas import (
     ProjectCreate,
     ProjectRead,
@@ -34,6 +34,7 @@ from app.backlink_service import backlink_service
 from app.visibility_service import visibility_service
 from app.report_service import report_service
 from app.scheduler_service import scheduler_service
+from app.api.deps import get_current_user, require_project_role, write_audit_log
 
 router = APIRouter()
 
@@ -57,7 +58,7 @@ def _project_to_read(project: Project) -> ProjectRead:
 
 
 @router.post("/", response_model=ProjectRead)
-def create_project(project: ProjectCreate, session: Session = Depends(get_session)):
+def create_project(project: ProjectCreate, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     db_project = Project(
         name=project.name,
         domain=project.domain,
@@ -67,17 +68,28 @@ def create_project(project: ProjectCreate, session: Session = Depends(get_sessio
     session.add(db_project)
     session.commit()
     session.refresh(db_project)
+
+    admin_role = session.exec(select(Role).where(Role.name == ProjectRoleType.ADMIN)).first()
+    if admin_role:
+        session.add(ProjectMember(project_id=db_project.id, user_id=user.id, role_id=admin_role.id))
+        session.commit()
+
+    write_audit_log(session, AuditActionType.PROJECT_CREATE, user.id, "project", db_project.id, {"name": db_project.name})
     return _project_to_read(db_project)
 
 
 @router.get("/", response_model=List[ProjectRead])
-def read_projects(skip: int = 0, limit: int = 100, session: Session = Depends(get_session)):
-    projects = session.exec(select(Project).offset(skip).limit(limit)).all()
+def read_projects(skip: int = 0, limit: int = 100, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    if user.is_superuser:
+        projects = session.exec(select(Project).offset(skip).limit(limit)).all()
+    else:
+        memberships = session.exec(select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)).all()
+        projects = session.exec(select(Project).where(Project.id.in_(memberships)).offset(skip).limit(limit)).all() if memberships else []
     return [_project_to_read(project) for project in projects]
 
 
 @router.get("/{project_id}", response_model=ProjectRead)
-def read_project(project_id: int, session: Session = Depends(get_session)):
+def read_project(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -85,12 +97,13 @@ def read_project(project_id: int, session: Session = Depends(get_session)):
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: int, session: Session = Depends(get_session)):
+def delete_project(project_id: int, session: Session = Depends(get_session), user: User = Depends(require_project_role(ProjectRoleType.ADMIN))):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     session.delete(project)
     session.commit()
+    write_audit_log(session, AuditActionType.PROJECT_DELETE, user.id, "project", project_id, {"name": project.name})
     return {"ok": True}
 
 
@@ -100,7 +113,8 @@ def start_crawl(
     background_tasks: BackgroundTasks,
     max_pages: Optional[int] = None,
     sitemap_url: Optional[str] = None,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user: User = Depends(require_project_role(ProjectRoleType.ADMIN))
 ):
     project = session.get(Project, project_id)
     if not project:
@@ -112,18 +126,19 @@ def start_crawl(
     session.refresh(crawl)
 
     background_tasks.add_task(crawler_service.run_crawl, crawl.id, max_pages, sitemap_url)
+    write_audit_log(session, AuditActionType.CRAWL_START, user.id, "crawl", crawl.id, {"project_id": project_id})
 
     return crawl
 
 
 @router.get("/{project_id}/crawls", response_model=List[CrawlRead])
-def read_crawls(project_id: int, session: Session = Depends(get_session)):
+def read_crawls(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     crawls = session.exec(select(Crawl).where(Crawl.project_id == project_id).order_by(Crawl.start_time.desc())).all()
     return crawls
 
 
 @router.get("/{project_id}/dashboard", response_model=Dict[str, Any])
-def get_dashboard(project_id: int, session: Session = Depends(get_session)):
+def get_dashboard(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -590,3 +605,14 @@ def list_report_logs(project_id: int, session: Session = Depends(get_session)):
         select(ReportDeliveryLog).where(ReportDeliveryLog.project_id == project_id).order_by(ReportDeliveryLog.created_at.desc()).limit(200)
     ).all()
     return logs
+
+
+@router.get("/{project_id}/permissions")
+def get_project_permissions(project_id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    if user.is_superuser:
+        return {"role": "admin"}
+    membership = session.exec(select(ProjectMember).join(Role, Role.id == ProjectMember.role_id).where(ProjectMember.project_id == project_id, ProjectMember.user_id == user.id)).first()
+    if not membership:
+        raise HTTPException(status_code=403, detail="No project access")
+    role = session.get(Role, membership.role_id)
+    return {"role": role.name.value}

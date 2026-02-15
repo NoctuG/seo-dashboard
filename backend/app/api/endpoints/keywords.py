@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.db import get_session
-from app.models import CompetitorDomain, Keyword, RankHistory, Project
+from app.models import CompetitorDomain, Keyword, RankHistory, Project, ProjectRoleType, User
 from app.schemas import (
     CompetitorDomainCreate,
     CompetitorDomainRead,
@@ -17,12 +17,13 @@ from app.schemas import (
 )
 from app.serp_service import check_keyword_rank
 from app.visibility_service import visibility_service
+from app.api.deps import require_project_role
 
 router = APIRouter()
 
 
 @router.get("/{project_id}/competitors", response_model=List[CompetitorDomainRead])
-def list_competitors(project_id: int, session: Session = Depends(get_session)):
+def list_competitors(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -39,6 +40,7 @@ def create_competitor(
     project_id: int,
     payload: CompetitorDomainCreate,
     session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
 ):
     project = session.get(Project, project_id)
     if not project:
@@ -62,7 +64,7 @@ def create_competitor(
 
 
 @router.delete("/{project_id}/competitors/{competitor_id}")
-def delete_competitor(project_id: int, competitor_id: int, session: Session = Depends(get_session)):
+def delete_competitor(project_id: int, competitor_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.ADMIN))):
     competitor = session.get(CompetitorDomain, competitor_id)
     if not competitor or competitor.project_id != project_id:
         raise HTTPException(status_code=404, detail="Competitor not found")
@@ -73,7 +75,7 @@ def delete_competitor(project_id: int, competitor_id: int, session: Session = De
 
 
 @router.get("/{project_id}/keywords", response_model=List[KeywordRead])
-def list_keywords(project_id: int, session: Session = Depends(get_session)):
+def list_keywords(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -89,6 +91,7 @@ def create_keyword(
     project_id: int,
     payload: KeywordCreate,
     session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
 ):
     project = session.get(Project, project_id)
     if not project:
@@ -110,6 +113,7 @@ def delete_keyword(
     project_id: int,
     keyword_id: int,
     session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
 ):
     keyword = session.get(Keyword, keyword_id)
     if not keyword or keyword.project_id != project_id:
@@ -125,6 +129,7 @@ def check_rank(
     project_id: int,
     keyword_id: int,
     session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
 ):
     keyword = session.get(Keyword, keyword_id)
     if not keyword or keyword.project_id != project_id:
@@ -153,6 +158,7 @@ def check_rank(
 def check_all_ranks(
     project_id: int,
     session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
 ):
     project = session.get(Project, project_id)
     if not project:
@@ -185,6 +191,7 @@ def check_all_ranks(
 def check_all_compare(
     project_id: int,
     session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
 ):
     project = session.get(Project, project_id)
     if not project:
@@ -262,6 +269,7 @@ def get_rank_history(
     keyword_id: int,
     limit: int = 30,
     session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
 ):
     keyword = session.get(Keyword, keyword_id)
     if not keyword or keyword.project_id != project_id:

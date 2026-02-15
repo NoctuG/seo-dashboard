@@ -1,32 +1,76 @@
+import json
+from typing import Callable
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-import secrets
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlmodel import Session, select
 
-from app.config import settings
+from app.auth_service import decode_token
+from app.db import get_session
+from app.models import AuditActionType, AuditLog, ProjectMember, ProjectRoleType, Role, User
 
-security = HTTPBasic(auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=True)
 
 
-def verify_basic_auth(credentials: HTTPBasicCredentials = Depends(security)) -> None:
-    """Enable HTTP basic auth only when username/password are configured in .env."""
-    configured_user = settings.API_USERNAME
-    configured_password = settings.API_PASSWORD
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    session: Session = Depends(get_session),
+) -> User:
+    try:
+        payload = decode_token(credentials.credentials)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
-    if not configured_user and not configured_password:
-        return
+    user_id = payload.get("uid")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
-            headers={"WWW-Authenticate": "Basic"},
+    user = session.get(User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
+    return user
+
+
+def require_project_role(required_role: ProjectRoleType) -> Callable:
+    def _check_project_role(
+        project_id: int,
+        user: User = Depends(get_current_user),
+        session: Session = Depends(get_session),
+    ) -> User:
+        if user.is_superuser:
+            return user
+
+        membership = session.exec(
+            select(ProjectMember)
+            .join(Role, Role.id == ProjectMember.role_id)
+            .where(ProjectMember.project_id == project_id, ProjectMember.user_id == user.id)
+        ).first()
+        if not membership:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No project access")
+
+        role = session.get(Role, membership.role_id)
+        if required_role == ProjectRoleType.ADMIN and role.name != ProjectRoleType.ADMIN:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+        return user
+
+    return _check_project_role
+
+
+def write_audit_log(
+    session: Session,
+    action: AuditActionType,
+    user_id: int | None,
+    entity_type: str,
+    entity_id: int | None,
+    metadata: dict | None = None,
+) -> None:
+    session.add(
+        AuditLog(
+            user_id=user_id,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            metadata_json=json.dumps(metadata or {}, ensure_ascii=False),
         )
-
-    is_valid_username = secrets.compare_digest(credentials.username, configured_user)
-    is_valid_password = secrets.compare_digest(credentials.password, configured_password)
-    if not (is_valid_username and is_valid_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
+    )
+    session.commit()

@@ -3,11 +3,13 @@ import { api } from '../api';
 import type { Project } from '../api';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
+import { useAuth } from '../auth';
 
 export default function Projects() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [isCreating, setIsCreating] = useState(false);
     const [newProject, setNewProject] = useState({ name: '', domain: '' });
+    const { user } = useAuth();
 
     useEffect(() => {
         fetchProjects();
@@ -38,12 +40,14 @@ export default function Projects() {
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">Projects</h1>
+                {user?.is_superuser && (
                 <button
                     onClick={() => setIsCreating(true)}
                     className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
                 >
                     <Plus size={18} /> New Project
                 </button>
+                )}
             </div>
 
             {isCreating && (
