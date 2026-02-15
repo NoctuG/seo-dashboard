@@ -71,8 +71,8 @@ export default function Layout() {
                             value={i18n.language}
                             onChange={(e) => i18n.changeLanguage(e.target.value)}
                         >
-                            <option value="zh-CN">简体中文</option>
-                            <option value="en-US">English</option>
+                            <option value="zh-CN">{t('layout.langZhCN')}</option>
+                            <option value="en-US">{t('layout.langEnUS')}</option>
                         </select>
                     </label>
                     <label className="block text-xs text-slate-700 dark:text-slate-200">
@@ -98,17 +98,17 @@ export default function Layout() {
                         <Sparkles size={20} /> {t('layout.aiAssistant')}
                     </Link>
                     {user?.is_superuser && (
-                    <Link to="/users" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
-                        <Users size={20} /> Users
+                    <Link to="/users" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                        <Users size={20} /> {t('layout.users')}
                     </Link>
                     )}
                     {user?.is_superuser && (
-                    <Link to="/settings" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
-                        <Settings size={20} /> 系统设置
+                    <Link to="/settings" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                        <Settings size={20} /> {t('layout.systemSettings')}
                     </Link>
                     )}
-                    <Link to="/change-password" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
-                        <KeyRound size={20} /> 修改密码
+                    <Link to="/change-password" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
+                        <KeyRound size={20} /> {t('layout.changePassword')}
                     </Link>
                     <Link to="/security/2fa" className="flex items-center gap-2 p-2 text-gray-700 hover:bg-gray-100 rounded">
                         <ShieldCheck size={20} /> 双重认证

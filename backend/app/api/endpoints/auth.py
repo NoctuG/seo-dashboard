@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from app.core.error_codes import ErrorCode
 from app.api.deps import get_current_user, write_audit_log
 from app.auth_service import (
     create_access_token,
@@ -139,7 +140,7 @@ def _verify_two_factor_code(session: Session, user: User, code: str) -> tuple[bo
 def login(request: Request, payload: LoginRequest, session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == payload.email.lower())).first()
     if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ErrorCode.INVALID_EMAIL_OR_PASSWORD)
 
     if user.two_factor_enabled:
         challenge_token = create_two_factor_challenge_token(user.email, user.id, user.full_name, user.is_superuser)
@@ -240,15 +241,15 @@ def refresh_token(payload: RefreshTokenRequest, session: Session = Depends(get_s
     try:
         token_payload = decode_refresh_token(payload.refresh_token)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ErrorCode.UNEXPECTED_ERROR) from exc
 
     user_id = token_payload.get("uid")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ErrorCode.INVALID_TOKEN_PAYLOAD)
 
     user = session.get(User, user_id)
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ErrorCode.USER_IS_INACTIVE)
 
     access_token = create_access_token(user.email, user.id, user.full_name, user.is_superuser)
     refresh_token_value = create_refresh_token(user.email, user.id, user.full_name, user.is_superuser)
@@ -263,7 +264,7 @@ def me(user: User = Depends(get_current_user)):
 @router.post("/bootstrap-admin", response_model=UserMeResponse)
 def bootstrap_admin(payload: BootstrapAdminRequest, session: Session = Depends(get_session)):
     if session.exec(select(User)).first():
-        raise HTTPException(status_code=400, detail="Admin already initialized")
+        raise HTTPException(status_code=400, detail=ErrorCode.ADMIN_ALREADY_INITIALIZED)
 
     ensure_default_roles(session)
     org = Organization(name=payload.organization_name)
@@ -299,7 +300,7 @@ def change_password(
     session: Session = Depends(get_session),
 ):
     if not verify_password(payload.old_password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Old password is incorrect")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.OLD_PASSWORD_IS_INCORRECT)
     user.password_hash = hash_password(payload.new_password)
     session.add(user)
     session.commit()
@@ -347,11 +348,11 @@ def reset_password(payload: ResetPasswordRequest, session: Session = Depends(get
         )
     ).first()
     if not reset_token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.INVALID_OR_EXPIRED_RESET_TOKEN)
 
     user = session.get(User, reset_token.user_id)
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid reset token")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.INVALID_RESET_TOKEN)
 
     user.password_hash = hash_password(payload.new_password)
     reset_token.used_at = now
