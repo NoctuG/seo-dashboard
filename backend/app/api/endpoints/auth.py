@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, write_audit_log
-from app.auth_service import create_access_token, ensure_default_roles, hash_password, verify_password
+from app.auth_service import create_access_token, create_refresh_token, decode_refresh_token, ensure_default_roles, hash_password, verify_password
 from app.config import settings
 from app.db import get_session
 from app.email_service import email_service
@@ -23,7 +23,12 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 
 class BootstrapAdminRequest(BaseModel):
@@ -68,7 +73,8 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)):
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
-    token = create_access_token(user.email, user.id, user.full_name, user.is_superuser)
+    access_token = create_access_token(user.email, user.id, user.full_name, user.is_superuser)
+    refresh_token = create_refresh_token(user.email, user.id, user.full_name, user.is_superuser)
     write_audit_log(
         session,
         action=AuditActionType.LOGIN,
@@ -77,7 +83,27 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)):
         entity_id=user.id,
         metadata={"email": user.email},
     )
-    return TokenResponse(access_token=token)
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh_token(payload: RefreshTokenRequest, session: Session = Depends(get_session)):
+    try:
+        token_payload = decode_refresh_token(payload.refresh_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+
+    user_id = token_payload.get("uid")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    user = session.get(User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
+
+    access_token = create_access_token(user.email, user.id, user.full_name, user.is_superuser)
+    refresh_token_value = create_refresh_token(user.email, user.id, user.full_name, user.is_superuser)
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token_value)
+
 
 
 @router.get("/me", response_model=UserMeResponse)
