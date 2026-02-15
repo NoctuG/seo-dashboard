@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional, Literal
 import json
-from datetime import date
+from datetime import date, datetime
+from fastapi.responses import Response
 from collections import Counter
 
 from app.db import get_session
-from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot
+from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog
 from app.schemas import (
     ProjectCreate,
     ProjectRead,
@@ -19,12 +20,20 @@ from app.schemas import (
     VisibilityResponse,
     RoiFormulaBreakdownResponse,
     RoiCostBreakdown,
+    ReportTemplateCreate,
+    ReportTemplateRead,
+    ReportScheduleCreate,
+    ReportScheduleRead,
+    ReportExportRequest,
+    ReportDeliveryLogRead,
 )
 from app.crawler.crawler import crawler_service
 from app.analytics_service import analytics_service
 from app.content_performance_service import content_performance_service
 from app.backlink_service import backlink_service
 from app.visibility_service import visibility_service
+from app.report_service import report_service
+from app.scheduler_service import scheduler_service
 
 router = APIRouter()
 
@@ -458,3 +467,126 @@ def get_project_backlink_changes(project_id: int, session: Session = Depends(get
         lost_links=json.loads(latest.lost_links_json),
         notes=json.loads(latest.notes_json),
     )
+
+
+def _template_to_read(template: ReportTemplate) -> ReportTemplateRead:
+    return ReportTemplateRead(
+        id=template.id,
+        project_id=template.project_id,
+        name=template.name,
+        indicators=json.loads(template.indicators_json or "[]"),
+        brand_styles=json.loads(template.brand_styles_json or "{}"),
+        time_range=template.time_range,
+        created_at=template.created_at,
+        updated_at=template.updated_at,
+    )
+
+
+@router.get("/{project_id}/reports/templates", response_model=List[ReportTemplateRead])
+def list_report_templates(project_id: int, session: Session = Depends(get_session)):
+    templates = session.exec(
+        select(ReportTemplate).where(ReportTemplate.project_id == project_id).order_by(ReportTemplate.created_at.desc())
+    ).all()
+    return [_template_to_read(template) for template in templates]
+
+
+@router.post("/{project_id}/reports/templates", response_model=ReportTemplateRead)
+def create_report_template(project_id: int, payload: ReportTemplateCreate, session: Session = Depends(get_session)):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    template = ReportTemplate(
+        project_id=project_id,
+        name=payload.name,
+        indicators_json=json.dumps(payload.indicators, ensure_ascii=False),
+        brand_styles_json=json.dumps(payload.brand_styles, ensure_ascii=False),
+        time_range=payload.time_range,
+    )
+    session.add(template)
+    session.commit()
+    session.refresh(template)
+    return _template_to_read(template)
+
+
+@router.put("/{project_id}/reports/templates/{template_id}", response_model=ReportTemplateRead)
+def update_report_template(project_id: int, template_id: int, payload: ReportTemplateCreate, session: Session = Depends(get_session)):
+    template = session.get(ReportTemplate, template_id)
+    if not template or template.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    template.name = payload.name
+    template.indicators_json = json.dumps(payload.indicators, ensure_ascii=False)
+    template.brand_styles_json = json.dumps(payload.brand_styles, ensure_ascii=False)
+    template.time_range = payload.time_range
+    template.updated_at = datetime.utcnow()
+    session.add(template)
+    session.commit()
+    session.refresh(template)
+    return _template_to_read(template)
+
+
+@router.post("/{project_id}/reports/export")
+def export_report(project_id: int, payload: ReportExportRequest, session: Session = Depends(get_session)):
+    template = session.get(ReportTemplate, payload.template_id)
+    if not template or template.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    try:
+        report_payload = report_service.build_report_payload(session, project_id, template)
+        content, media_type = report_service.render(report_payload, payload.format)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    log = ReportDeliveryLog(
+        project_id=project_id,
+        template_id=template.id,
+        format=payload.format.lower(),
+        status="success",
+    )
+    session.add(log)
+    session.commit()
+
+    filename = f"report-{project_id}-{template.id}.{payload.format.lower()}"
+    return Response(content=content, media_type=media_type, headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+@router.get("/{project_id}/reports/schedules", response_model=List[ReportScheduleRead])
+def list_report_schedules(project_id: int, session: Session = Depends(get_session)):
+    schedules = session.exec(
+        select(ReportSchedule).where(ReportSchedule.project_id == project_id).order_by(ReportSchedule.created_at.desc())
+    ).all()
+    return schedules
+
+
+@router.post("/{project_id}/reports/schedules", response_model=ReportScheduleRead)
+def create_report_schedule(project_id: int, payload: ReportScheduleCreate, session: Session = Depends(get_session)):
+    template = session.get(ReportTemplate, payload.template_id)
+    if not template or template.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    schedule = ReportSchedule(project_id=project_id, **payload.model_dump())
+    session.add(schedule)
+    session.commit()
+    session.refresh(schedule)
+    scheduler_service.reload_jobs()
+    return schedule
+
+
+@router.delete("/{project_id}/reports/schedules/{schedule_id}")
+def delete_report_schedule(project_id: int, schedule_id: int, session: Session = Depends(get_session)):
+    schedule = session.get(ReportSchedule, schedule_id)
+    if not schedule or schedule.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    session.delete(schedule)
+    session.commit()
+    scheduler_service.reload_jobs()
+    return {"ok": True}
+
+
+@router.get("/{project_id}/reports/logs", response_model=List[ReportDeliveryLogRead])
+def list_report_logs(project_id: int, session: Session = Depends(get_session)):
+    logs = session.exec(
+        select(ReportDeliveryLog).where(ReportDeliveryLog.project_id == project_id).order_by(ReportDeliveryLog.created_at.desc()).limit(200)
+    ).all()
+    return logs

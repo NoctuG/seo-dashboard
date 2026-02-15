@@ -232,3 +232,68 @@ class RoiFormulaBreakdownResponse(BaseModel):
     roi: float
     roi_pct: float
     formula: dict[str, str]
+
+
+class ReportTemplateBase(BaseModel):
+    name: str
+    indicators: List[str] = Field(default_factory=list)
+    brand_styles: dict = Field(default_factory=dict)
+    time_range: str = "30d"
+
+
+class ReportTemplateCreate(ReportTemplateBase):
+    pass
+
+
+class ReportTemplateRead(ReportTemplateBase):
+    id: int
+    project_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReportScheduleBase(BaseModel):
+    template_id: int
+    cron_expression: str
+    timezone: str = "UTC"
+    recipient_email: str
+    active: bool = True
+    retry_limit: int = 2
+
+
+class ReportScheduleCreate(ReportScheduleBase):
+    pass
+
+
+class ReportScheduleRead(ReportScheduleBase):
+    id: int
+    project_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReportExportRequest(BaseModel):
+    template_id: int
+    format: str = "csv"
+
+
+class ReportDeliveryLogRead(BaseModel):
+    id: int
+    project_id: int
+    template_id: Optional[int]
+    schedule_id: Optional[int]
+    format: str
+    status: str
+    retries: int
+    recipient_email: Optional[str]
+    error_message: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

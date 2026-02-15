@@ -214,3 +214,40 @@ class BacklinkSnapshot(SQLModel, table=True):
     lost_links_json: str = "[]"
     notes_json: str = "[]"
     provider: str = "sample"
+
+
+class ReportTemplate(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    name: str
+    indicators_json: str = "[]"
+    brand_styles_json: str = "{}"
+    time_range: str = "30d"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ReportSchedule(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    template_id: int = Field(foreign_key="reporttemplate.id", index=True)
+    cron_expression: str = "0 9 * * 1"
+    timezone: str = "UTC"
+    recipient_email: str
+    active: bool = True
+    retry_limit: int = 2
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ReportDeliveryLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    template_id: Optional[int] = Field(default=None, foreign_key="reporttemplate.id", index=True)
+    schedule_id: Optional[int] = Field(default=None, foreign_key="reportschedule.id", index=True)
+    format: str = "csv"
+    status: str = "success"
+    retries: int = 0
+    recipient_email: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
