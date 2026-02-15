@@ -26,6 +26,7 @@ from app.schemas import (
     ReportScheduleRead,
     ReportExportRequest,
     ReportDeliveryLogRead,
+    ProjectSettingsUpdate,
 )
 from app.crawler.crawler import crawler_service
 from app.analytics_service import analytics_service
@@ -53,6 +54,8 @@ def _project_to_read(project: Project) -> ProjectRead:
         domain=project.domain,
         brand_keywords=brand_keywords,
         brand_regex=project.brand_regex,
+        default_gl=project.default_gl,
+        default_hl=project.default_hl,
         created_at=project.created_at,
     )
 
@@ -64,6 +67,8 @@ def create_project(project: ProjectCreate, session: Session = Depends(get_sessio
         domain=project.domain,
         brand_keywords_json=json.dumps(project.brand_keywords, ensure_ascii=False),
         brand_regex=project.brand_regex,
+        default_gl=project.default_gl,
+        default_hl=project.default_hl,
     )
     session.add(db_project)
     session.commit()
@@ -95,6 +100,29 @@ def read_project(project_id: int, session: Session = Depends(get_session), _: Us
         raise HTTPException(status_code=404, detail="Project not found")
     return _project_to_read(project)
 
+
+
+
+@router.patch("/{project_id}/settings", response_model=ProjectRead)
+def update_project_settings(
+    project_id: int,
+    payload: ProjectSettingsUpdate,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if payload.default_gl is not None:
+        project.default_gl = payload.default_gl.strip().lower() or project.default_gl
+    if payload.default_hl is not None:
+        project.default_hl = payload.default_hl.strip().lower() or project.default_hl
+
+    session.add(project)
+    session.commit()
+    session.refresh(project)
+    return _project_to_read(project)
 
 @router.delete("/{project_id}")
 def delete_project(project_id: int, session: Session = Depends(get_session), user: User = Depends(require_project_role(ProjectRoleType.ADMIN))):
@@ -492,6 +520,7 @@ def _template_to_read(template: ReportTemplate) -> ReportTemplateRead:
         indicators=json.loads(template.indicators_json or "[]"),
         brand_styles=json.loads(template.brand_styles_json or "{}"),
         time_range=template.time_range,
+        locale=template.locale,
         created_at=template.created_at,
         updated_at=template.updated_at,
     )
@@ -517,6 +546,7 @@ def create_report_template(project_id: int, payload: ReportTemplateCreate, sessi
         indicators_json=json.dumps(payload.indicators, ensure_ascii=False),
         brand_styles_json=json.dumps(payload.brand_styles, ensure_ascii=False),
         time_range=payload.time_range,
+        locale=payload.locale,
     )
     session.add(template)
     session.commit()
@@ -534,6 +564,7 @@ def update_report_template(project_id: int, template_id: int, payload: ReportTem
     template.indicators_json = json.dumps(payload.indicators, ensure_ascii=False)
     template.brand_styles_json = json.dumps(payload.brand_styles, ensure_ascii=False)
     template.time_range = payload.time_range
+    template.locale = payload.locale
     template.updated_at = datetime.utcnow()
     session.add(template)
     session.commit()
@@ -548,6 +579,8 @@ def export_report(project_id: int, payload: ReportExportRequest, session: Sessio
         raise HTTPException(status_code=404, detail="Template not found")
 
     try:
+        if payload.locale:
+            template.locale = payload.locale
         report_payload = report_service.build_report_payload(session, project_id, template)
         content, media_type = report_service.render(report_payload, payload.format)
     except ValueError as exc:

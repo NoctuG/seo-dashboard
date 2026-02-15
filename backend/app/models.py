@@ -45,6 +45,8 @@ class Project(SQLModel, table=True):
     domain: str
     brand_keywords_json: str = "[]"
     brand_regex: Optional[str] = None
+    default_gl: str = "us"
+    default_hl: str = "en"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     crawls: List["Crawl"] = Relationship(back_populates="project")
@@ -191,6 +193,8 @@ class Keyword(SQLModel, table=True):
     project_id: int = Field(foreign_key="project.id")
     term: str
     target_url: Optional[str] = None
+    locale: Optional[str] = None
+    market: Optional[str] = None
     current_rank: Optional[int] = None
     last_checked: Optional[datetime] = None
 
@@ -207,6 +211,8 @@ class RankHistory(SQLModel, table=True):
     keyword_id: int = Field(foreign_key="keyword.id")
     rank: Optional[int] = None
     url: Optional[str] = None
+    gl: Optional[str] = None
+    hl: Optional[str] = None
     checked_at: datetime = Field(default_factory=datetime.utcnow)
 
     keyword: Keyword = Relationship(back_populates="rank_history")
@@ -301,6 +307,7 @@ class ReportTemplate(SQLModel, table=True):
     indicators_json: str = "[]"
     brand_styles_json: str = "{}"
     time_range: str = "30d"
+    locale: str = "en-US"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   api,
   getProjectAuthority,
@@ -64,6 +65,7 @@ export default function ProjectDashboard() {
   const [attributionModel, setAttributionModel] = useState<'linear' | 'first_click' | 'last_click'>('linear');
   const [roi, setRoi] = useState<RoiBreakdownResponse | null>(null);
   const { isAdmin } = useProjectRole(id);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (id) {
@@ -139,13 +141,13 @@ export default function ProjectDashboard() {
         },
       });
       fetchDashboard();
-      alert('Crawl started!');
+      alert(t('dashboard.crawlStarted'));
     } catch (error) {
       console.error(error);
     }
   };
 
-  if (loading || !stats) return <div>Loading...</div>;
+  if (loading || !stats) return <div>{t('app.loading')}</div>;
 
   const { last_crawl, issues_breakdown, analytics } = stats;
   const hasGrowth = analytics.period.growth_pct >= 0;

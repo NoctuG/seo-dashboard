@@ -7,6 +7,7 @@ import {
     getProjectCompetitors,
     getProjectVisibility,
     runProjectKeywordCompare,
+    updateProjectSettings,
 } from '../api';
 import type {
     CompetitorDomainItem,
@@ -14,6 +15,7 @@ import type {
     RankHistoryItem,
     VisibilityHistoryItem,
     VisibilityResponse,
+    Project,
 } from '../api';
 import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield } from 'lucide-react';
 import { useProjectRole } from '../useProjectRole';
@@ -35,6 +37,8 @@ export default function ProjectKeywords() {
     const [loading, setLoading] = useState(true);
     const [term, setTerm] = useState('');
     const [targetUrl, setTargetUrl] = useState('');
+    const [locale, setLocale] = useState('');
+    const [market, setMarket] = useState('');
     const [checking, setChecking] = useState<number | null>(null);
     const [checkingAll, setCheckingAll] = useState(false);
     const [comparing, setComparing] = useState(false);
@@ -47,6 +51,8 @@ export default function ProjectKeywords() {
     const [competitorInput, setCompetitorInput] = useState('');
     const [compareHistory, setCompareHistory] = useState<VisibilityHistoryItem[]>([]);
     const [visibility, setVisibility] = useState<VisibilityResponse | null>(null);
+    const [projectSettings, setProjectSettings] = useState<Project | null>(null);
+    const [marketFilter, setMarketFilter] = useState('all');
     const { isAdmin } = useProjectRole(id);
 
     useEffect(() => {
@@ -54,6 +60,7 @@ export default function ProjectKeywords() {
             fetchKeywords();
             fetchCompetitors();
             fetchVisibility();
+            fetchProject();
         }
     }, [id]);
 
@@ -77,6 +84,17 @@ export default function ProjectKeywords() {
         }
     };
 
+
+    const fetchProject = async () => {
+        if (!id) return;
+        try {
+            const res = await api.get<Project>(`/projects/${id}`);
+            setProjectSettings(res.data);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     const fetchVisibility = async () => {
         if (!id) return;
         try {
@@ -92,9 +110,13 @@ export default function ProjectKeywords() {
             await api.post(`/projects/${id}/keywords`, {
                 term: term.trim(),
                 target_url: targetUrl.trim() || undefined,
+                locale: locale.trim() || undefined,
+                market: market.trim() || undefined,
             });
             setTerm('');
             setTargetUrl('');
+            setLocale('');
+            setMarket('');
             fetchKeywords();
         } catch (error) {
             console.error(error);
@@ -173,6 +195,7 @@ export default function ProjectKeywords() {
             setCompareHistory(rows);
             fetchKeywords();
             fetchVisibility();
+            fetchProject();
         } catch (error) {
             console.error(error);
         } finally {
@@ -210,6 +233,11 @@ export default function ProjectKeywords() {
             })),
         [visibility]
     );
+
+    const filteredKeywords = useMemo(() => {
+        if (marketFilter === 'all') return keywords;
+        return keywords.filter((kw: KeywordItem) => (kw.market || '').toLowerCase() === marketFilter.toLowerCase());
+    }, [keywords, marketFilter]);
 
     if (loading) return <div>Loading...</div>;
 
@@ -254,6 +282,14 @@ export default function ProjectKeywords() {
                             className="border rounded px-3 py-2"
                             onKeyDown={(e) => e.key === 'Enter' && addCompetitor()}
                         />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">locale</span>
+                        <input type="text" value={locale} onChange={(e) => setLocale(e.target.value)} placeholder="en / zh-CN" className="border rounded px-3 py-2" />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">market</span>
+                        <input type="text" value={market} onChange={(e) => setMarket(e.target.value)} placeholder="us / sg / cn" className="border rounded px-3 py-2" />
                     </label>
                     {isAdmin && (<button
                         onClick={addCompetitor}
@@ -318,6 +354,28 @@ export default function ProjectKeywords() {
             </div>
 
             <div className="bg-white p-4 rounded shadow mb-6">
+                <h2 className="text-lg font-semibold mb-3">项目市场设置</h2>
+                <div className="flex gap-3 items-end">
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">国家(gl)</span>
+                        <input className="border rounded px-3 py-2" value={projectSettings?.default_gl || ''} onChange={(e) => setProjectSettings((p) => p ? ({ ...p, default_gl: e.target.value }) : p)} />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">语言(hl)</span>
+                        <input className="border rounded px-3 py-2" value={projectSettings?.default_hl || ''} onChange={(e) => setProjectSettings((p) => p ? ({ ...p, default_hl: e.target.value }) : p)} />
+                    </label>
+                    {isAdmin && <button className="bg-indigo-600 text-white px-4 py-2 rounded" onClick={() => id && projectSettings && updateProjectSettings(id, { default_gl: projectSettings.default_gl, default_hl: projectSettings.default_hl })}>保存</button>}
+                    <label className="flex flex-col gap-1 text-sm ml-auto">
+                        <span className="text-gray-600">按市场筛选</span>
+                        <select className="border rounded px-3 py-2" value={marketFilter} onChange={(e) => setMarketFilter(e.target.value)}>
+                            <option value="all">全部</option>
+                            {[...new Set(keywords.map((k) => k.market).filter(Boolean) as string[])].map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                    </label>
+                </div>
+            </div>
+
+            <div className="bg-white p-4 rounded shadow mb-6">
                 <h2 className="text-lg font-semibold mb-3">添加关键词</h2>
                 <div className="flex gap-3 items-end">
                     <label className="flex flex-col gap-1 text-sm flex-1">
@@ -328,6 +386,14 @@ export default function ProjectKeywords() {
                         <span className="text-gray-600">目标 URL（可选）</span>
                         <input type="url" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} placeholder="https://example.com/page" className="border rounded px-3 py-2" onKeyDown={(e) => e.key === 'Enter' && addKeyword()} />
                     </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">locale</span>
+                        <input type="text" value={locale} onChange={(e) => setLocale(e.target.value)} placeholder="en / zh-CN" className="border rounded px-3 py-2" />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">market</span>
+                        <input type="text" value={market} onChange={(e) => setMarket(e.target.value)} placeholder="us / sg / cn" className="border rounded px-3 py-2" />
+                    </label>
                     {isAdmin && (
                     <button onClick={addKeyword} disabled={!term.trim()} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50">
                         <Plus size={18} /> 添加
@@ -336,7 +402,7 @@ export default function ProjectKeywords() {
                 </div>
             </div>
 
-            {keywords.length === 0 ? (
+            {filteredKeywords.length === 0 ? (
                 <div className="bg-white p-8 rounded shadow text-center text-gray-500">
                     <Search size={48} className="mx-auto mb-3 text-gray-300" />
                     <p>尚未添加关键词，请在上方添加要跟踪的关键词。</p>
@@ -348,16 +414,20 @@ export default function ProjectKeywords() {
                             <tr>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">关键词</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">目标 URL</th>
+                                <th className="px-4 py-3 text-sm font-medium text-gray-500">locale</th>
+                                <th className="px-4 py-3 text-sm font-medium text-gray-500">market</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500 text-center">当前排名</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">最后检查时间</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500 text-right">操作</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {keywords.map((kw) => (
+                            {filteredKeywords.map((kw) => (
                                 <tr key={kw.id} className={`hover:bg-gray-50 cursor-pointer ${selectedKeyword?.id === kw.id ? 'bg-blue-50' : ''}`} onClick={() => selectKeyword(kw)}>
                                     <td className="px-4 py-3 font-medium">{kw.term}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{kw.target_url || '-'}</td>
+                                    <td className="px-4 py-3 text-sm">{kw.locale || '-'}</td>
+                                    <td className="px-4 py-3 text-sm">{kw.market || '-'}</td>
                                     <td className="px-4 py-3 text-center">{kw.current_rank != null ? `#${kw.current_rank}` : '未检测'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{kw.last_checked ? new Date(kw.last_checked).toLocaleString() : '-'}</td>
                                     <td className="px-4 py-3 text-right">

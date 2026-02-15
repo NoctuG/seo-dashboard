@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   createReportSchedule,
   createReportTemplate,
@@ -13,17 +14,21 @@ import type { ReportDeliveryLog, ReportSchedule, ReportTemplate } from '../api';
 
 export default function ProjectReports() {
   const { id } = useParams<{ id: string }>();
+  const { t, i18n } = useTranslation();
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [schedules, setSchedules] = useState<ReportSchedule[]>([]);
   const [logs, setLogs] = useState<ReportDeliveryLog[]>([]);
   const [name, setName] = useState('Weekly SEO Summary');
   const [indicators, setIndicators] = useState('traffic,rank,conversion');
   const [timeRange, setTimeRange] = useState('30d');
+  const [templateLocale, setTemplateLocale] = useState(i18n.language === 'zh-CN' ? 'zh-CN' : 'en-US');
   const [brandPrimary, setBrandPrimary] = useState('#1d4ed8');
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [format, setFormat] = useState<'csv' | 'pdf'>('csv');
   const [cron, setCron] = useState('0 9 * * 1');
   const [email, setEmail] = useState('ops@example.com');
+
+  const dtf = useMemo(() => new Intl.DateTimeFormat(templateLocale, { dateStyle: 'medium', timeStyle: 'short' }), [templateLocale]);
 
   const reload = async () => {
     if (!id) return;
@@ -51,6 +56,7 @@ export default function ProjectReports() {
       indicators: indicators.split(',').map((item) => item.trim()).filter(Boolean),
       brand_styles: { primary: brandPrimary },
       time_range: timeRange,
+      locale: templateLocale,
     });
     setSelectedTemplateId(template.id);
     await reload();
@@ -58,7 +64,7 @@ export default function ProjectReports() {
 
   const handleExport = async () => {
     if (!id || !selectedTemplateId) return;
-    const blob = await exportProjectReport(id, { template_id: selectedTemplateId, format });
+    const blob = await exportProjectReport(id, { template_id: selectedTemplateId, format, locale: templateLocale });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -83,15 +89,19 @@ export default function ProjectReports() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Reports</h1>
+      <h1 className="text-2xl font-bold">{t('reports.title')}</h1>
 
       <section className="bg-white rounded shadow p-4 space-y-3">
-        <h2 className="font-semibold">Template Editor</h2>
+        <h2 className="font-semibold">{t('reports.templateEditor')}</h2>
         <div className="grid md:grid-cols-2 gap-3">
           <input className="border rounded px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} placeholder="Template name" />
           <input className="border rounded px-3 py-2" value={timeRange} onChange={(e) => setTimeRange(e.target.value)} placeholder="30d / 90d / 12m" />
           <input className="border rounded px-3 py-2" value={indicators} onChange={(e) => setIndicators(e.target.value)} placeholder="comma separated indicators" />
           <input className="border rounded px-3 py-2" value={brandPrimary} onChange={(e) => setBrandPrimary(e.target.value)} placeholder="brand primary color" />
+          <select className="border rounded px-3 py-2" value={templateLocale} onChange={(e) => setTemplateLocale(e.target.value)}>
+            <option value="zh-CN">{t('reports.templateLocale')} zh-CN</option>
+            <option value="en-US">{t('reports.templateLocale')} en-US</option>
+          </select>
         </div>
         <button className="bg-blue-600 text-white px-4 py-2 rounded" onClick={handleCreateTemplate}>Save Template</button>
       </section>
@@ -133,8 +143,8 @@ export default function ProjectReports() {
         <ul className="text-sm space-y-2 max-h-72 overflow-auto">
           {logs.map((log) => (
             <li key={log.id} className="border rounded p-2">
-              <div className="font-medium">{log.status.toUpperCase()} · {log.format} · retries={log.retries}</div>
-              <div className="text-gray-600">{log.recipient_email || 'manual'} · {new Date(log.created_at).toLocaleString()}</div>
+              <div className="font-medium">{log.status.toUpperCase()} · {log.format} · retries={new Intl.NumberFormat(templateLocale).format(log.retries)}</div>
+              <div className="text-gray-600">{log.recipient_email || 'manual'} · {dtf.format(new Date(log.created_at))}</div>
               {log.error_message && <div className="text-red-600">{log.error_message}</div>}
             </li>
           ))}

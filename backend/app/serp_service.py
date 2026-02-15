@@ -48,7 +48,7 @@ def _extract_serp_features(data: dict) -> list[str]:
     return [name for name, source_key in known_features.items() if data.get(source_key)]
 
 
-def check_keyword_rank(term: str, domain: str, competitor_domains: Optional[list[str]] = None) -> RankResult:
+def check_keyword_rank(term: str, domain: str, competitor_domains: Optional[list[str]] = None, gl: str = "us", hl: str = "en") -> RankResult:
     """Check the SERP rank for a keyword against a domain.
 
     Returns the position and URL of the first result matching the domain.
@@ -66,8 +66,8 @@ def check_keyword_rank(term: str, domain: str, competitor_domains: Optional[list
 
     provider = settings.SERP_API_PROVIDER.lower()
     if provider == "valueserp":
-        return _check_valueserp(term, domain, competitor_domains)
-    return _check_serpapi(term, domain, competitor_domains)
+        return _check_valueserp(term, domain, competitor_domains, gl=gl, hl=hl)
+    return _check_serpapi(term, domain, competitor_domains, gl=gl, hl=hl)
 
 
 def _build_rank_result(data: dict, domain: str, competitor_domains: Optional[list[str]]) -> RankResult:
@@ -100,7 +100,7 @@ def _build_rank_result(data: dict, domain: str, competitor_domains: Optional[lis
     )
 
 
-def _check_serpapi(term: str, domain: str, competitor_domains: Optional[list[str]]) -> RankResult:
+def _check_serpapi(term: str, domain: str, competitor_domains: Optional[list[str]], gl: str, hl: str) -> RankResult:
     """Query SerpApi (https://serpapi.com)."""
     try:
         resp = requests.get(
@@ -109,6 +109,8 @@ def _check_serpapi(term: str, domain: str, competitor_domains: Optional[list[str
                 "q": term,
                 "api_key": settings.SERP_API_KEY,
                 "num": 100,
+                "gl": gl,
+                "hl": hl,
             },
             timeout=30,
         )
@@ -119,7 +121,7 @@ def _check_serpapi(term: str, domain: str, competitor_domains: Optional[list[str
         return RankResult(rank=None, url=None)
 
 
-def _check_valueserp(term: str, domain: str, competitor_domains: Optional[list[str]]) -> RankResult:
+def _check_valueserp(term: str, domain: str, competitor_domains: Optional[list[str]], gl: str, hl: str) -> RankResult:
     """Query ValueSERP (https://www.valueserp.com)."""
     try:
         resp = requests.get(
@@ -128,6 +130,8 @@ def _check_valueserp(term: str, domain: str, competitor_domains: Optional[list[s
                 "q": term,
                 "api_key": settings.SERP_API_KEY,
                 "num": 100,
+                "gl": gl,
+                "hl": hl,
             },
             timeout=30,
         )

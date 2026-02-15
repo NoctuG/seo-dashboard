@@ -8,6 +8,13 @@ class ProjectCreate(BaseModel):
     domain: str
     brand_keywords: List[str] = Field(default_factory=list)
     brand_regex: Optional[str] = None
+    default_gl: str = "us"
+    default_hl: str = "en"
+
+
+class ProjectSettingsUpdate(BaseModel):
+    default_gl: Optional[str] = None
+    default_hl: Optional[str] = None
 
 class ProjectRead(BaseModel):
     id: int
@@ -15,6 +22,8 @@ class ProjectRead(BaseModel):
     domain: str
     brand_keywords: List[str] = Field(default_factory=list)
     brand_regex: Optional[str] = None
+    default_gl: str
+    default_hl: str
     created_at: datetime
 
     class Config:
@@ -79,6 +88,8 @@ class LinkRead(BaseModel):
 class KeywordCreate(BaseModel):
     term: str
     target_url: Optional[str] = None
+    locale: Optional[str] = None
+    market: Optional[str] = None
 
 
 class KeywordRead(BaseModel):
@@ -86,6 +97,8 @@ class KeywordRead(BaseModel):
     project_id: int
     term: str
     target_url: Optional[str]
+    locale: Optional[str]
+    market: Optional[str]
     current_rank: Optional[int]
     last_checked: Optional[datetime]
 
@@ -98,6 +111,8 @@ class RankHistoryRead(BaseModel):
     keyword_id: int
     rank: Optional[int]
     url: Optional[str]
+    gl: Optional[str]
+    hl: Optional[str]
     checked_at: datetime
 
     class Config:
@@ -239,6 +254,7 @@ class ReportTemplateBase(BaseModel):
     indicators: List[str] = Field(default_factory=list)
     brand_styles: dict = Field(default_factory=dict)
     time_range: str = "30d"
+    locale: str = "en-US"
 
 
 class ReportTemplateCreate(ReportTemplateBase):
@@ -281,6 +297,7 @@ class ReportScheduleRead(ReportScheduleBase):
 class ReportExportRequest(BaseModel):
     template_id: int
     format: str = "csv"
+    locale: Optional[str] = None
 
 
 class ReportDeliveryLogRead(BaseModel):

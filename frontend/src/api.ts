@@ -67,7 +67,18 @@ export interface Project {
   domain: string;
   brand_keywords: string[];
   brand_regex?: string;
+  default_gl: string;
+  default_hl: string;
   created_at: string;
+}
+
+
+export async function updateProjectSettings(
+  projectId: string | number,
+  payload: { default_gl?: string; default_hl?: string },
+): Promise<Project> {
+  const res = await api.patch<Project>(`/projects/${projectId}/settings`, payload);
+  return res.data;
 }
 
 export interface Crawl {
@@ -190,6 +201,8 @@ export interface KeywordItem {
   project_id: number;
   term: string;
   target_url?: string;
+  locale?: string;
+  market?: string;
   current_rank?: number;
   last_checked?: string;
 }
@@ -199,6 +212,8 @@ export interface RankHistoryItem {
   keyword_id: number;
   rank?: number;
   url?: string;
+  gl?: string;
+  hl?: string;
   checked_at: string;
 }
 
@@ -392,6 +407,7 @@ export interface ReportTemplate {
   indicators: string[];
   brand_styles: Record<string, string>;
   time_range: string;
+  locale: string;
   created_at: string;
   updated_at: string;
 }
@@ -429,7 +445,7 @@ export async function getReportTemplates(projectId: string | number): Promise<Re
 
 export async function createReportTemplate(
   projectId: string | number,
-  payload: Pick<ReportTemplate, 'name' | 'indicators' | 'brand_styles' | 'time_range'>,
+  payload: Pick<ReportTemplate, 'name' | 'indicators' | 'brand_styles' | 'time_range' | 'locale'>,
 ): Promise<ReportTemplate> {
   const res = await api.post<ReportTemplate>(`/projects/${projectId}/reports/templates`, payload);
   return res.data;
@@ -437,7 +453,7 @@ export async function createReportTemplate(
 
 export async function exportProjectReport(
   projectId: string | number,
-  payload: { template_id: number; format: 'csv' | 'pdf' },
+  payload: { template_id: number; format: 'csv' | 'pdf'; locale?: string },
 ): Promise<Blob> {
   const res = await api.post(`/projects/${projectId}/reports/export`, payload, { responseType: 'blob' });
   return res.data;
