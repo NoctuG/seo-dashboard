@@ -103,6 +103,9 @@ export default function Layout() {
                     <Link to="/ai" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
                         <Sparkles size={20} /> {t('layout.aiAssistant')}
                     </Link>
+                    <Link to="/ai/content" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
+                        <span className="w-5 h-5 flex items-center justify-center"><i className="fa-solid fa-wand-magic-sparkles text-sm" style={{ color: '#63C4F8' }} /></span> {t('layout.aiContent')}
+                    </Link>
                     {user?.is_superuser && (
                     <Link to="/users" className="flex items-center gap-2 p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
                         <Users size={20} /> {t('layout.users')}

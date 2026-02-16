@@ -643,6 +643,72 @@ export async function analyzeSeoWithAi(
   return res.data;
 }
 
+export interface AiGenerateArticleRequest {
+  topic: string;
+  keywords?: string[];
+  tone?: string;
+  language?: string;
+  word_count?: number;
+  outline?: string;
+}
+
+export interface AiGenerateArticleResponse {
+  title: string;
+  content: string;
+  meta_description: string;
+  keywords_used: string[];
+}
+
+export async function generateSeoArticle(
+  payload: AiGenerateArticleRequest,
+): Promise<AiGenerateArticleResponse> {
+  const res = await api.post<AiGenerateArticleResponse>("/ai/generate-article", payload);
+  return res.data;
+}
+
+export interface AiGenerateSocialRequest {
+  topic: string;
+  platform?: string;
+  tone?: string;
+  language?: string;
+  include_hashtags?: boolean;
+  count?: number;
+}
+
+export interface AiSocialPost {
+  content: string;
+  hashtags: string[];
+  platform: string;
+}
+
+export interface AiGenerateSocialResponse {
+  posts: AiSocialPost[];
+}
+
+export async function generateSocialContent(
+  payload: AiGenerateSocialRequest,
+): Promise<AiGenerateSocialResponse> {
+  const res = await api.post<AiGenerateSocialResponse>("/ai/generate-social", payload);
+  return res.data;
+}
+
+export interface AiRewriteRequest {
+  content: string;
+  instruction?: string;
+  language?: string;
+}
+
+export interface AiRewriteResponse {
+  result: string;
+}
+
+export async function rewriteContent(
+  payload: AiRewriteRequest,
+): Promise<AiRewriteResponse> {
+  const res = await api.post<AiRewriteResponse>("/ai/rewrite", payload);
+  return res.data;
+}
+
 export interface AuthorityResponse {
   project_id: number;
   provider: string;
