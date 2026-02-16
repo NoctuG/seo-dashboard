@@ -41,7 +41,7 @@ export default function Projects() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{t('projects.title')}</h1>
+        <h1 className="md-headline-large">{t('projects.title')}</h1>
         {user?.is_superuser && (
           <button onClick={() => setIsCreating(true)} className="app-btn app-btn-primary">
             <Plus size={18} /> {t('projects.newProject')}
@@ -51,10 +51,10 @@ export default function Projects() {
 
       {isCreating && (
         <div className="app-card mb-6 max-w-md p-6">
-          <h2 className="text-lg font-semibold mb-4">{t('projects.createProject')}</h2>
+          <h2 className="md-title-large mb-4">{t('projects.createProject')}</h2>
           <form onSubmit={handleCreate}>
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">{t('projects.name')}</label>
+              <label className="block md-label-large mb-1">{t('projects.name')}</label>
               <input
                 className="app-input w-full"
                 value={newProject.name}
@@ -63,7 +63,7 @@ export default function Projects() {
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">{t('projects.domain')}</label>
+              <label className="block md-label-large mb-1">{t('projects.domain')}</label>
               <input
                 className="app-input w-full"
                 value={newProject.domain}
@@ -83,9 +83,9 @@ export default function Projects() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((p) => (
           <Link to={`/projects/${p.id}`} key={p.id} className="app-card block p-6 transition hover:shadow-md">
-            <h3 className="text-lg font-semibold">{p.name}</h3>
-            <p className="text-[color:var(--md-sys-color-on-surface-variant)]">{p.domain}</p>
-            <p className="mt-4 text-sm text-[color:var(--md-sys-color-on-surface-variant)]">{t('projects.createdAt', { date: new Date(p.created_at).toLocaleDateString() })}</p>
+            <h3 className="md-title-large">{p.name}</h3>
+            <p className="md-body-medium text-[color:var(--md-sys-color-on-surface-variant)]">{p.domain}</p>
+            <p className="mt-4 md-body-medium text-[color:var(--md-sys-color-on-surface-variant)]">{t('projects.createdAt', { date: new Date(p.created_at).toLocaleDateString() })}</p>
           </Link>
         ))}
       </div>

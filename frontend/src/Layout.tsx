@@ -112,7 +112,7 @@ export default function Layout() {
                 <button
                     type="button"
                     onClick={() => setMenuOpen((prev) => !prev)}
-                    className="inline-flex items-center gap-2 rounded-full border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] px-4 py-2 text-sm font-medium text-[color:var(--md-sys-color-on-surface)] shadow-lg backdrop-blur-md transition hover:bg-[color:var(--md-sys-color-primary-container)]"
+                    className="inline-flex items-center gap-2 rounded-full border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] px-4 py-2 md-label-large text-[color:var(--md-sys-color-on-surface)] shadow-lg backdrop-blur-md transition hover:bg-[color:var(--md-sys-color-primary-container)]"
                 >
                     {menuOpen ? <X size={16} /> : <Menu size={16} />}
                     {menuOpen ? t('layout.collapseMenu') : t('layout.expandMenu')}
@@ -139,10 +139,10 @@ export default function Layout() {
             >
                 <div className="flex h-full flex-col gap-5">
                     <div className="rounded-3xl border border-[color:var(--md-sys-color-outline)] bg-gradient-to-br from-[color:var(--md-sys-color-surface)] to-[color:var(--md-sys-color-primary-container)] p-5 shadow-sm">
-                        <p className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[color:var(--md-sys-color-primary)]">
+                        <p className="inline-flex items-center gap-2 md-label-medium uppercase tracking-wide text-[color:var(--md-sys-color-primary)]">
                             <PanelsTopLeft size={14} /> {t('layout.title')}
                         </p>
-                        <p className="mt-2 text-sm text-[color:var(--md-sys-color-on-surface-variant)]">{user?.email}</p>
+                        <p className="mt-2 md-body-medium text-[color:var(--md-sys-color-on-surface-variant)]">{user?.email}</p>
                     </div>
 
                     <nav className="rounded-3xl border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-3">
@@ -153,7 +153,7 @@ export default function Layout() {
                                         to={to}
                                         onClick={onNavigateFromMenu}
                                         className={({ isActive }) =>
-                                            `flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm transition ${
+                                            `flex items-center gap-2 rounded-2xl px-3 py-2.5 md-label-large transition ${
                                                 isActive
                                                     ? 'bg-[color:var(--md-sys-color-primary)] text-[color:var(--md-sys-color-on-primary)] shadow-md'
                                                     : 'text-[color:var(--md-sys-color-on-surface)] hover:bg-[color:var(--md-sys-state-hover)]'
@@ -169,7 +169,7 @@ export default function Layout() {
                     </nav>
 
                     <div className="space-y-3 rounded-3xl border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-4">
-                        <label className="block text-xs font-medium text-[color:var(--md-sys-color-on-surface-variant)]">
+                        <label className="block md-label-medium text-[color:var(--md-sys-color-on-surface-variant)]">
                             <span className="mb-1 inline-flex items-center gap-1">
                                 <Languages size={14} /> {t('layout.language')}
                             </span>
@@ -183,7 +183,7 @@ export default function Layout() {
                             </select>
                         </label>
 
-                        <label className="block text-xs font-medium text-[color:var(--md-sys-color-on-surface-variant)]">
+                        <label className="block md-label-medium text-[color:var(--md-sys-color-on-surface-variant)]">
                             <span className="mb-1 inline-flex items-center gap-1">
                                 <MonitorCog size={14} /> {t('layout.theme')}
                             </span>
@@ -200,7 +200,7 @@ export default function Layout() {
                     </div>
 
                     <div className="mt-auto space-y-3">
-                        <p className="text-center text-xs text-[color:var(--md-sys-color-on-surface-variant)]">Version: {displayVersion}</p>
+                        <p className="text-center md-label-medium text-[color:var(--md-sys-color-on-surface-variant)]">Version: {displayVersion}</p>
                         <button
                             type="button"
                             onClick={handleLogout}
