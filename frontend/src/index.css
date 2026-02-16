@@ -4,12 +4,36 @@
 
 @layer base {
   :root {
-    --color-primary: #63C4F8;
-    --color-accent: #F4420B;
-    --color-transition: #8FFADF;
-    --color-primary-light: #E3F8FF;
-    --color-accent-light: #FEF2F2;
-    --color-transition-light: #E8FFF8;
+    --md-sys-color-primary: #14638f;
+    --md-sys-color-on-primary: #ffffff;
+    --md-sys-color-primary-container: #c8e6ff;
+    --md-sys-color-on-primary-container: #001e2f;
+    --md-sys-color-surface: #f7fafd;
+    --md-sys-color-surface-variant: #e6eef5;
+    --md-sys-color-on-surface: #171c22;
+    --md-sys-color-on-surface-variant: #414b57;
+    --md-sys-color-outline: #707a86;
+    --md-sys-color-error: #ba1a1a;
+    --md-sys-color-on-error: #ffffff;
+
+    --md-sys-state-hover: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+    --md-sys-state-focus: color-mix(in srgb, var(--md-sys-color-primary) 22%, transparent);
+    --md-sys-state-disabled-bg: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+    --md-sys-state-disabled-text: color-mix(in srgb, var(--md-sys-color-on-surface) 45%, transparent);
+  }
+
+  html.dark {
+    --md-sys-color-primary: #8fd1ff;
+    --md-sys-color-on-primary: #00344f;
+    --md-sys-color-primary-container: #004b6f;
+    --md-sys-color-on-primary-container: #c8e6ff;
+    --md-sys-color-surface: #0f141a;
+    --md-sys-color-surface-variant: #2a323b;
+    --md-sys-color-on-surface: #dfe3ea;
+    --md-sys-color-on-surface-variant: #c0c7d1;
+    --md-sys-color-outline: #8a939e;
+    --md-sys-color-error: #ffb4ab;
+    --md-sys-color-on-error: #690005;
   }
 
   html,
@@ -19,28 +43,26 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100;
+    background-color: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    @apply antialiased transition-colors duration-200;
     font-family: 'Roboto', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
-  /* Material Design focus ring using primary color */
   input:focus,
   select:focus,
   textarea:focus {
-    --tw-ring-color: var(--color-primary);
     outline: none;
-    box-shadow: 0 0 0 2px var(--color-primary-light);
-    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--md-sys-state-focus);
+    border-color: var(--md-sys-color-primary);
   }
 
-  /* Rich text editor placeholder */
   [contenteditable]:empty:before {
     content: attr(data-placeholder);
-    color: #aaa;
+    color: color-mix(in srgb, var(--md-sys-color-on-surface) 52%, transparent);
     pointer-events: none;
   }
 
-  /* Scrollbar styling */
   ::-webkit-scrollbar {
     width: 6px;
   }
@@ -48,10 +70,84 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #ccc;
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 30%, transparent);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 45%, transparent);
+  }
+}
+
+@layer components {
+  .app-card {
+    background: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    border: 1px solid var(--md-sys-color-outline);
+    @apply rounded-2xl shadow-sm;
+  }
+
+  .app-input,
+  .app-select,
+  .app-textarea {
+    background: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+    border: 1px solid var(--md-sys-color-outline);
+    @apply rounded-lg px-3 py-2 text-sm transition-colors;
+  }
+
+  .app-input:hover,
+  .app-select:hover,
+  .app-textarea:hover {
+    border-color: var(--md-sys-color-primary);
+  }
+
+  .app-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition;
+  }
+
+  .app-btn-primary {
+    background: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+  }
+
+  .app-btn-primary:hover {
+    background: color-mix(in srgb, var(--md-sys-color-primary) 88%, black);
+  }
+
+  .app-btn-tonal {
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+  }
+
+  .app-btn-outline {
+    border: 1px solid var(--md-sys-color-outline);
+    color: var(--md-sys-color-on-surface);
+    background: transparent;
+  }
+
+  .app-btn-outline:hover {
+    background: var(--md-sys-state-hover);
+  }
+
+  .app-btn-danger {
+    background: var(--md-sys-color-error);
+    color: var(--md-sys-color-on-error);
+  }
+
+  .app-btn:focus-visible,
+  .app-input:focus-visible,
+  .app-select:focus-visible,
+  .app-textarea:focus-visible {
+    box-shadow: 0 0 0 2px var(--md-sys-state-focus);
+  }
+
+  .app-btn:disabled,
+  .app-input:disabled,
+  .app-select:disabled,
+  .app-textarea:disabled {
+    background: var(--md-sys-state-disabled-bg);
+    color: var(--md-sys-state-disabled-text);
+    border-color: color-mix(in srgb, var(--md-sys-color-outline) 70%, transparent);
+    @apply cursor-not-allowed opacity-70;
   }
 }

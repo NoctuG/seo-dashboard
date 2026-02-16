@@ -67,14 +67,14 @@ export default function SystemSettings() {
   return (
     <div className="space-y-6 max-w-4xl">
       <h1 className="text-2xl font-bold">{t('systemSettings.title')}</h1>
-      {error && <div className="p-3 rounded border border-red-200 bg-red-50 text-red-700">{error}</div>}
+      {error && <div className="rounded-lg border border-[color:var(--md-sys-color-error)] bg-[color:color-mix(in_srgb,var(--md-sys-color-error)_14%,transparent)] p-3 text-[color:var(--md-sys-color-error)]">{error}</div>}
 
-      <form onSubmit={handleCreate} className="space-y-4 border rounded bg-white p-4">
+      <form onSubmit={handleCreate} className="app-card space-y-4 p-4">
         <h2 className="text-lg font-semibold">{t('systemSettings.addWebhook')}</h2>
-        <input className="w-full border rounded p-2" placeholder={t('systemSettings.webhookUrl')} value={url} onChange={(e) => setUrl(e.target.value)} required />
-        <input className="w-full border rounded p-2" placeholder={t('systemSettings.secret')} value={secret} onChange={(e) => setSecret(e.target.value)} required />
+        <input className="app-input w-full" placeholder={t('systemSettings.webhookUrl')} value={url} onChange={(e) => setUrl(e.target.value)} required />
+        <input className="app-input w-full" placeholder={t('systemSettings.secret')} value={secret} onChange={(e) => setSecret(e.target.value)} required />
         <div>
-          <div className="text-sm text-gray-600 mb-2">{t('systemSettings.subscribedEvents')}</div>
+          <div className="mb-2 text-sm text-[color:var(--md-sys-color-on-surface-variant)]">{t('systemSettings.subscribedEvents')}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {events.map((event) => (
               <label key={event} className="flex items-center gap-2 text-sm">
@@ -84,28 +84,28 @@ export default function SystemSettings() {
             ))}
           </div>
         </div>
-        <button className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700" type="submit">{t('systemSettings.saveConfig')}</button>
+        <button className="app-btn app-btn-primary" type="submit">{t('systemSettings.saveConfig')}</button>
       </form>
 
-      <div className="border rounded bg-white p-4">
+      <div className="app-card p-4">
         <h2 className="text-lg font-semibold mb-3">{t('systemSettings.existingConfigs')}</h2>
         <div className="space-y-3">
           {configs.map((config) => (
-            <div key={config.id} className="border rounded p-3">
+            <div key={config.id} className="rounded-lg border border-[color:var(--md-sys-color-outline)] p-3">
               <div className="font-medium">{config.url}</div>
-              <div className="text-sm text-gray-600">{t('systemSettings.events')}: {config.subscribed_events.join(', ') || '-'}</div>
-              <div className="text-xs text-gray-500 mt-1">secret: {config.secret}</div>
+              <div className="text-sm text-[color:var(--md-sys-color-on-surface-variant)]">{t('systemSettings.events')}: {config.subscribed_events.join(', ') || '-'}</div>
+              <div className="mt-1 text-xs text-[color:var(--md-sys-color-on-surface-variant)]">secret: {config.secret}</div>
               <div className="mt-3 flex gap-2">
-                <button className="px-3 py-1 rounded border hover:bg-gray-50" onClick={() => handleToggleEnabled(config)} type="button">
+                <button className="app-btn app-btn-outline px-3 py-1" onClick={() => handleToggleEnabled(config)} type="button">
                   {config.enabled ? t('systemSettings.disable') : t('systemSettings.enable')}
                 </button>
-                <button className="px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleDelete(config.id)} type="button">
+                <button className="app-btn app-btn-danger px-3 py-1" onClick={() => handleDelete(config.id)} type="button">
                   {t('common.delete')}
                 </button>
               </div>
             </div>
           ))}
-          {!configs.length && <div className="text-sm text-gray-500">{t('systemSettings.empty')}</div>}
+          {!configs.length && <div className="text-sm text-[color:var(--md-sys-color-on-surface-variant)]">{t('systemSettings.empty')}</div>}
         </div>
       </div>
     </div>
