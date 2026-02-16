@@ -22,10 +22,11 @@ services:
     build:
       context: ./frontend
       args:
-        # Use the docker-internal hostname so the browser talks to the
-        # backend through the host-mapped port.
+        # Browser requests still go through the frontend origin.
         VITE_API_URL: /api/v1
     restart: unless-stopped
+    environment:
+      - API_UPSTREAM=backend:28000
     ports:
       - "32000:32000"
     depends_on:
