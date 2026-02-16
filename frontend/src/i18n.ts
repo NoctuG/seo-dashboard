@@ -33,6 +33,9 @@ const resources = {
         theme: 'Theme',
         langZhCN: '简体中文',
         langEnUS: 'English',
+        expandMenu: 'Open menu',
+        collapseMenu: 'Close menu',
+        closeMenu: 'Close menu panel',
       },
       login: {
         title: 'Sign in to SEO Dashboard',
@@ -236,6 +239,7 @@ const resources = {
       app: { loading: '加载中...' },
       layout: {
         title: 'SEO 工具', projects: '项目', aiAssistant: 'AI 助手', aiContent: 'AI 内容创作', users: '用户管理', systemSettings: '系统设置', changePassword: '修改密码', twoFactorAuth: '双重认证', logout: '退出登录', language: '语言', theme: '主题', langZhCN: '简体中文', langEnUS: 'English',
+        expandMenu: '打开菜单', collapseMenu: '收起菜单', closeMenu: '关闭菜单面板',
       },
       login: {
         title: '登录 SEO Dashboard', email: '邮箱', password: '密码', submit: '登录', loading: '登录中...', forgotPassword: '忘记密码？', errors: { failed: '登录失败，请检查邮箱和密码。' },
