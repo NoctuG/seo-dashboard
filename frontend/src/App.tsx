@@ -24,9 +24,19 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useTranslation } from 'react-i18next';
 
 function Protected({ children }: { children: ReactElement }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, backendUnavailable } = useAuth();
   const { t } = useTranslation();
   if (loading) return <div className="p-8">{t("app.loading")}</div>;
+  if (backendUnavailable) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+        <div className="w-full max-w-xl rounded border border-amber-200 bg-white p-6 shadow">
+          <h1 className="mb-2 text-xl font-semibold text-gray-900">{t('backendUnavailable.title')}</h1>
+          <p className="text-gray-600">{t('backendUnavailable.description')}</p>
+        </div>
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return children;
 }

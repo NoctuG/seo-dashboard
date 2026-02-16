@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
 import {
   clearAuthTokens,
   getAccessToken,
@@ -17,6 +18,7 @@ type AuthContextValue = {
   user: UserProfile | null;
   loading: boolean;
   isAuthenticated: boolean;
+  backendUnavailable: boolean;
   signIn: (email: string, password: string) => Promise<SignInResult>;
   completeTwoFactorSignIn: (code: string) => Promise<void>;
   signOut: () => void;
@@ -28,6 +30,7 @@ const TWO_FACTOR_TOKEN_STORAGE_KEY = 'seo.auth.two-factor-token';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [backendUnavailable, setBackendUnavailable] = useState(false);
 
   const signOut = useCallback(() => {
     clearAuthTokens();
@@ -49,8 +52,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const me = await getCurrentUser();
         setUser(me);
-      } catch {
-        signOut();
+        setBackendUnavailable(false);
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          const status = error.response?.status;
+          const isTokenIssue = status === 401 || status === 403;
+          const isNetworkIssue = !error.response || error.code === 'ECONNABORTED' || status === 502 || status === 503 || status === 504;
+
+          if (isTokenIssue) {
+            signOut();
+          } else if (isNetworkIssue) {
+            setBackendUnavailable(true);
+          } else {
+            signOut();
+          }
+        } else {
+          signOut();
+        }
       } finally {
         setLoading(false);
       }
@@ -63,8 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       loading,
       isAuthenticated: !!user,
+      backendUnavailable,
       signIn: async (email: string, password: string) => {
         const response = await login(email, password);
+        setBackendUnavailable(false);
         if (response.requires_2fa && response.two_factor_token) {
           sessionStorage.setItem(TWO_FACTOR_TOKEN_STORAGE_KEY, response.two_factor_token);
           return '2fa_required';
@@ -103,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       signOut,
     }),
-    [user, loading, signOut]
+    [user, loading, backendUnavailable, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
