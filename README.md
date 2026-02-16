@@ -117,4 +117,325 @@ npm run dev -- --host
 - **后端 (`backend/.env`)**: 控制数据库连接、认证密钥、CORS策略、邮件服务以及与第三方服务（如 GA4, Matomo, AI接口）的集成。
 - **前端 (`frontend/.env`)**: 主要用于指定后端 API 的访问地址 (`VITE_API_URL`)。
 
-请参考根目录下的 `.env.example` 文件了解所有可用的配置选项。
+请参考 `backend/.env.example` 文件了解所有可用的配置选项。
+
+---
+
+## 📋 部署后设置指南
+
+完成上述安装步骤后，请按照以下指南完成生产环境的初始化和安全加固。
+
+### 1. 创建管理员账户
+
+首次使用时需要创建一个管理员（超级用户）账户来管理项目和用户。系统提供两种方式：
+
+#### 方式 A：通过环境变量自动创建（推荐用于 Docker 部署）
+
+在 `backend/.env` 中设置以下变量，服务首次启动时将自动创建管理员：
+
+```bash
+INITIAL_ADMIN_EMAIL=admin@example.com
+INITIAL_ADMIN_PASSWORD=your-secure-password
+INITIAL_ADMIN_NAME=Administrator
+```
+
+> **注意**: 此方式仅在数据库中没有任何用户时生效。管理员创建后建议从 `.env` 中移除密码。
+
+#### 方式 B：通过 API 接口手动创建
+
+如果未配置环境变量，可在服务启动后调用 Bootstrap API 创建首位管理员：
+
+```bash
+curl -X POST http://localhost:28000/api/v1/auth/bootstrap-admin \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "your-secure-password",
+    "full_name": "Administrator",
+    "organization_name": "My Organization"
+  }'
+```
+
+> **注意**: 该接口仅在数据库中没有任何用户时可用，创建第一个用户后将自动禁用。
+
+#### 后续用户管理
+
+管理员创建完成后，可通过以下方式管理用户：
+
+- **创建新用户**: `POST /api/v1/users` （需要管理员权限）
+- **启用两步验证**: 登录后通过 `POST /api/v1/auth/2fa/bind` 和 `POST /api/v1/auth/2fa/enable` 配置 TOTP
+- **重置密码**: 配置 SMTP 后支持通过邮件重置密码
+
+### 2. 配置环境变量
+
+在生产环境中，请务必根据实际需求配置 `backend/.env`。以下是关键配置项：
+
+#### 必须修改的配置
+
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `ENV` | 运行环境 | `production` |
+| `JWT_SECRET_KEY` | JWT 签名密钥（至少 32 字符） | 见下方生成命令 |
+| `ALLOWED_ORIGINS` | CORS 允许的前端域名 | `https://seo.example.com` |
+| `PASSWORD_RESET_URL` | 密码重置页面地址 | `https://seo.example.com/reset-password` |
+
+生成安全的 JWT 密钥：
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+#### SMTP 邮件服务配置
+
+配置 SMTP 以启用密码重置和邮件通知功能：
+
+```bash
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=noreply@example.com
+SMTP_PASSWORD=your-smtp-password
+SMTP_FROM=noreply@example.com
+SMTP_USE_TLS=true
+```
+
+#### AI API 密钥配置
+
+配置 AI 助手以获取 SEO 优化建议（支持 OpenAI 兼容接口）：
+
+```bash
+AI_BASE_URL=https://api.openai.com/v1
+AI_API_KEY=sk-your-api-key
+AI_MODEL=gpt-4o-mini
+```
+
+#### 完整配置参考
+
+所有可用的环境变量及说明请参考 [`backend/.env.example`](backend/.env.example)。
+
+### 3. 数据备份策略
+
+SQLite 数据库文件存储在 Docker 卷 `seo-dashboard_db-data` 中，建议制定定期备份策略。
+
+#### 方式 A：使用内置备份脚本（推荐）
+
+项目提供了一键备份脚本 `scripts/backup-db.sh`，支持从 Docker 容器中安全导出数据库并压缩：
+
+```bash
+# 手动执行备份
+./scripts/backup-db.sh
+
+# 自定义备份保留天数（默认 7 天）
+BACKUP_RETAIN_DAYS=14 ./scripts/backup-db.sh
+```
+
+配合 cron 实现每日自动备份：
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 添加以下行（每天凌晨 2:00 执行备份）
+0 2 * * * /path/to/seo-dashboard/scripts/backup-db.sh >> /var/log/seo-backup.log 2>&1
+```
+
+#### 方式 B：通过管理 API 备份
+
+系统提供了 RESTful 备份/恢复接口（需要管理员权限）：
+
+```bash
+# 创建备份
+curl -X POST http://localhost:28000/api/v1/admin/backup \
+  -H "Authorization: Bearer <your-access-token>"
+
+# 恢复备份
+curl -X POST http://localhost:28000/api/v1/admin/restore \
+  -H "Authorization: Bearer <your-access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"backup_file": "/data/backups/seo-backup-20260101-020000.db", "confirm_phrase": "RESTORE"}'
+```
+
+#### 方式 C：直接复制 Docker 卷数据
+
+```bash
+# 查看数据库卷的实际路径
+docker volume inspect seo-dashboard_db-data
+
+# 从容器中复制数据库文件
+docker compose cp backend:/data/seo_tool.db ./seo_tool_backup_$(date +%Y%m%d).db
+```
+
+> **建议**: 将备份文件同步到异地存储（如 S3、OSS），避免单点故障导致数据丢失。
+
+### 4. 监控和日志
+
+#### 内置 Prometheus 指标
+
+后端已集成 `prometheus-client`，暴露以下指标端点：
+
+```
+GET http://localhost:28000/metrics
+```
+
+主要指标包括：
+- `seo_dashboard_http_requests_total` — HTTP 请求总数（按方法/路径/状态码）
+- `seo_dashboard_http_request_duration_seconds` — 请求延迟直方图
+- `seo_dashboard_crawl_runs_total` — 爬虫运行次数
+- `seo_dashboard_crawl_pages_processed_total` — 已处理页面总数
+- `seo_dashboard_db_pool_in_use` — 数据库连接池使用数
+
+#### 集成 Prometheus + Grafana
+
+在 `docker-compose.yml` 同级目录创建 Prometheus 配置文件 `prometheus.yml`：
+
+```yaml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "seo-dashboard"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["backend:28000"]
+```
+
+然后在 `docker-compose.yml` 中添加 Prometheus 和 Grafana 服务：
+
+```yaml
+services:
+  # ... 已有的 backend 和 frontend 服务 ...
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  # ... 已有卷 ...
+  prometheus-data:
+  grafana-data:
+```
+
+#### 健康检查端点
+
+系统提供两个健康检查端点，可用于负载均衡器或 Kubernetes 探针：
+
+| 端点 | 用途 | 成功状态码 |
+|------|------|-----------|
+| `GET /api/v1/health` | 整体健康状态（数据库 + 调度器） | `200` |
+| `GET /api/v1/health/ready` | 就绪检查（适用于 K8s readiness probe） | `200` / `503` |
+
+#### 日志配置
+
+通过环境变量控制日志行为：
+
+```bash
+# 日志级别: DEBUG, INFO, WARNING, ERROR
+LOG_LEVEL=INFO
+
+# 日志格式: json（推荐生产环境，便于 ELK/Loki 解析）或 plain
+LOG_FORMAT=json
+```
+
+**集成 ELK Stack**: 将 `LOG_FORMAT` 设为 `json` 后，可使用 Filebeat 采集容器日志并发送到 Elasticsearch：
+
+```bash
+# 查看后端容器的 JSON 日志输出
+docker compose logs -f backend
+```
+
+### 5. 安全加固
+
+#### HTTPS 配置
+
+生产环境务必启用 HTTPS。推荐在容器外部署反向代理来终止 TLS：
+
+**使用 Caddy（自动 HTTPS，推荐）：**
+
+```
+# Caddyfile
+seo.example.com {
+    reverse_proxy localhost:32000
+}
+```
+
+**使用 Nginx：**
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name seo.example.com;
+
+    ssl_certificate     /etc/ssl/certs/seo.example.com.pem;
+    ssl_certificate_key /etc/ssl/private/seo.example.com.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    location / {
+        proxy_pass http://127.0.0.1:32000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    server_name seo.example.com;
+    return 301 https://$host$request_uri;
+}
+```
+
+#### 防火墙规则
+
+仅暴露必要端口，后端 API 端口不应直接对公网开放：
+
+```bash
+# UFW 示例：仅允许 HTTP/HTTPS 和 SSH
+sudo ufw default deny incoming
+sudo ufw allow ssh
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+
+# 确保后端端口 28000 不对外暴露
+# 在 docker-compose.yml 中将后端端口绑定为仅本地：
+#   ports:
+#     - "127.0.0.1:28000:28000"
+```
+
+#### 限制数据库访问
+
+- SQLite 数据库文件存储在 Docker 卷中，确保宿主机上的卷目录权限仅限 root 或 Docker 用户访问。
+- 备份文件同样包含敏感数据，应设置严格的文件权限：
+
+```bash
+# 查看并限制卷目录权限
+docker volume inspect seo-dashboard_db-data --format '{{ .Mountpoint }}'
+sudo chmod 700 /var/lib/docker/volumes/seo-dashboard_db-data/_data
+```
+
+#### 其他安全建议
+
+| 措施 | 说明 |
+|------|------|
+| **强密码策略** | 管理员密码至少 12 位，包含大小写字母、数字和特殊字符 |
+| **启用两步验证** | 为管理员账户启用 TOTP 两步验证 |
+| **更新 JWT 密钥** | 使用至少 32 字符的高熵随机密钥，切勿使用默认值 |
+| **配置 CORS** | `ALLOWED_ORIGINS` 仅填写实际使用的前端域名 |
+| **定期更新** | 定期拉取最新镜像以获取安全补丁 |
+| **速率限制** | 系统已内置登录（5次/分钟）和爬虫启动（2次/分钟）的速率限制 |
+| **审计日志** | 系统自动记录登录、备份、管理员操作等审计日志 |
