@@ -65,9 +65,9 @@ export default function SystemSettings() {
   if (loading) return <div>{t('common.loading')}</div>;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-4xl space-y-6">
       <h1 className="md-headline-large">{t('systemSettings.title')}</h1>
-      {error && <div className="rounded-lg border border-[color:var(--md-sys-color-error)] bg-[color:color-mix(in_srgb,var(--md-sys-color-error)_14%,transparent)] p-3 text-[color:var(--md-sys-color-error)]">{error}</div>}
+      {error && <div className="shape-small border border-[color:var(--md-sys-color-error)] bg-[color:color-mix(in_srgb,var(--md-sys-color-error)_14%,transparent)] p-4 text-[color:var(--md-sys-color-error)]">{error}</div>}
 
       <form onSubmit={handleCreate} className="app-card space-y-4 p-4">
         <h2 className="md-title-large">{t('systemSettings.addWebhook')}</h2>
@@ -75,7 +75,7 @@ export default function SystemSettings() {
         <input className="app-input w-full" placeholder={t('systemSettings.secret')} value={secret} onChange={(e) => setSecret(e.target.value)} required />
         <div>
           <div className="mb-2 md-body-medium text-[color:var(--md-sys-color-on-surface-variant)]">{t('systemSettings.subscribedEvents')}</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {events.map((event) => (
               <label key={event} className="flex items-center gap-2 md-label-large">
                 <input type="checkbox" checked={selectedEvents.includes(event)} onChange={() => toggleEvent(event)} />
@@ -88,18 +88,18 @@ export default function SystemSettings() {
       </form>
 
       <div className="app-card p-4">
-        <h2 className="md-title-large mb-3">{t('systemSettings.existingConfigs')}</h2>
-        <div className="space-y-3">
+        <h2 className="mb-4 md-title-large">{t('systemSettings.existingConfigs')}</h2>
+        <div className="space-y-4">
           {configs.map((config) => (
-            <div key={config.id} className="rounded-lg border border-[color:var(--md-sys-color-outline)] p-3">
+            <div key={config.id} className="shape-small border border-[color:var(--md-sys-color-outline)] p-4">
               <div className="md-title-medium">{config.url}</div>
               <div className="md-body-medium text-[color:var(--md-sys-color-on-surface-variant)]">{t('systemSettings.events')}: {config.subscribed_events.join(', ') || '-'}</div>
-              <div className="mt-1 md-label-medium text-[color:var(--md-sys-color-on-surface-variant)]">secret: {config.secret}</div>
-              <div className="mt-3 flex gap-2">
-                <button className="app-btn app-btn-outline px-3 py-1" onClick={() => handleToggleEnabled(config)} type="button">
+              <div className="mt-2 md-label-medium text-[color:var(--md-sys-color-on-surface-variant)]">secret: {config.secret}</div>
+              <div className="mt-4 flex gap-2">
+                <button className="app-btn app-btn-outline" onClick={() => handleToggleEnabled(config)} type="button">
                   {config.enabled ? t('systemSettings.disable') : t('systemSettings.enable')}
                 </button>
-                <button className="app-btn app-btn-danger px-3 py-1" onClick={() => handleDelete(config.id)} type="button">
+                <button className="app-btn app-btn-danger" onClick={() => handleDelete(config.id)} type="button">
                   {t('common.delete')}
                 </button>
               </div>

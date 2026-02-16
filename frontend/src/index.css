@@ -16,6 +16,16 @@
     --md-sys-color-error: #ba1a1a;
     --md-sys-color-on-error: #ffffff;
 
+    --shape-small: 8px;
+    --shape-medium: 12px;
+    --shape-large: 16px;
+    --shape-full: 9999px;
+
+    --space-1: 8px;
+    --space-2: 16px;
+    --space-3: 24px;
+    --space-4: 32px;
+
     --md-sys-state-hover: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
     --md-sys-state-focus: color-mix(in srgb, var(--md-sys-color-primary) 22%, transparent);
     --md-sys-state-disabled-bg: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
@@ -111,7 +121,8 @@
     background: var(--md-sys-color-surface);
     color: var(--md-sys-color-on-surface);
     border: 1px solid var(--md-sys-color-outline);
-    @apply rounded-2xl shadow-sm;
+    border-radius: var(--shape-large);
+    @apply shadow-sm;
   }
 
   .app-input,
@@ -120,7 +131,9 @@
     background: var(--md-sys-color-surface);
     color: var(--md-sys-color-on-surface);
     border: 1px solid var(--md-sys-color-outline);
-    @apply rounded-lg px-3 py-2 transition-colors;
+    border-radius: var(--shape-small);
+    padding: var(--space-1) var(--space-2);
+    @apply transition-colors;
     font-size: var(--md-sys-typescale-body-medium-size);
     line-height: var(--md-sys-typescale-body-medium-line-height);
     font-weight: var(--md-sys-typescale-body-medium-weight);
@@ -133,7 +146,9 @@
   }
 
   .app-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 transition;
+    border-radius: var(--shape-small);
+    padding: var(--space-1) var(--space-2);
+    @apply inline-flex items-center justify-center gap-2 transition;
     font-size: var(--md-sys-typescale-label-large-size);
     line-height: var(--md-sys-typescale-label-large-line-height);
     font-weight: var(--md-sys-typescale-label-large-weight);
@@ -231,5 +246,21 @@
     color: var(--md-sys-state-disabled-text);
     border-color: color-mix(in srgb, var(--md-sys-color-outline) 70%, transparent);
     @apply cursor-not-allowed opacity-70;
+  }
+
+  .shape-small {
+    border-radius: var(--shape-small);
+  }
+
+  .shape-medium {
+    border-radius: var(--shape-medium);
+  }
+
+  .shape-large {
+    border-radius: var(--shape-large);
+  }
+
+  .shape-full {
+    border-radius: var(--shape-full);
   }
 }

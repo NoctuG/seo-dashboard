@@ -112,7 +112,7 @@ export default function Layout() {
                 <button
                     type="button"
                     onClick={() => setMenuOpen((prev) => !prev)}
-                    className="inline-flex items-center gap-2 rounded-full border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] px-4 py-2 md-label-large text-[color:var(--md-sys-color-on-surface)] shadow-lg backdrop-blur-md transition hover:bg-[color:var(--md-sys-color-primary-container)]"
+                    className="inline-flex items-center gap-2 shape-full border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] px-4 py-2 md-label-large text-[color:var(--md-sys-color-on-surface)] shadow-lg backdrop-blur-md transition hover:bg-[color:var(--md-sys-color-primary-container)]"
                 >
                     {menuOpen ? <X size={16} /> : <Menu size={16} />}
                     {menuOpen ? t('layout.collapseMenu') : t('layout.expandMenu')}
@@ -129,7 +129,7 @@ export default function Layout() {
             )}
 
             <main className="relative z-10 flex-1 overflow-auto p-4 pr-6 md:p-8 md:pr-20">
-                <div className="mx-auto w-full max-w-6xl rounded-[2rem] border border-[color:var(--md-sys-color-outline)] bg-[color:color-mix(in_srgb,var(--md-sys-color-surface)_85%,transparent)] p-4 shadow-[0_24px_64px_-24px_rgba(15,23,42,0.35)] backdrop-blur-md md:p-6">
+                <div className="mx-auto w-full max-w-6xl shape-large border border-[color:var(--md-sys-color-outline)] bg-[color:color-mix(in_srgb,var(--md-sys-color-surface)_85%,transparent)] p-4 shadow-[0_24px_64px_-24px_rgba(15,23,42,0.35)] backdrop-blur-md md:p-6">
                     <Outlet />
                 </div>
             </main>
@@ -137,23 +137,23 @@ export default function Layout() {
             <aside
                 className={`absolute right-0 top-0 z-30 h-full w-full max-w-sm transform border-l border-[color:var(--md-sys-color-outline)] bg-[color:color-mix(in_srgb,var(--md-sys-color-surface)_92%,transparent)] p-6 shadow-2xl backdrop-blur-xl transition-transform duration-300 ${menuOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
-                <div className="flex h-full flex-col gap-5">
-                    <div className="rounded-3xl border border-[color:var(--md-sys-color-outline)] bg-gradient-to-br from-[color:var(--md-sys-color-surface)] to-[color:var(--md-sys-color-primary-container)] p-5 shadow-sm">
+                <div className="flex h-full flex-col gap-6">
+                    <div className="shape-large border border-[color:var(--md-sys-color-outline)] bg-gradient-to-br from-[color:var(--md-sys-color-surface)] to-[color:var(--md-sys-color-primary-container)] p-6 shadow-sm">
                         <p className="inline-flex items-center gap-2 md-label-medium uppercase tracking-wide text-[color:var(--md-sys-color-primary)]">
                             <PanelsTopLeft size={14} /> {t('layout.title')}
                         </p>
                         <p className="mt-2 md-body-medium text-[color:var(--md-sys-color-on-surface-variant)]">{user?.email}</p>
                     </div>
 
-                    <nav className="rounded-3xl border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-3">
-                        <ul className="space-y-1.5">
+                    <nav className="shape-large border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-4">
+                        <ul className="space-y-2">
                             {navItems.map(({ to, label, icon: Icon }) => (
                                 <li key={to}>
                                     <NavLink
                                         to={to}
                                         onClick={onNavigateFromMenu}
                                         className={({ isActive }) =>
-                                            `flex items-center gap-2 rounded-2xl px-3 py-2.5 md-label-large transition ${
+                                            `flex items-center gap-2 shape-medium px-4 py-2 md-label-large transition ${
                                                 isActive
                                                     ? 'bg-[color:var(--md-sys-color-primary)] text-[color:var(--md-sys-color-on-primary)] shadow-md'
                                                     : 'text-[color:var(--md-sys-color-on-surface)] hover:bg-[color:var(--md-sys-state-hover)]'
@@ -168,13 +168,13 @@ export default function Layout() {
                         </ul>
                     </nav>
 
-                    <div className="space-y-3 rounded-3xl border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-4">
+                    <div className="space-y-4 shape-large border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-4">
                         <label className="block md-label-medium text-[color:var(--md-sys-color-on-surface-variant)]">
                             <span className="mb-1 inline-flex items-center gap-1">
                                 <Languages size={14} /> {t('layout.language')}
                             </span>
                             <select
-                                className="app-select w-full rounded-xl"
+                                className="app-select w-full"
                                 value={i18n.language}
                                 onChange={(e) => i18n.changeLanguage(e.target.value)}
                             >
@@ -188,7 +188,7 @@ export default function Layout() {
                                 <MonitorCog size={14} /> {t('layout.theme')}
                             </span>
                             <select
-                                className="app-select w-full rounded-xl"
+                                className="app-select w-full"
                                 value={themePreference}
                                 onChange={(e) => setThemePreference(e.target.value as ThemePreference)}
                             >
@@ -199,12 +199,12 @@ export default function Layout() {
                         </label>
                     </div>
 
-                    <div className="mt-auto space-y-3">
+                    <div className="mt-auto space-y-4">
                         <p className="text-center md-label-medium text-[color:var(--md-sys-color-on-surface-variant)]">Version: {displayVersion}</p>
                         <button
                             type="button"
                             onClick={handleLogout}
-                            className="app-btn app-btn-outline flex w-full justify-center rounded-2xl px-3 py-2.5"
+                            className="app-btn app-btn-outline flex w-full justify-center"
                         >
                             <LogOut size={16} /> {t('layout.logout')}
                         </button>

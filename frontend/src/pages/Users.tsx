@@ -78,19 +78,19 @@ export default function Users() {
       <h1 className="md-headline-large">{t('users.title')}</h1>
 
       <form onSubmit={handleCreate} className="app-card max-w-2xl p-6">
-        <h2 className="md-title-large mb-4">{t('users.createUser')}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h2 className="mb-4 md-title-large">{t('users.createUser')}</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <label className="md-label-large">
             {t('users.email')}
-            <input className="app-input mt-1 w-full" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+            <input className="app-input mt-2 w-full" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
           </label>
           <label className="md-label-large">
             {t('users.fullName')}
-            <input className="app-input mt-1 w-full" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+            <input className="app-input mt-2 w-full" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
           </label>
           <label className="md-label-large">
             {t('users.password')}
-            <input className="app-input mt-1 w-full" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+            <input className="app-input mt-2 w-full" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
           </label>
           <div className="flex items-center gap-6 pt-6 md-label-large">
             <label className="flex items-center gap-2">
@@ -108,28 +108,28 @@ export default function Users() {
 
       {error && <p className="md-body-medium text-[color:var(--md-sys-color-error)]">{error}</p>}
 
-      <div className="app-card overflow-hidden rounded-xl">
+      <div className="app-card overflow-hidden">
         <table className="w-full md-body-medium">
           <thead className="border-b border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface-variant)]">
             <tr>
-              <th className="p-3 text-left md-label-large">{t('users.email')}</th>
-              <th className="p-3 text-left md-label-large">{t('users.name')}</th>
-              <th className="p-3 text-left md-label-large">{t('users.active')}</th>
-              <th className="p-3 text-left md-label-large">{t('users.superuser')}</th>
-              <th className="p-3 text-left md-label-large">{t('users.actions')}</th>
+              <th className="p-4 text-left md-label-large">{t('users.email')}</th>
+              <th className="p-4 text-left md-label-large">{t('users.name')}</th>
+              <th className="p-4 text-left md-label-large">{t('users.active')}</th>
+              <th className="p-4 text-left md-label-large">{t('users.superuser')}</th>
+              <th className="p-4 text-left md-label-large">{t('users.actions')}</th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => (
               <tr key={user.id} className="border-b border-[color:var(--md-sys-color-outline)] last:border-b-0">
-                <td className="p-3">{user.email}</td>
-                <td className="p-3">{user.full_name || '-'}</td>
-                <td className="p-3">{user.is_active ? t('common.yes') : t('common.no')}</td>
-                <td className="p-3">{user.is_superuser ? t('common.yes') : t('common.no')}</td>
-                <td className="p-3 space-x-2">
-                  <button className="app-btn app-btn-outline px-2 py-1" onClick={() => handleToggle(user, 'is_active')}>{t('users.toggleActive')}</button>
-                  <button className="app-btn app-btn-outline px-2 py-1" onClick={() => handleToggle(user, 'is_superuser')}>{t('users.toggleAdmin')}</button>
-                  <button className="app-btn app-btn-danger px-2 py-1" onClick={() => handleDelete(user.id)}>{t('common.delete')}</button>
+                <td className="p-4">{user.email}</td>
+                <td className="p-4">{user.full_name || '-'}</td>
+                <td className="p-4">{user.is_active ? t('common.yes') : t('common.no')}</td>
+                <td className="p-4">{user.is_superuser ? t('common.yes') : t('common.no')}</td>
+                <td className="space-x-2 p-4">
+                  <button className="app-btn app-btn-outline py-2" onClick={() => handleToggle(user, 'is_active')}>{t('users.toggleActive')}</button>
+                  <button className="app-btn app-btn-outline py-2" onClick={() => handleToggle(user, 'is_superuser')}>{t('users.toggleAdmin')}</button>
+                  <button className="app-btn app-btn-danger py-2" onClick={() => handleDelete(user.id)}>{t('common.delete')}</button>
                 </td>
               </tr>
             ))}
