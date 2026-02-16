@@ -40,7 +40,16 @@
       ```
       > **说明**: 若未提供 `backend/.env`，容器会使用内置开发默认值启动；但在生产环境中，请务必显式创建并修改 `JWT_SECRET_KEY`、`ALLOWED_ORIGINS` 等配置以确保安全。
 
-    - **前端配置**: `docker-compose.yml` 已将 API 地址配置为 `/api/v1`，由 Nginx 自动代理到后端，因此前端无需额外配置。
+    - **前端配置**: 默认无需额外 `.env` 配置，浏览器仍访问 `/api/v1`，再由前端容器内 Nginx 转发到 `API_UPSTREAM` 指定的后端地址。
+
+    **部署网络说明（frontend `API_UPSTREAM`）**
+    - **同一 Compose 网络（默认）**: 使用 `API_UPSTREAM=backend:28000`，即通过服务名访问后端。
+    - **跨网络 / 跨主机**: 将其改为可达地址，例如 `host.docker.internal:28000`、内网域名（`seo-api.internal:28000`）或 LB 地址（`api-lb.example.com:28000`）。
+
+    可通过以下方式覆盖默认值：
+    ```bash
+    API_UPSTREAM=host.docker.internal:28000 docker compose up -d --build
+    ```
 
 3.  **启动服务**
 
@@ -53,7 +62,16 @@
     服务启动后，您可以通过浏览器访问 `http://localhost:32000`。
     > 如需公网 HTTPS，建议在容器外使用 Caddy、Traefik 或 Nginx 统一终止 TLS 并反向代理到 `32000`。
 
+5.  **最小回归检查（静态说明，可按需手动执行）**
+
+    容器启动后，可在 Compose 网络内验证前端 API 反向代理是否正常：
+    ```bash
+    docker compose exec frontend curl -fsS http://frontend:32000/api/v1/health
+    ```
+    预期返回后端健康检查响应（HTTP 200 与 JSON 健康状态）。
+
 ### 🛠️ 方式二：从源代码构建
+
 
 如果您希望进行二次开发或自定义部署，可以按照以下步骤从源代码构建。
 
