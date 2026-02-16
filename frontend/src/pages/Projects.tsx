@@ -39,8 +39,8 @@ export default function Projects() {
   };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <h1 className="md-headline-large">{t('projects.title')}</h1>
         {user?.is_superuser && (
           <button onClick={() => setIsCreating(true)} className="app-btn app-btn-primary">
@@ -50,11 +50,11 @@ export default function Projects() {
       </div>
 
       {isCreating && (
-        <div className="app-card mb-6 max-w-md p-6">
+        <div className="app-card max-w-md p-6">
           <h2 className="md-title-large mb-4">{t('projects.createProject')}</h2>
-          <form onSubmit={handleCreate}>
-            <div className="mb-4">
-              <label className="block md-label-large mb-1">{t('projects.name')}</label>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div>
+              <label className="mb-2 block md-label-large">{t('projects.name')}</label>
               <input
                 className="app-input w-full"
                 value={newProject.name}
@@ -62,8 +62,8 @@ export default function Projects() {
                 required
               />
             </div>
-            <div className="mb-4">
-              <label className="block md-label-large mb-1">{t('projects.domain')}</label>
+            <div>
+              <label className="mb-2 block md-label-large">{t('projects.domain')}</label>
               <input
                 className="app-input w-full"
                 value={newProject.domain}
@@ -80,7 +80,7 @@ export default function Projects() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {projects.map((p) => (
           <Link to={`/projects/${p.id}`} key={p.id} className="app-card block p-6 transition hover:shadow-md">
             <h3 className="md-title-large">{p.name}</h3>
