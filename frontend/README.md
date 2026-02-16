@@ -1,3 +1,9 @@
+## Frontend Docker / Nginx 说明
+
+- Nginx 运行时配置由 `default.conf.template` 在容器启动时渲染生成。
+- 渲染后的生效文件路径为 `/etc/nginx/conf.d/default.conf`。
+- `API_UPSTREAM` 仅在容器启动渲染模板时生效。
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

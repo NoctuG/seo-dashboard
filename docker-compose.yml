@@ -26,6 +26,7 @@ services:
         VITE_API_URL: /api/v1
     restart: unless-stopped
     environment:
+      # API_UPSTREAM 仅在容器启动时用于渲染 nginx 模板，运行中修改不会热更新配置。
       - API_UPSTREAM=backend:28000
     ports:
       - "32000:32000"

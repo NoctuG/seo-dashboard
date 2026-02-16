@@ -43,6 +43,9 @@
     - **前端配置**: 默认无需额外 `.env` 配置。容器模式下浏览器应始终访问前端域名下的 `/api/v1`，再由前端容器内 Nginx 转发到 `API_UPSTREAM` 指定的后端地址。
       > **重要**: 不建议在浏览器可见的 URL 中直接写 `backend:28000` 这类容器服务名；容器服务名仅用于容器内部网络解析，对终端用户浏览器不可见也通常不可达。
 
+    **运行时 Nginx 生效文件**
+    - 前端容器启动时会基于模板渲染配置，最终生效文件路径为 `/etc/nginx/conf.d/default.conf`。
+
     **部署网络说明（frontend `API_UPSTREAM`）**
     - **同一 Compose 网络（默认）**: 使用 `API_UPSTREAM=backend:28000`，即通过服务名访问后端。
     - **跨网络 / 跨主机**: 将其改为可达地址，例如 `host.docker.internal:28000`、内网域名（`seo-api.internal:28000`）或 LB 地址（`api-lb.example.com:28000`）。
