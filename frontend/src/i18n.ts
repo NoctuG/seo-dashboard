@@ -19,6 +19,10 @@ const resources = {
         no: 'No',
       },
       app: { loading: 'Loading...' },
+      backendUnavailable: {
+        title: 'Service temporarily unavailable',
+        description: 'The backend service is unreachable or network connectivity is abnormal. Please contact operations to check container network status.',
+      },
       layout: {
         title: 'SEO Tool',
         projects: 'Projects',
@@ -44,7 +48,7 @@ const resources = {
         submit: 'Sign in',
         loading: 'Signing in...',
         forgotPassword: 'Forgot password?',
-        errors: { failed: 'Login failed. Please check email and password.' },
+        errors: { failed: 'Login failed. Please check email and password.', backendUnavailable: 'Backend service is unreachable. Please contact operations to check container network.' },
       },
       forgotPassword: {
         title: 'Forgot password',
@@ -237,12 +241,16 @@ const resources = {
     translation: {
       common: { loading: '加载中...', create: '创建', cancel: '取消', delete: '删除', yes: '是', no: '否' },
       app: { loading: '加载中...' },
+      backendUnavailable: {
+        title: '服务暂不可用',
+        description: '后端服务不可达或网络连通异常，请联系运维检查容器网络状态。',
+      },
       layout: {
         title: 'SEO 工具', projects: '项目', aiAssistant: 'AI 助手', aiContent: 'AI 内容创作', users: '用户管理', systemSettings: '系统设置', changePassword: '修改密码', twoFactorAuth: '双重认证', logout: '退出登录', language: '语言', theme: '主题', langZhCN: '简体中文', langEnUS: 'English',
         expandMenu: '打开菜单', collapseMenu: '收起菜单', closeMenu: '关闭菜单面板',
       },
       login: {
-        title: '登录 SEO Dashboard', email: '邮箱', password: '密码', submit: '登录', loading: '登录中...', forgotPassword: '忘记密码？', errors: { failed: '登录失败，请检查邮箱和密码。' },
+        title: '登录 SEO Dashboard', email: '邮箱', password: '密码', submit: '登录', loading: '登录中...', forgotPassword: '忘记密码？', errors: { failed: '登录失败，请检查邮箱和密码。', backendUnavailable: '后端服务不可达，请联系运维检查容器网络。' },
       },
       forgotPassword: {
         title: '忘记密码', email: '邮箱', submit: '发送重置链接', loading: '发送中...', backToLogin: '返回登录', errors: { failed: '发送重置邮件失败，请稍后重试。' },
