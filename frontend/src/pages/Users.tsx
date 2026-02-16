@@ -77,20 +77,20 @@ export default function Users() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">{t('users.title')}</h1>
 
-      <form onSubmit={handleCreate} className="bg-white p-6 rounded shadow max-w-2xl">
+      <form onSubmit={handleCreate} className="app-card max-w-2xl p-6">
         <h2 className="text-lg font-semibold mb-4">{t('users.createUser')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="text-sm">
             {t('users.email')}
-            <input className="mt-1 w-full border rounded px-3 py-2" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+            <input className="app-input mt-1 w-full" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
           </label>
           <label className="text-sm">
             {t('users.fullName')}
-            <input className="mt-1 w-full border rounded px-3 py-2" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+            <input className="app-input mt-1 w-full" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
           </label>
           <label className="text-sm">
             {t('users.password')}
-            <input className="mt-1 w-full border rounded px-3 py-2" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+            <input className="app-input mt-1 w-full" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
           </label>
           <div className="flex items-center gap-6 pt-6 text-sm">
             <label className="flex items-center gap-2">
@@ -103,14 +103,14 @@ export default function Users() {
             </label>
           </div>
         </div>
-        <button className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" type="submit">{t('common.create')}</button>
+        <button className="app-btn app-btn-primary mt-4" type="submit">{t('common.create')}</button>
       </form>
 
-      {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p className="text-sm text-[color:var(--md-sys-color-error)]">{error}</p>}
 
-      <div className="bg-white dark:bg-slate-900 rounded shadow border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="app-card overflow-hidden rounded-xl">
         <table className="w-full text-sm">
-          <thead className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+          <thead className="border-b border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface-variant)]">
             <tr>
               <th className="p-3 text-left">{t('users.email')}</th>
               <th className="p-3 text-left">{t('users.name')}</th>
@@ -121,21 +121,21 @@ export default function Users() {
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="border-b border-slate-200 dark:border-slate-700 last:border-b-0">
+              <tr key={user.id} className="border-b border-[color:var(--md-sys-color-outline)] last:border-b-0">
                 <td className="p-3">{user.email}</td>
                 <td className="p-3">{user.full_name || '-'}</td>
                 <td className="p-3">{user.is_active ? t('common.yes') : t('common.no')}</td>
                 <td className="p-3">{user.is_superuser ? t('common.yes') : t('common.no')}</td>
                 <td className="p-3 space-x-2">
-                  <button className="border rounded px-2 py-1 hover:bg-gray-100" onClick={() => handleToggle(user, 'is_active')}>{t('users.toggleActive')}</button>
-                  <button className="border rounded px-2 py-1 hover:bg-gray-100" onClick={() => handleToggle(user, 'is_superuser')}>{t('users.toggleAdmin')}</button>
-                  <button className="border rounded px-2 py-1 text-red-600 hover:bg-red-50" onClick={() => handleDelete(user.id)}>{t('common.delete')}</button>
+                  <button className="app-btn app-btn-outline px-2 py-1" onClick={() => handleToggle(user, 'is_active')}>{t('users.toggleActive')}</button>
+                  <button className="app-btn app-btn-outline px-2 py-1" onClick={() => handleToggle(user, 'is_superuser')}>{t('users.toggleAdmin')}</button>
+                  <button className="app-btn app-btn-danger px-2 py-1" onClick={() => handleDelete(user.id)}>{t('common.delete')}</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {!loading && users.length === 0 && <p className="p-4 text-sm text-gray-500">{t('users.empty')}</p>}
+        {!loading && users.length === 0 && <p className="p-4 text-sm text-[color:var(--md-sys-color-on-surface-variant)]">{t('users.empty')}</p>}
       </div>
     </div>
   );

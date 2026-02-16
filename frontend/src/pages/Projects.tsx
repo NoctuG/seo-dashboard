@@ -43,23 +43,20 @@ export default function Projects() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">{t('projects.title')}</h1>
         {user?.is_superuser && (
-          <button
-            onClick={() => setIsCreating(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
+          <button onClick={() => setIsCreating(true)} className="app-btn app-btn-primary">
             <Plus size={18} /> {t('projects.newProject')}
           </button>
         )}
       </div>
 
       {isCreating && (
-        <div className="bg-white p-6 rounded shadow mb-6 max-w-md">
+        <div className="app-card mb-6 max-w-md p-6">
           <h2 className="text-lg font-semibold mb-4">{t('projects.createProject')}</h2>
           <form onSubmit={handleCreate}>
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">{t('projects.name')}</label>
               <input
-                className="w-full border rounded p-2"
+                className="app-input w-full"
                 value={newProject.name}
                 onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
                 required
@@ -68,7 +65,7 @@ export default function Projects() {
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">{t('projects.domain')}</label>
               <input
-                className="w-full border rounded p-2"
+                className="app-input w-full"
                 value={newProject.domain}
                 onChange={(e) => setNewProject({ ...newProject, domain: e.target.value })}
                 placeholder="https://example.com"
@@ -76,8 +73,8 @@ export default function Projects() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setIsCreating(false)} className="text-gray-600 px-4 py-2">{t('common.cancel')}</button>
-              <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">{t('common.create')}</button>
+              <button type="button" onClick={() => setIsCreating(false)} className="app-btn app-btn-outline">{t('common.cancel')}</button>
+              <button type="submit" className="app-btn app-btn-primary">{t('common.create')}</button>
             </div>
           </form>
         </div>
@@ -85,10 +82,10 @@ export default function Projects() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((p) => (
-          <Link to={`/projects/${p.id}`} key={p.id} className="block bg-white p-6 rounded shadow hover:shadow-md transition">
+          <Link to={`/projects/${p.id}`} key={p.id} className="app-card block p-6 transition hover:shadow-md">
             <h3 className="text-lg font-semibold">{p.name}</h3>
-            <p className="text-gray-500">{p.domain}</p>
-            <p className="text-sm text-gray-400 mt-4">{t('projects.createdAt', { date: new Date(p.created_at).toLocaleDateString() })}</p>
+            <p className="text-[color:var(--md-sys-color-on-surface-variant)]">{p.domain}</p>
+            <p className="mt-4 text-sm text-[color:var(--md-sys-color-on-surface-variant)]">{t('projects.createdAt', { date: new Date(p.created_at).toLocaleDateString() })}</p>
           </Link>
         ))}
       </div>

@@ -107,12 +107,12 @@ export default function Layout() {
     };
 
     return (
-        <div className="relative flex min-h-screen bg-[radial-gradient(circle_at_20%_20%,#e0f2fe_0%,#f8fafc_42%,#f8fafc_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_20%_20%,#0b1728_0%,#020617_45%,#020617_100%)] dark:text-slate-100">
+        <div className="relative flex min-h-screen bg-[radial-gradient(circle_at_20%_20%,var(--md-sys-color-primary-container)_0%,var(--md-sys-color-surface)_42%,var(--md-sys-color-surface)_100%)] text-[color:var(--md-sys-color-on-surface)]">
             <div className="absolute right-4 top-4 z-40 md:right-6 md:top-6">
                 <button
                     type="button"
                     onClick={() => setMenuOpen((prev) => !prev)}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow-lg shadow-sky-100/70 backdrop-blur-md transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:shadow-none"
+                    className="inline-flex items-center gap-2 rounded-full border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] px-4 py-2 text-sm font-medium text-[color:var(--md-sys-color-on-surface)] shadow-lg backdrop-blur-md transition hover:bg-[color:var(--md-sys-color-primary-container)]"
                 >
                     {menuOpen ? <X size={16} /> : <Menu size={16} />}
                     {menuOpen ? t('layout.collapseMenu') : t('layout.expandMenu')}
@@ -124,28 +124,28 @@ export default function Layout() {
                     type="button"
                     aria-label={t('layout.closeMenu')}
                     onClick={() => setMenuOpen(false)}
-                    className="absolute inset-0 z-20 bg-slate-900/20 backdrop-blur-[2px]"
+                    className="absolute inset-0 z-20 bg-[color:color-mix(in_srgb,var(--md-sys-color-on-surface)_20%,transparent)] backdrop-blur-[2px]"
                 />
             )}
 
             <main className="relative z-10 flex-1 overflow-auto p-4 pr-6 md:p-8 md:pr-20">
-                <div className="mx-auto w-full max-w-6xl rounded-[2rem] border border-white/60 bg-white/80 p-4 shadow-[0_24px_64px_-24px_rgba(15,23,42,0.35)] backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/70 md:p-6">
+                <div className="mx-auto w-full max-w-6xl rounded-[2rem] border border-[color:var(--md-sys-color-outline)] bg-[color:color-mix(in_srgb,var(--md-sys-color-surface)_85%,transparent)] p-4 shadow-[0_24px_64px_-24px_rgba(15,23,42,0.35)] backdrop-blur-md md:p-6">
                     <Outlet />
                 </div>
             </main>
 
             <aside
-                className={`absolute right-0 top-0 z-30 h-full w-full max-w-sm transform border-l border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl transition-transform duration-300 dark:border-slate-700 dark:bg-slate-900/90 ${menuOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`absolute right-0 top-0 z-30 h-full w-full max-w-sm transform border-l border-[color:var(--md-sys-color-outline)] bg-[color:color-mix(in_srgb,var(--md-sys-color-surface)_92%,transparent)] p-6 shadow-2xl backdrop-blur-xl transition-transform duration-300 ${menuOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 <div className="flex h-full flex-col gap-5">
-                    <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-white to-sky-50 p-5 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:to-slate-800">
-                        <p className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-sky-600 dark:text-sky-300">
+                    <div className="rounded-3xl border border-[color:var(--md-sys-color-outline)] bg-gradient-to-br from-[color:var(--md-sys-color-surface)] to-[color:var(--md-sys-color-primary-container)] p-5 shadow-sm">
+                        <p className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[color:var(--md-sys-color-primary)]">
                             <PanelsTopLeft size={14} /> {t('layout.title')}
                         </p>
-                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{user?.email}</p>
+                        <p className="mt-2 text-sm text-[color:var(--md-sys-color-on-surface-variant)]">{user?.email}</p>
                     </div>
 
-                    <nav className="rounded-3xl border border-slate-200/80 bg-white/90 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+                    <nav className="rounded-3xl border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-3">
                         <ul className="space-y-1.5">
                             {navItems.map(({ to, label, icon: Icon }) => (
                                 <li key={to}>
@@ -155,8 +155,8 @@ export default function Layout() {
                                         className={({ isActive }) =>
                                             `flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm transition ${
                                                 isActive
-                                                    ? 'bg-sky-500 text-white shadow-md shadow-sky-200 dark:shadow-none'
-                                                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                                                    ? 'bg-[color:var(--md-sys-color-primary)] text-[color:var(--md-sys-color-on-primary)] shadow-md'
+                                                    : 'text-[color:var(--md-sys-color-on-surface)] hover:bg-[color:var(--md-sys-state-hover)]'
                                             }`
                                         }
                                     >
@@ -168,13 +168,13 @@ export default function Layout() {
                         </ul>
                     </nav>
 
-                    <div className="space-y-3 rounded-3xl border border-slate-200/80 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-900/70">
-                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-300">
+                    <div className="space-y-3 rounded-3xl border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-4">
+                        <label className="block text-xs font-medium text-[color:var(--md-sys-color-on-surface-variant)]">
                             <span className="mb-1 inline-flex items-center gap-1">
                                 <Languages size={14} /> {t('layout.language')}
                             </span>
                             <select
-                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                className="app-select w-full rounded-xl"
                                 value={i18n.language}
                                 onChange={(e) => i18n.changeLanguage(e.target.value)}
                             >
@@ -183,12 +183,12 @@ export default function Layout() {
                             </select>
                         </label>
 
-                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-300">
+                        <label className="block text-xs font-medium text-[color:var(--md-sys-color-on-surface-variant)]">
                             <span className="mb-1 inline-flex items-center gap-1">
                                 <MonitorCog size={14} /> {t('layout.theme')}
                             </span>
                             <select
-                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                                className="app-select w-full rounded-xl"
                                 value={themePreference}
                                 onChange={(e) => setThemePreference(e.target.value as ThemePreference)}
                             >
@@ -200,11 +200,11 @@ export default function Layout() {
                     </div>
 
                     <div className="mt-auto space-y-3">
-                        <p className="text-center text-xs text-slate-500 dark:text-slate-400">Version: {displayVersion}</p>
+                        <p className="text-center text-xs text-[color:var(--md-sys-color-on-surface-variant)]">Version: {displayVersion}</p>
                         <button
                             type="button"
                             onClick={handleLogout}
-                            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                            className="app-btn app-btn-outline flex w-full justify-center rounded-2xl px-3 py-2.5"
                         >
                             <LogOut size={16} /> {t('layout.logout')}
                         </button>
