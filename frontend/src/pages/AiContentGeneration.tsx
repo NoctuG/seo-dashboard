@@ -47,11 +47,11 @@ export default function AiContentGeneration() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-3">
+        <h1 className="md-headline-large flex items-center gap-3">
           <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--md-sys-color-primary)' }} />
           {t('aiContent.title')}
         </h1>
-        <p className="text-sm mt-1 opacity-60">{t('aiContent.subtitle')}</p>
+        <p className="md-body-medium mt-1 opacity-60">{t('aiContent.subtitle')}</p>
       </div>
 
       {/* Material Design Tabs */}
@@ -60,7 +60,7 @@ export default function AiContentGeneration() {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className="flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all duration-200 relative"
+            className="flex items-center gap-2 px-6 py-3 md-label-large transition-all duration-200 relative"
             style={{
               color: activeTab === tab.key ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-on-surface-variant)',
               borderBottom: activeTab === tab.key ? '3px solid var(--md-sys-color-primary)' : '3px solid transparent',
@@ -153,7 +153,7 @@ function RichTextEditor({
                   execCmd(btn.cmd!);
                 }
               }}
-              className="w-8 h-8 rounded flex items-center justify-center text-sm hover:bg-white transition-colors"
+              className="w-8 h-8 rounded flex items-center justify-center md-body-medium hover:bg-white transition-colors"
               style={{ color: 'var(--md-sys-color-on-surface-variant)' }}
             >
               <i className={btn.icon} />
@@ -164,7 +164,7 @@ function RichTextEditor({
         <button
           type="button"
           onClick={() => setIsMarkdownMode(!isMarkdownMode)}
-          className="flex items-center gap-1 px-3 py-1 rounded text-xs font-medium transition-colors"
+          className="flex items-center gap-1 px-3 py-1 rounded md-label-medium transition-colors"
           style={{
             background: isMarkdownMode ? 'var(--md-sys-color-primary)' : 'transparent',
             color: isMarkdownMode ? 'var(--md-sys-color-on-primary)' : 'var(--md-sys-color-on-surface-variant)',
@@ -179,7 +179,7 @@ function RichTextEditor({
       {/* Editor area */}
       {isMarkdownMode ? (
         <textarea
-          className="w-full min-h-[400px] px-4 py-3 text-sm font-mono resize-y focus:outline-none bg-[color:var(--md-sys-color-surface)] text-[color:var(--md-sys-color-on-surface)]"
+          className="w-full min-h-[400px] px-4 py-3 md-body-medium font-mono resize-y focus:outline-none bg-[color:var(--md-sys-color-surface)] text-[color:var(--md-sys-color-on-surface)]"
           value={content}
           onChange={handleMarkdownChange}
           placeholder={placeholder}
@@ -191,7 +191,7 @@ function RichTextEditor({
           suppressContentEditableWarning
           onInput={handleEditorInput}
           dangerouslySetInnerHTML={{ __html: content }}
-          className="w-full min-h-[400px] px-4 py-3 text-sm focus:outline-none prose prose-sm max-w-none bg-[color:var(--md-sys-color-surface)] text-[color:var(--md-sys-color-on-surface)]"
+          className="w-full min-h-[400px] px-4 py-3 md-body-medium focus:outline-none prose prose-sm max-w-none bg-[color:var(--md-sys-color-surface)] text-[color:var(--md-sys-color-on-surface)]"
           data-placeholder={placeholder}
           style={{ minHeight: '400px' }}
         />
@@ -266,13 +266,13 @@ function ArticleGenerator() {
       {/* Left panel - Settings */}
       <div className="lg:col-span-1">
         <div className="rounded-2xl shadow-md border p-6 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)]" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
-          <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+          <h2 className="md-title-medium mb-4 flex items-center gap-2">
             <i className="fa-solid fa-sliders" style={{ color: 'var(--md-sys-color-primary)' }} />
             {t('aiContent.article.settings')}
           </h2>
           <form onSubmit={handleGenerate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">{t('aiContent.article.topic')}</label>
+              <label className="block md-label-large mb-1">{t('aiContent.article.topic')}</label>
               <input
                 type="text"
                 value={topic}
@@ -285,7 +285,7 @@ function ArticleGenerator() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">{t('aiContent.article.keywords')}</label>
+              <label className="block md-label-large mb-1">{t('aiContent.article.keywords')}</label>
               <input
                 type="text"
                 value={keywords}
@@ -298,7 +298,7 @@ function ArticleGenerator() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1">{t('aiContent.article.tone')}</label>
+                <label className="block md-label-large mb-1">{t('aiContent.article.tone')}</label>
                 <select
                   value={tone}
                   onChange={(e) => setTone(e.target.value)}
@@ -311,7 +311,7 @@ function ArticleGenerator() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">{t('aiContent.article.language')}</label>
+                <label className="block md-label-large mb-1">{t('aiContent.article.language')}</label>
                 <select
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
@@ -325,7 +325,7 @@ function ArticleGenerator() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">{t('aiContent.article.wordCount')}</label>
+              <label className="block md-label-large mb-1">{t('aiContent.article.wordCount')}</label>
               <input
                 type="range"
                 min={300}
@@ -335,11 +335,11 @@ function ArticleGenerator() {
                 onChange={(e) => setWordCount(Number(e.target.value))}
                 className="w-full accent-[var(--md-sys-color-primary)]"
               />
-              <div className="text-xs text-center mt-1 opacity-60">{wordCount} {t('aiContent.article.words')}</div>
+              <div className="md-label-medium text-center mt-1 opacity-60">{wordCount} {t('aiContent.article.words')}</div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">{t('aiContent.article.outline')}</label>
+              <label className="block md-label-large mb-1">{t('aiContent.article.outline')}</label>
               <textarea
                 value={outline}
                 onChange={(e) => setOutline(e.target.value)}
@@ -352,7 +352,7 @@ function ArticleGenerator() {
             <button
               type="submit"
               disabled={loading}
-              className="app-btn w-full rounded-xl py-2.5 font-medium transition-all duration-200 hover:shadow-lg disabled:opacity-60"
+              className="app-btn w-full rounded-xl py-2.5 md-label-large transition-all duration-200 hover:shadow-lg disabled:opacity-60"
               style={{ background: loading ? 'var(--md-sys-state-disabled-text)' : 'var(--md-sys-color-primary)' }}
             >
               <i className={loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles'} />
@@ -365,7 +365,7 @@ function ArticleGenerator() {
       {/* Right panel - Editor */}
       <div className="lg:col-span-2">
         {error && (
-          <div className="mb-4 rounded-xl p-4 flex items-center gap-2 text-sm" style={{ background: 'color-mix(in srgb, var(--md-sys-color-error) 14%, transparent)', color: 'var(--md-sys-color-error)', border: '1px solid color-mix(in srgb, var(--md-sys-color-error) 35%, white)' }}>
+          <div className="mb-4 rounded-xl p-4 flex items-center gap-2 md-body-medium" style={{ background: 'color-mix(in srgb, var(--md-sys-color-error) 14%, transparent)', color: 'var(--md-sys-color-error)', border: '1px solid color-mix(in srgb, var(--md-sys-color-error) 35%, white)' }}>
             <i className="fa-solid fa-circle-exclamation" />
             {error}
           </div>
@@ -376,22 +376,22 @@ function ArticleGenerator() {
             {/* Article meta info card */}
             <div className="rounded-2xl shadow-md border p-5 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)]" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
               <div className="flex items-start justify-between mb-3">
-                <h2 className="text-lg font-bold">{result.title}</h2>
+                <h2 className="md-title-large">{result.title}</h2>
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:shadow"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg md-label-medium transition-colors hover:shadow"
                   style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}
                 >
                   <i className="fa-regular fa-copy" />
                   {t('aiContent.copy')}
                 </button>
               </div>
-              <p className="text-sm opacity-70 mb-2">{result.meta_description}</p>
+              <p className="md-body-medium opacity-70 mb-2">{result.meta_description}</p>
               <div className="flex flex-wrap gap-2">
                 {result.keywords_used.map((kw, i) => (
                   <span
                     key={i}
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                    className="inline-flex items-center px-2.5 py-0.5 rounded-full md-label-medium"
                     style={{ background: 'color-mix(in srgb, var(--md-sys-color-primary-container) 70%, white)', color: 'var(--md-sys-color-on-primary-container)' }}
                   >
                     <i className="fa-solid fa-tag mr-1 text-[10px]" />
@@ -408,13 +408,13 @@ function ArticleGenerator() {
                 type="text"
                 value={rewriteInstruction}
                 onChange={(e) => setRewriteInstruction(e.target.value)}
-                className="flex-1 border-0 bg-transparent text-sm text-[color:var(--md-sys-color-on-surface)] focus:outline-none"
+                className="flex-1 border-0 bg-transparent md-body-medium text-[color:var(--md-sys-color-on-surface)] focus:outline-none"
                 placeholder={t('aiContent.article.rewritePlaceholder')}
               />
               <button
                 onClick={handleRewrite}
                 disabled={rewriting}
-                className="app-btn app-btn-danger px-4 py-1.5 text-sm transition-all hover:shadow"
+                className="app-btn app-btn-danger px-4 py-1.5 md-label-large transition-all hover:shadow"
                 style={{ background: 'var(--md-sys-color-error)' }}
               >
                 {rewriting ? (
@@ -437,15 +437,15 @@ function ArticleGenerator() {
         {!result && !loading && (
           <div className="rounded-2xl border-2 border-dashed p-16 flex flex-col items-center justify-center text-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
             <i className="fa-solid fa-file-pen text-5xl mb-4" style={{ color: 'var(--md-sys-color-primary-container)' }} />
-            <p className="text-lg font-medium mb-1">{t('aiContent.article.emptyTitle')}</p>
-            <p className="text-sm opacity-50">{t('aiContent.article.emptySubtitle')}</p>
+            <p className="md-title-large mb-1">{t('aiContent.article.emptyTitle')}</p>
+            <p className="md-body-medium opacity-50">{t('aiContent.article.emptySubtitle')}</p>
           </div>
         )}
 
         {loading && !result && (
           <div className="rounded-2xl border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-16 text-center flex flex-col items-center justify-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
             <i className="fa-solid fa-spinner fa-spin text-4xl mb-4" style={{ color: 'var(--md-sys-color-primary)' }} />
-            <p className="text-sm font-medium">{t('aiContent.generating')}</p>
+            <p className="md-label-large">{t('aiContent.generating')}</p>
           </div>
         )}
       </div>
@@ -515,13 +515,13 @@ function SocialGenerator() {
       {/* Settings panel */}
       <div className="lg:col-span-1">
         <div className="rounded-2xl shadow-md border p-6 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)]" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
-          <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+          <h2 className="md-title-medium mb-4 flex items-center gap-2">
             <i className="fa-solid fa-share-nodes" style={{ color: 'var(--md-sys-color-primary)' }} />
             {t('aiContent.social.settings')}
           </h2>
           <form onSubmit={handleGenerate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">{t('aiContent.social.topic')}</label>
+              <label className="block md-label-large mb-1">{t('aiContent.social.topic')}</label>
               <input
                 type="text"
                 value={topic}
@@ -534,14 +534,14 @@ function SocialGenerator() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">{t('aiContent.social.platform')}</label>
+              <label className="block md-label-large mb-2">{t('aiContent.social.platform')}</label>
               <div className="grid grid-cols-3 gap-2">
                 {PLATFORMS.map((p) => (
                   <button
                     key={p.value}
                     type="button"
                     onClick={() => setPlatform(p.value)}
-                    className="flex flex-col items-center gap-1 p-2 rounded-lg border text-xs transition-all"
+                    className="flex flex-col items-center gap-1 p-2 rounded-lg border md-label-medium transition-all"
                     style={{
                       borderColor: platform === p.value ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-outline)',
                       background: platform === p.value ? 'var(--md-sys-color-primary-container)' : 'transparent',
@@ -557,7 +557,7 @@ function SocialGenerator() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1">{t('aiContent.social.tone')}</label>
+                <label className="block md-label-large mb-1">{t('aiContent.social.tone')}</label>
                 <select
                   value={tone}
                   onChange={(e) => setTone(e.target.value)}
@@ -570,7 +570,7 @@ function SocialGenerator() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">{t('aiContent.social.count')}</label>
+                <label className="block md-label-large mb-1">{t('aiContent.social.count')}</label>
                 <select
                   value={count}
                   onChange={(e) => setCount(Number(e.target.value))}
@@ -585,7 +585,7 @@ function SocialGenerator() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">{t('aiContent.article.language')}</label>
+              <label className="block md-label-large mb-1">{t('aiContent.article.language')}</label>
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
@@ -597,7 +597,7 @@ function SocialGenerator() {
               </select>
             </div>
 
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <label className="flex items-center gap-2 md-label-large cursor-pointer">
               <input
                 type="checkbox"
                 checked={includeHashtags}
@@ -610,7 +610,7 @@ function SocialGenerator() {
             <button
               type="submit"
               disabled={loading}
-              className="app-btn w-full rounded-xl py-2.5 font-medium transition-all duration-200 hover:shadow-lg disabled:opacity-60"
+              className="app-btn w-full rounded-xl py-2.5 md-label-large transition-all duration-200 hover:shadow-lg disabled:opacity-60"
               style={{ background: loading ? 'var(--md-sys-state-disabled-text)' : 'var(--md-sys-color-primary)' }}
             >
               <i className={loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-paper-plane'} />
@@ -623,7 +623,7 @@ function SocialGenerator() {
       {/* Posts results */}
       <div className="lg:col-span-2 space-y-4">
         {error && (
-          <div className="rounded-xl p-4 flex items-center gap-2 text-sm" style={{ background: 'color-mix(in srgb, var(--md-sys-color-error) 14%, transparent)', color: 'var(--md-sys-color-error)', border: '1px solid color-mix(in srgb, var(--md-sys-color-error) 35%, white)' }}>
+          <div className="rounded-xl p-4 flex items-center gap-2 md-body-medium" style={{ background: 'color-mix(in srgb, var(--md-sys-color-error) 14%, transparent)', color: 'var(--md-sys-color-error)', border: '1px solid color-mix(in srgb, var(--md-sys-color-error) 35%, white)' }}>
             <i className="fa-solid fa-circle-exclamation" />
             {error}
           </div>
@@ -638,16 +638,16 @@ function SocialGenerator() {
               style={{ borderColor: 'var(--md-sys-color-outline)' }}
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-sm font-medium">
+                <div className="flex items-center gap-2 md-label-large">
                   <i className={platformInfo?.icon || 'fa-solid fa-share-nodes'} style={{ color: 'var(--md-sys-color-primary)' }} />
                   {platformInfo?.label || post.platform}
-                  <span className="text-xs opacity-40">#{i + 1}</span>
+                  <span className="md-label-medium opacity-40">#{i + 1}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {editingIndex === i ? (
                     <button
                       onClick={saveEditing}
-                      className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium"
+                      className="flex items-center gap-1 px-3 py-1 rounded-lg md-label-medium"
                       style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}
                     >
                       <i className="fa-solid fa-check" />
@@ -656,7 +656,7 @@ function SocialGenerator() {
                   ) : (
                     <button
                       onClick={() => startEditing(i)}
-                      className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium border transition-colors hover:bg-gray-50 dark:hover:bg-slate-800"
+                      className="flex items-center gap-1 px-3 py-1 rounded-lg md-label-medium border transition-colors hover:bg-gray-50 dark:hover:bg-slate-800"
                       style={{ borderColor: 'var(--md-sys-color-outline)' }}
                     >
                       <i className="fa-solid fa-pen" />
@@ -665,7 +665,7 @@ function SocialGenerator() {
                   )}
                   <button
                     onClick={() => copyPost(post)}
-                    className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium border transition-colors hover:bg-gray-50 dark:hover:bg-slate-800"
+                    className="flex items-center gap-1 px-3 py-1 rounded-lg md-label-medium border transition-colors hover:bg-gray-50 dark:hover:bg-slate-800"
                     style={{ borderColor: 'var(--md-sys-color-outline)' }}
                   >
                     <i className="fa-regular fa-copy" />
@@ -678,11 +678,11 @@ function SocialGenerator() {
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm h-32 resize-y focus:outline-none bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)] text-[color:var(--md-sys-color-on-surface)]"
+                  className="w-full rounded-lg border px-3 py-2 md-body-medium h-32 resize-y focus:outline-none bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)] text-[color:var(--md-sys-color-on-surface)]"
                   style={{ borderColor: 'var(--md-sys-color-primary)' }}
                 />
               ) : (
-                <p className="text-sm leading-6 whitespace-pre-wrap">{post.content}</p>
+                <p className="md-body-medium leading-7 whitespace-pre-wrap">{post.content}</p>
               )}
 
               {post.hashtags.length > 0 && (
@@ -690,7 +690,7 @@ function SocialGenerator() {
                   {post.hashtags.map((tag, j) => (
                     <span
                       key={j}
-                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs"
+                      className="inline-flex items-center px-2 py-0.5 rounded-full md-label-medium"
                       style={{ background: 'color-mix(in srgb, var(--md-sys-color-primary-container) 50%, white)', color: 'var(--md-sys-color-on-primary-container)' }}
                     >
                       #{tag}
@@ -705,15 +705,15 @@ function SocialGenerator() {
         {posts.length === 0 && !loading && (
           <div className="rounded-2xl border-2 border-dashed p-16 flex flex-col items-center justify-center text-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
             <i className="fa-solid fa-comments text-5xl mb-4" style={{ color: 'var(--md-sys-color-primary-container)' }} />
-            <p className="text-lg font-medium mb-1">{t('aiContent.social.emptyTitle')}</p>
-            <p className="text-sm opacity-50">{t('aiContent.social.emptySubtitle')}</p>
+            <p className="md-title-large mb-1">{t('aiContent.social.emptyTitle')}</p>
+            <p className="md-body-medium opacity-50">{t('aiContent.social.emptySubtitle')}</p>
           </div>
         )}
 
         {loading && posts.length === 0 && (
           <div className="rounded-2xl border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-16 text-center flex flex-col items-center justify-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
             <i className="fa-solid fa-spinner fa-spin text-4xl mb-4" style={{ color: 'var(--md-sys-color-primary)' }} />
-            <p className="text-sm font-medium">{t('aiContent.generating')}</p>
+            <p className="md-label-large">{t('aiContent.generating')}</p>
           </div>
         )}
       </div>
@@ -750,13 +750,13 @@ function SeoAnalyzer() {
       {/* Input panel */}
       <div>
         <div className="rounded-2xl shadow-md border p-6 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)]" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
-          <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+          <h2 className="md-title-medium mb-4 flex items-center gap-2">
             <i className="fa-solid fa-magnifying-glass-chart" style={{ color: 'var(--md-sys-color-primary)' }} />
             {t('aiContent.analyze.title')}
           </h2>
           <form onSubmit={onSubmit} className="space-y-4">
             <textarea
-              className="w-full rounded-xl border px-4 py-3 h-64 text-sm focus:outline-none focus:ring-2 resize-y bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)] text-[color:var(--md-sys-color-on-surface)]"
+              className="w-full rounded-xl border px-4 py-3 h-64 md-body-medium focus:outline-none focus:ring-2 resize-y bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)] text-[color:var(--md-sys-color-on-surface)]"
               style={{ borderColor: 'var(--md-sys-color-outline)' }}
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -766,7 +766,7 @@ function SeoAnalyzer() {
             <button
               type="submit"
               disabled={loading}
-              className="app-btn w-full rounded-xl py-2.5 font-medium transition-all duration-200 hover:shadow-lg disabled:opacity-60"
+              className="app-btn w-full rounded-xl py-2.5 md-label-large transition-all duration-200 hover:shadow-lg disabled:opacity-60"
               style={{ background: loading ? 'var(--md-sys-state-disabled-text)' : 'var(--md-sys-color-primary)' }}
             >
               <i className={loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-magnifying-glass'} />
@@ -779,7 +779,7 @@ function SeoAnalyzer() {
       {/* Result panel */}
       <div>
         {error && (
-          <div className="mb-4 rounded-xl p-4 flex items-center gap-2 text-sm" style={{ background: 'color-mix(in srgb, var(--md-sys-color-error) 14%, transparent)', color: 'var(--md-sys-color-error)', border: '1px solid color-mix(in srgb, var(--md-sys-color-error) 35%, white)' }}>
+          <div className="mb-4 rounded-xl p-4 flex items-center gap-2 md-body-medium" style={{ background: 'color-mix(in srgb, var(--md-sys-color-error) 14%, transparent)', color: 'var(--md-sys-color-error)', border: '1px solid color-mix(in srgb, var(--md-sys-color-error) 35%, white)' }}>
             <i className="fa-solid fa-circle-exclamation" />
             {error}
           </div>
@@ -788,27 +788,27 @@ function SeoAnalyzer() {
         {result ? (
           <div className="rounded-2xl shadow-md border p-6 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)]" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold flex items-center gap-2">
+              <h2 className="md-title-medium flex items-center gap-2">
                 <i className="fa-solid fa-chart-line" style={{ color: 'var(--md-sys-color-primary-container)' }} />
                 {t('aiContent.analyze.result')}
               </h2>
               <button
                 onClick={() => navigator.clipboard.writeText(result)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg md-label-medium transition-colors"
                 style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}
               >
                 <i className="fa-regular fa-copy" />
                 {t('aiContent.copy')}
               </button>
             </div>
-            <pre className="whitespace-pre-wrap text-sm leading-6 opacity-80">{result}</pre>
+            <pre className="whitespace-pre-wrap md-body-medium leading-7 opacity-80">{result}</pre>
           </div>
         ) : (
           !loading && (
             <div className="rounded-2xl border-2 border-dashed p-16 flex flex-col items-center justify-center text-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
               <i className="fa-solid fa-chart-pie text-5xl mb-4" style={{ color: 'var(--md-sys-color-primary-container)' }} />
-              <p className="text-lg font-medium mb-1">{t('aiContent.analyze.emptyTitle')}</p>
-              <p className="text-sm opacity-50">{t('aiContent.analyze.emptySubtitle')}</p>
+              <p className="md-title-large mb-1">{t('aiContent.analyze.emptyTitle')}</p>
+              <p className="md-body-medium opacity-50">{t('aiContent.analyze.emptySubtitle')}</p>
             </div>
           )
         )}
@@ -816,7 +816,7 @@ function SeoAnalyzer() {
         {loading && !result && (
           <div className="rounded-2xl border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-16 text-center flex flex-col items-center justify-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
             <i className="fa-solid fa-spinner fa-spin text-4xl mb-4" style={{ color: 'var(--md-sys-color-primary)' }} />
-            <p className="text-sm font-medium">{t('aiContent.analyzing')}</p>
+            <p className="md-label-large">{t('aiContent.analyzing')}</p>
           </div>
         )}
       </div>

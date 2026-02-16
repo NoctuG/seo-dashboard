@@ -20,6 +20,31 @@
     --md-sys-state-focus: color-mix(in srgb, var(--md-sys-color-primary) 22%, transparent);
     --md-sys-state-disabled-bg: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
     --md-sys-state-disabled-text: color-mix(in srgb, var(--md-sys-color-on-surface) 45%, transparent);
+
+    --md-sys-typescale-display-large-size: 3.5625rem;
+    --md-sys-typescale-display-large-line-height: 1.12;
+    --md-sys-typescale-display-large-weight: 400;
+    --md-sys-typescale-headline-large-size: 2rem;
+    --md-sys-typescale-headline-large-line-height: 1.35;
+    --md-sys-typescale-headline-large-weight: 700;
+    --md-sys-typescale-title-large-size: 1.375rem;
+    --md-sys-typescale-title-large-line-height: 1.4;
+    --md-sys-typescale-title-large-weight: 600;
+    --md-sys-typescale-title-medium-size: 1rem;
+    --md-sys-typescale-title-medium-line-height: 1.5;
+    --md-sys-typescale-title-medium-weight: 600;
+    --md-sys-typescale-body-large-size: 1rem;
+    --md-sys-typescale-body-large-line-height: 1.7;
+    --md-sys-typescale-body-large-weight: 400;
+    --md-sys-typescale-body-medium-size: 0.875rem;
+    --md-sys-typescale-body-medium-line-height: 1.65;
+    --md-sys-typescale-body-medium-weight: 400;
+    --md-sys-typescale-label-large-size: 0.875rem;
+    --md-sys-typescale-label-large-line-height: 1.45;
+    --md-sys-typescale-label-large-weight: 500;
+    --md-sys-typescale-label-medium-size: 0.75rem;
+    --md-sys-typescale-label-medium-line-height: 1.4;
+    --md-sys-typescale-label-medium-weight: 500;
   }
 
   html.dark {
@@ -47,6 +72,9 @@
     color: var(--md-sys-color-on-surface);
     @apply antialiased transition-colors duration-200;
     font-family: 'Roboto', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: var(--md-sys-typescale-body-large-size);
+    line-height: var(--md-sys-typescale-body-large-line-height);
+    font-weight: var(--md-sys-typescale-body-large-weight);
   }
 
   input:focus,
@@ -92,7 +120,10 @@
     background: var(--md-sys-color-surface);
     color: var(--md-sys-color-on-surface);
     border: 1px solid var(--md-sys-color-outline);
-    @apply rounded-lg px-3 py-2 text-sm transition-colors;
+    @apply rounded-lg px-3 py-2 transition-colors;
+    font-size: var(--md-sys-typescale-body-medium-size);
+    line-height: var(--md-sys-typescale-body-medium-line-height);
+    font-weight: var(--md-sys-typescale-body-medium-weight);
   }
 
   .app-input:hover,
@@ -102,7 +133,58 @@
   }
 
   .app-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 transition;
+    font-size: var(--md-sys-typescale-label-large-size);
+    line-height: var(--md-sys-typescale-label-large-line-height);
+    font-weight: var(--md-sys-typescale-label-large-weight);
+  }
+
+  .md-display-large {
+    font-size: var(--md-sys-typescale-display-large-size);
+    line-height: var(--md-sys-typescale-display-large-line-height);
+    font-weight: var(--md-sys-typescale-display-large-weight);
+  }
+
+  .md-headline-large {
+    font-size: var(--md-sys-typescale-headline-large-size);
+    line-height: var(--md-sys-typescale-headline-large-line-height);
+    font-weight: var(--md-sys-typescale-headline-large-weight);
+  }
+
+  .md-title-large {
+    font-size: var(--md-sys-typescale-title-large-size);
+    line-height: var(--md-sys-typescale-title-large-line-height);
+    font-weight: var(--md-sys-typescale-title-large-weight);
+  }
+
+  .md-title-medium {
+    font-size: var(--md-sys-typescale-title-medium-size);
+    line-height: var(--md-sys-typescale-title-medium-line-height);
+    font-weight: var(--md-sys-typescale-title-medium-weight);
+  }
+
+  .md-body-large {
+    font-size: var(--md-sys-typescale-body-large-size);
+    line-height: var(--md-sys-typescale-body-large-line-height);
+    font-weight: var(--md-sys-typescale-body-large-weight);
+  }
+
+  .md-body-medium {
+    font-size: var(--md-sys-typescale-body-medium-size);
+    line-height: var(--md-sys-typescale-body-medium-line-height);
+    font-weight: var(--md-sys-typescale-body-medium-weight);
+  }
+
+  .md-label-large {
+    font-size: var(--md-sys-typescale-label-large-size);
+    line-height: var(--md-sys-typescale-label-large-line-height);
+    font-weight: var(--md-sys-typescale-label-large-weight);
+  }
+
+  .md-label-medium {
+    font-size: var(--md-sys-typescale-label-medium-size);
+    line-height: var(--md-sys-typescale-label-medium-line-height);
+    font-weight: var(--md-sys-typescale-label-medium-weight);
   }
 
   .app-btn-primary {
