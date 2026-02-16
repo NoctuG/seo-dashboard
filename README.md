@@ -40,7 +40,8 @@
       ```
       > **说明**: 若未提供 `backend/.env`，容器会使用内置开发默认值启动；但在生产环境中，请务必显式创建并修改 `JWT_SECRET_KEY`、`ALLOWED_ORIGINS` 等配置以确保安全。
 
-    - **前端配置**: 默认无需额外 `.env` 配置，浏览器仍访问 `/api/v1`，再由前端容器内 Nginx 转发到 `API_UPSTREAM` 指定的后端地址。
+    - **前端配置**: 默认无需额外 `.env` 配置。容器模式下浏览器应始终访问前端域名下的 `/api/v1`，再由前端容器内 Nginx 转发到 `API_UPSTREAM` 指定的后端地址。
+      > **重要**: 不建议在浏览器可见的 URL 中直接写 `backend:28000` 这类容器服务名；容器服务名仅用于容器内部网络解析，对终端用户浏览器不可见也通常不可达。
 
     **部署网络说明（frontend `API_UPSTREAM`）**
     - **同一 Compose 网络（默认）**: 使用 `API_UPSTREAM=backend:28000`，即通过服务名访问后端。
@@ -50,6 +51,12 @@
     ```bash
     API_UPSTREAM=host.docker.internal:28000 docker compose up -d --build
     ```
+
+    **推荐生产拓扑（统一反向代理入口）**
+    - 建议仅暴露一个统一入口（如 `https://seo.example.com`），由外层反向代理（Nginx/Caddy/Traefik）接收所有浏览器请求。
+    - 外层代理将静态页面与 `/api/v1` 一并转发到前端容器（例如 `frontend:32000`）。
+    - 前端容器内 Nginx 再把 `/api/v1` 转发到后端上游（`API_UPSTREAM`）。
+    - 在该拓扑下，`API_UPSTREAM` 应设置为**前端容器可达**的后端地址（例如同网段 `backend:28000`，或内网 LB `seo-api.internal:28000`），而不是浏览器直接访问地址。
 
 3.  **启动服务**
 
@@ -117,7 +124,9 @@ npm install
 
 # 3. 创建并配置 .env 文件
 cp .env.example .env
-# 确保 .env 文件中的 VITE_API_URL 指向后端服务地址，默认为 http://localhost:28000/api/v1
+# 确保 .env 文件中的 VITE_API_URL 指向“浏览器可访问”的后端地址，
+# 例如 http://localhost:28000/api/v1（本机开发）或 https://seo.example.com/api/v1（经网关转发）。
+# 不要填写仅容器内可解析的服务名（如 backend:28000）。
 
 # 4. 启动前端开发服务器
 npm run dev -- --host
@@ -127,6 +136,28 @@ npm run dev -- --host
 **3. 访问应用**
 
 在浏览器中打开前端应用的地址即可开始使用。
+
+### 🧯 常见故障：登录后又跳回登录页
+
+若出现“输入账号密码后页面刷新并回到登录页”，通常是 `/api/v1/auth/me` 获取当前用户失败导致。可按以下顺序排查：
+
+1. **检查前端容器到后端容器的连通性**
+   ```bash
+   docker compose exec frontend sh -lc 'wget -qO- http://backend:28000/api/v1/health || curl -fsS http://backend:28000/api/v1/health'
+   ```
+   - 若失败，优先检查 Compose 网络、服务名、后端端口监听与容器状态。
+
+2. **检查前端 Nginx 的 `/api/v1` 反代上游配置**
+   - 确认 `API_UPSTREAM` 实际生效值正确（目标地址应可从前端容器访问）。
+   - 检查前端容器内 Nginx 配置生成结果，确认 `/api/v1` 的 `proxy_pass` 指向期望上游。
+   - 如有外层网关（Ingress/Nginx/Caddy），确认未错误改写 `/api/v1` 路径。
+
+3. **使用浏览器开发者工具定位 `/api/v1/auth/me`**
+   - 打开 Network 面板，筛选 `/api/v1/auth/me` 请求，关注状态码和错误类型：
+     - `401/403`: 多为认证信息缺失、过期或被网关剥离。
+     - `404`: 路径转发错误（常见于 `/api/v1` 被错误重写）。
+     - `502/504` 或 `(failed)`: 上游不可达、DNS 解析失败或反代超时。
+     - CORS 报错：前后端访问域不一致且后端 `ALLOWED_ORIGINS` 未正确配置。
 
 ## ⚙️ 配置
 
