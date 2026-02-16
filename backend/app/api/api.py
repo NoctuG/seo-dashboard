@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_user
-from app.api.endpoints import admin_backup, ai, auth, crawls, health, issues, keywords, pages, projects, users, version, webhooks
+from app.api.endpoints import admin_backup, ai, api_keys, auth, crawls, health, issues, keywords, pages, projects, users, version, webhooks
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
