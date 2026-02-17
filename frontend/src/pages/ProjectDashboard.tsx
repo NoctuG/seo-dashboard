@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -163,9 +163,9 @@ export default function ProjectDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchBacklinkData = async () => {
+  const fetchBacklinkData = useCallback(async () => {
     if (!id) return;
     try {
       const [authorityData, backlinkData, changesData, statusData] = await Promise.all([
@@ -181,9 +181,9 @@ export default function ProjectDashboard() {
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [id]);
 
-  const fetchBacklinkStatus = async () => {
+  const fetchBacklinkStatus = useCallback(async () => {
     if (!id) return;
     try {
       const status = await getProjectBacklinkStatus(id);
@@ -191,9 +191,9 @@ export default function ProjectDashboard() {
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [id]);
 
-  const fetchRoiData = async () => {
+  const fetchRoiData = useCallback(async () => {
     if (!id) return;
     try {
       const roiData = await getProjectRoi(id, roiRange, attributionModel);
@@ -201,9 +201,9 @@ export default function ProjectDashboard() {
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [id, roiRange, attributionModel]);
 
-  const fetchContentPerformance = async () => {
+  const fetchContentPerformance = useCallback(async () => {
     if (!id) return;
     try {
       const data = await getProjectContentPerformance(id, window, sort);
@@ -211,7 +211,31 @@ export default function ProjectDashboard() {
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [id, window, sort]);
+
+  useEffect(() => {
+    if (id) {
+      fetchDashboard();
+      fetchContentPerformance();
+      fetchBacklinkData();
+      fetchRoiData();
+    }
+  }, [id, fetchDashboard, fetchContentPerformance, fetchBacklinkData, fetchRoiData]);
+
+  useEffect(() => {
+    if (id) fetchContentPerformance();
+  }, [id, window, sort, fetchContentPerformance]);
+
+  useEffect(() => {
+    if (id) fetchRoiData();
+  }, [id, roiRange, attributionModel, fetchRoiData]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchBacklinkStatus();
+    const timer = globalThis.setInterval(fetchBacklinkStatus, 10000);
+    return () => globalThis.clearInterval(timer);
+  }, [id, fetchBacklinkStatus]);
 
   const startCrawl = async () => {
     try {
@@ -227,6 +251,49 @@ export default function ProjectDashboard() {
       console.error(error);
     }
   };
+
+  const brandWindowDays =
+    brandWindow === "7d" ? 7 : brandWindow === "30d" ? 30 : 90;
+  const brandSeries = useMemo(() => {
+    const rows = [...(stats?.analytics.daily_brand_segments || [])];
+    return rows.slice(Math.max(rows.length - brandWindowDays, 0));
+  }, [stats?.analytics.daily_brand_segments, brandWindowDays]);
+
+  const brandSummary = useMemo(() => {
+    return brandSeries.reduce(
+      (acc, row) => ({
+        brandSessions: acc.brandSessions + row.brand_sessions,
+        nonBrandSessions: acc.nonBrandSessions + row.non_brand_sessions,
+        brandConversions: acc.brandConversions + row.brand_conversions,
+        nonBrandConversions:
+          acc.nonBrandConversions + row.non_brand_conversions,
+      }),
+      {
+        brandSessions: 0,
+        nonBrandSessions: 0,
+        brandConversions: 0,
+        nonBrandConversions: 0,
+      },
+    );
+  }, [brandSeries]);
+
+  const backlinkRows = useMemo(() => {
+    const rows = [
+      ...(changes?.new_links ?? []).map((l) => ({ ...l, status: '新增' })),
+      ...(changes?.lost_links ?? []).map((l) => ({ ...l, status: '失效' })),
+    ];
+    const filtered = rows.filter((row) => {
+      if (!backlinkQuery.trim()) return true;
+      const q = backlinkQuery.toLowerCase();
+      return `${row.status} ${row.source ?? ''} ${row.url} ${row.anchor ?? ''} ${row.date ?? ''}`.toLowerCase().includes(q);
+    });
+
+    return filtered.sort((a, b) => {
+      if (backlinkSort === 'source') return (a.source ?? '').localeCompare(b.source ?? '');
+      if (backlinkSort === 'status') return a.status.localeCompare(b.status);
+      return (b.date ?? '').localeCompare(a.date ?? '');
+    });
+  }, [backlinkQuery, backlinkSort, changes?.lost_links, changes?.new_links]);
 
   if (loading || !stats) return <div>{t("app.loading")}</div>;
 
@@ -249,51 +316,7 @@ export default function ProjectDashboard() {
   const healthDashOffset =
     healthCircumference - (stats.site_health_score / 100) * healthCircumference;
 
-  const brandWindowDays =
-    brandWindow === "7d" ? 7 : brandWindow === "30d" ? 30 : 90;
-  const brandSeries = useMemo(() => {
-    const rows = [...(analytics.daily_brand_segments || [])];
-    return rows.slice(Math.max(rows.length - brandWindowDays, 0));
-  }, [analytics.daily_brand_segments, brandWindowDays]);
-
-  const brandSummary = useMemo(() => {
-    return brandSeries.reduce(
-      (acc, row) => ({
-        brandSessions: acc.brandSessions + row.brand_sessions,
-        nonBrandSessions: acc.nonBrandSessions + row.non_brand_sessions,
-        brandConversions: acc.brandConversions + row.brand_conversions,
-        nonBrandConversions:
-          acc.nonBrandConversions + row.non_brand_conversions,
-      }),
-      {
-        brandSessions: 0,
-        nonBrandSessions: 0,
-        brandConversions: 0,
-        nonBrandConversions: 0,
-      },
-    );
-  }, [brandSeries]);
-
-
   const categoryScores = stats.category_scores ?? [];
-
-  const backlinkRows = useMemo(() => {
-    const rows = [
-      ...(changes?.new_links ?? []).map((l) => ({ ...l, status: '新增' })),
-      ...(changes?.lost_links ?? []).map((l) => ({ ...l, status: '失效' })),
-    ];
-    const filtered = rows.filter((row) => {
-      if (!backlinkQuery.trim()) return true;
-      const q = backlinkQuery.toLowerCase();
-      return `${row.status} ${row.source ?? ''} ${row.url} ${row.anchor ?? ''} ${row.date ?? ''}`.toLowerCase().includes(q);
-    });
-
-    return filtered.sort((a, b) => {
-      if (backlinkSort === 'source') return (a.source ?? '').localeCompare(b.source ?? '');
-      if (backlinkSort === 'status') return a.status.localeCompare(b.status);
-      return (b.date ?? '').localeCompare(a.date ?? '');
-    });
-  }, [backlinkQuery, backlinkSort, changes?.lost_links, changes?.new_links]);
 
   const qualityCards = [
     {

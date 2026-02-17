@@ -88,7 +88,7 @@ export function getSerpFeatureDisplay(feature: string):
     return { kind: 'unknown', feature };
 }
 
-export function filterKeywordsBySerpFeature<T extends { market?: string | null; serp_features_json: string }>(
+export function filterKeywordsBySerpFeature<T extends { market?: string | null; serp_features_json?: string }>(
     keywordRows: T[],
     marketFilter: string,
     serpFeatureFilter: string,
