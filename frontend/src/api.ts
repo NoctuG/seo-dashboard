@@ -497,6 +497,18 @@ export async function getSiteAuditOverview(projectId: string) {
   return data;
 }
 
+export interface SiteAuditHistoryPoint {
+  project_id: number;
+  crawl_id: number;
+  score: number;
+  calculated_at: string;
+}
+
+export async function getSiteAuditHistory(projectId: string) {
+  const { data } = await api.get<SiteAuditHistoryPoint[]>(`/projects/${projectId}/site-audit/history`);
+  return data;
+}
+
 export interface KeywordItem {
   id: number;
   project_id: number;

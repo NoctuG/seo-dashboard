@@ -209,6 +209,14 @@ class Crawl(SQLModel, table=True):
     pages: List["Page"] = Relationship(back_populates="crawl")
     issues: List["Issue"] = Relationship(back_populates="crawl")
 
+
+class SiteAuditHistory(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    crawl_id: int = Field(foreign_key="crawl.id", index=True)
+    score: int
+    calculated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
 class Page(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     crawl_id: int = Field(foreign_key="crawl.id")

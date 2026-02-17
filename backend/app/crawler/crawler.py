@@ -5,11 +5,11 @@ from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 import xml.etree.ElementTree as ET
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.runtime_settings import get_runtime_settings
 from app.db import engine
-from app.models import Crawl, Page, Link, Issue, CrawlStatus, IssueStatus, PagePerformanceSnapshot
+from app.models import Crawl, Page, Link, Issue, CrawlStatus, IssueStatus, PagePerformanceSnapshot, SiteAuditHistory
 from app.crawler.fetcher import Fetcher
 from app.crawler.parser import Parser
 from app.crawler.analyzer import Analyzer
@@ -22,6 +22,7 @@ from app.metrics import (
     CRAWL_RUNS_TOTAL,
     update_crawl_status,
 )
+from app.site_audit import calculate_site_health_score
 from app.webhook_service import (
     WEBHOOK_EVENT_CRAWL_COMPLETED,
     WEBHOOK_EVENT_CRITICAL_ISSUE_FOUND,
@@ -359,6 +360,16 @@ class CrawlerService:
                 session.commit()
 
                 if crawl.status == CrawlStatus.COMPLETED:
+                    crawl_issues = session.exec(select(Issue).where(Issue.crawl_id == crawl.id)).all()
+                    session.add(
+                        SiteAuditHistory(
+                            project_id=crawl.project_id,
+                            crawl_id=crawl.id,
+                            score=calculate_site_health_score(crawl_issues),
+                        )
+                    )
+                    session.commit()
+
                     webhook_service.dispatch_event(
                         session,
                         WEBHOOK_EVENT_CRAWL_COMPLETED,
