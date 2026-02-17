@@ -8,7 +8,7 @@ from collections import Counter
 
 from app.core.error_codes import ErrorCode
 from app.db import get_session
-from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog, ProjectMember, ProjectRoleType, Role, User, AuditActionType
+from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog, ProjectMember, ProjectRoleType, Role, User, AuditActionType, SiteAuditHistory
 from app.schemas import (
     ProjectCreate,
     ProjectRead,
@@ -30,6 +30,7 @@ from app.schemas import (
     ReportDeliveryLogRead,
     ProjectSettingsUpdate,
     PaginatedResponse,
+    SiteAuditHistoryPoint,
 )
 from app.crawler.crawler import crawler_service
 from app.analytics_service import analytics_service
@@ -42,7 +43,7 @@ from app.api.deps import get_current_user, require_project_role, write_audit_log
 from app.config import settings
 from app.metrics import update_crawl_status
 from app.rate_limit import limiter
-from app.site_audit import build_category_scores
+from app.site_audit import build_category_scores, calculate_site_health_score
 
 router = APIRouter()
 
@@ -265,9 +266,6 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
         }
 
     issues = session.exec(select(Issue).where(Issue.crawl_id == last_crawl.id)).all()
-    critical = len([i for i in issues if i.severity == "critical"])
-    warning = len([i for i in issues if i.severity == "warning"])
-    info = len([i for i in issues if i.severity == "info"])
     site_health_score, site_health_band = _calculate_site_health(critical, warning, info)
 
     issue_counter = Counter(i.issue_type for i in issues)
@@ -365,10 +363,7 @@ def get_site_audit_overview(project_id: int, session: Session = Depends(get_sess
         }
 
     issues = session.exec(select(Issue).where(Issue.crawl_id == last_crawl.id)).all()
-    critical = len([i for i in issues if i.severity == "critical"])
-    warning = len([i for i in issues if i.severity == "warning"])
-    info = len([i for i in issues if i.severity == "info"])
-    site_health_score = max(0, min(100, 100 - (critical * 10 + warning * 3 + info)))
+    site_health_score = calculate_site_health_score(issues)
 
     category_scores = build_category_scores(issues)
 
@@ -381,6 +376,24 @@ def get_site_audit_overview(project_id: int, session: Session = Depends(get_sess
             for score in category_scores
         ],
     }
+
+
+@router.get("/{project_id}/site-audit/history", response_model=List[SiteAuditHistoryPoint])
+def get_site_audit_history(
+    project_id: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    history = session.exec(
+        select(SiteAuditHistory)
+        .where(SiteAuditHistory.project_id == project_id)
+        .order_by(SiteAuditHistory.calculated_at.asc())
+    ).all()
+    return history
 
 
 @router.get("/{project_id}/roi", response_model=RoiFormulaBreakdownResponse)

@@ -56,6 +56,16 @@ class CrawlRead(BaseModel):
     class Config:
         from_attributes = True
 
+
+class SiteAuditHistoryPoint(BaseModel):
+    project_id: int
+    crawl_id: int
+    score: int
+    calculated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class PageRead(BaseModel):
     id: int
     crawl_id: int

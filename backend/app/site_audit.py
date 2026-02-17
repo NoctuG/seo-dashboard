@@ -60,6 +60,14 @@ def map_issue_type_to_site_audit_category(issue_type: str, fallback_category: st
     return "technical_seo"
 
 
+def calculate_site_health_score(issues: Iterable[Issue]) -> int:
+    total_penalty = 0
+    for issue in issues:
+        severity = issue.severity.value if hasattr(issue.severity, "value") else str(issue.severity)
+        total_penalty += SEVERITY_PENALTY.get(severity, 1)
+    return max(0, min(100, 100 - total_penalty))
+
+
 def build_category_scores(issues: Iterable[Issue]) -> list[dict[str, int | str]]:
     issue_count_map = defaultdict(int)
     penalty_map = defaultdict(int)

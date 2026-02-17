@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Issue, Crawl } from '../api';
 import PaginationControls from '../components/PaginationControls';
@@ -15,6 +15,7 @@ const PAGE_SIZE = 20;
 
 export default function ProjectIssues() {
     const { id } = useParams<{ id: string }>();
+    const [searchParams] = useSearchParams();
     const [issues, setIssues] = useState<Issue[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -24,14 +25,16 @@ export default function ProjectIssues() {
     const [severityFilter, setSeverityFilter] = useState<'all' | Issue['severity']>('all');
     const [statusFilter, setStatusFilter] = useState<'all' | Issue['status']>('all');
 
+    const selectedCrawlId = searchParams.get('crawlId');
+
     useEffect(() => {
         if (id) fetchIssues(page);
-    }, [id, page]);
+    }, [id, page, selectedCrawlId]);
 
     const fetchIssues = async (targetPage: number) => {
         try {
             const crawlsRes = await api.get<PaginatedResponse<Crawl>>(`/projects/${id}/crawls`, {
-                params: { page: 1, page_size: 1 },
+                params: { page: 1, page_size: selectedCrawlId ? 100 : 1 },
             });
             if (crawlsRes.data.items.length === 0) {
                 setIssues([]);
@@ -39,8 +42,11 @@ export default function ProjectIssues() {
                 setLoading(false);
                 return;
             }
-            const latestCrawl = crawlsRes.data.items[0];
-            const issuesRes = await api.get<PaginatedResponse<Issue>>(`/crawls/${latestCrawl.id}/issues`, {
+            const defaultCrawl = crawlsRes.data.items[0];
+            const targetCrawl = selectedCrawlId
+                ? crawlsRes.data.items.find((crawl) => crawl.id === Number(selectedCrawlId)) ?? defaultCrawl
+                : defaultCrawl;
+            const issuesRes = await api.get<PaginatedResponse<Issue>>(`/crawls/${targetCrawl.id}/issues`, {
                 params: { page: targetPage, page_size: PAGE_SIZE },
             });
             setIssues(issuesRes.data.items);
