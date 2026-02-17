@@ -257,6 +257,34 @@ class BacklinkGapResponse(BaseModel):
     sort_order: str
 
 
+class TrafficOverviewTrendPoint(BaseModel):
+    month: str
+    my_site: float
+    competitor: float
+
+
+class TrafficOverviewTopPage(BaseModel):
+    url: str
+    estimated_traffic: float
+    keyword_count: int
+
+
+class TrafficOverviewTopKeyword(BaseModel):
+    keyword: str
+    rank: Optional[int] = None
+    search_volume: int = 0
+    estimated_clicks: float = 0
+
+
+class CompetitorTrafficOverviewResponse(BaseModel):
+    project_id: int
+    competitor_id: int
+    data_source: str
+    monthly_trend: List[TrafficOverviewTrendPoint]
+    top_pages: List[TrafficOverviewTopPage]
+    top_keywords: List[TrafficOverviewTopKeyword]
+
+
 class VisibilityHistoryRead(BaseModel):
     keyword_id: Optional[int]
     keyword_term: str

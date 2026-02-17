@@ -13,11 +13,13 @@ from sqlmodel import Session, select
 from app.api.deps import require_project_role
 from app.backlink_gap_service import BacklinkGapDomainRow, backlink_gap_service
 from app.config import settings
+from app.competitor_traffic_service import competitor_traffic_service
 from app.core.error_codes import ErrorCode
 from app.db import get_session
 from app.models import CompetitorDomain, Keyword, Project, ProjectRoleType, RankHistory, User, VisibilityHistory
 from app.schemas import (
     BacklinkGapResponse,
+    CompetitorTrafficOverviewResponse,
     BacklinkGapRow,
     BacklinkGapStats,
     KeywordGapResponse,
@@ -319,6 +321,7 @@ def get_backlink_gap(
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
+
     total = len(sorted_rows)
     offset = (page - 1) * page_size
     paged_rows = sorted_rows[offset : offset + page_size]
@@ -341,3 +344,21 @@ def get_backlink_gap(
         sort_by=sort_by,
         sort_order=sort_order,
     )
+
+
+@router.get("/{project_id}/competitors/{competitor_id}/traffic-overview", response_model=CompetitorTrafficOverviewResponse)
+def get_traffic_overview(
+    project_id: int,
+    competitor_id: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    competitor = session.get(CompetitorDomain, competitor_id)
+    if not competitor or competitor.project_id != project_id:
+        raise HTTPException(status_code=404, detail=ErrorCode.COMPETITOR_NOT_FOUND)
+
+    return competitor_traffic_service.get_overview(session, project=project, competitor=competitor)
