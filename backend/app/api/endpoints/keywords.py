@@ -23,6 +23,9 @@ from app.schemas import (
     RankHistoryRead,
     VisibilityHistoryRead,
     PaginatedResponse,
+    RankingDistributionPoint,
+    RankingDistributionResponse,
+    RankingDistributionSummary,
 )
 from app.serp_service import check_keyword_rank
 from app.visibility_service import visibility_service
@@ -37,6 +40,111 @@ def _resolve_geo_language(project: Project, keyword: Keyword) -> tuple[str, str]
     gl = (keyword.market or project.default_gl or "us").strip().lower()
     hl = (keyword.locale or project.default_hl or "en").strip().lower()
     return gl, hl
+
+
+def _bucket_start_for_dt(value: datetime, bucket: str) -> datetime:
+    if bucket == "week":
+        start = value - timedelta(days=value.weekday())
+        return datetime(start.year, start.month, start.day)
+    return datetime(value.year, value.month, value.day)
+
+
+def _build_distribution_row(ranks: list[int]) -> dict[str, int]:
+    return {
+        "top3_count": sum(1 for rank in ranks if rank <= 3),
+        "top10_count": sum(1 for rank in ranks if rank <= 10),
+        "top100_count": sum(1 for rank in ranks if rank <= 100),
+    }
+
+
+@router.get("/{project_id}/rankings/distribution", response_model=RankingDistributionResponse)
+def get_rankings_distribution(
+    project_id: int,
+    window_days: int = 30,
+    bucket: str = "day",
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    if window_days not in {7, 30, 90}:
+        raise HTTPException(status_code=400, detail="window_days must be one of 7, 30, 90")
+    if bucket not in {"day", "week"}:
+        raise HTTPException(status_code=400, detail="bucket must be one of day, week")
+
+    now = datetime.utcnow()
+    current_window_start = now - timedelta(days=window_days)
+    lookback_start = current_window_start - timedelta(days=7)
+
+    rows = session.exec(
+        select(RankHistory)
+        .join(Keyword, Keyword.id == RankHistory.keyword_id)
+        .where(
+            Keyword.project_id == project_id,
+            RankHistory.checked_at >= lookback_start,
+        )
+        .order_by(RankHistory.checked_at.asc())
+    ).all()
+
+    latest_per_keyword_bucket: dict[tuple[int, datetime], RankHistory] = {}
+    for row in rows:
+        if row.rank is None:
+            continue
+        bucket_start = _bucket_start_for_dt(row.checked_at, bucket)
+        key = (row.keyword_id, bucket_start)
+        previous = latest_per_keyword_bucket.get(key)
+        if not previous or previous.checked_at < row.checked_at:
+            latest_per_keyword_bucket[key] = row
+
+    bucket_ranks: dict[datetime, list[int]] = {}
+    for (_keyword_id, bucket_start), row in latest_per_keyword_bucket.items():
+        bucket_ranks.setdefault(bucket_start, []).append(row.rank)
+
+    series: list[RankingDistributionPoint] = []
+    for bucket_start in sorted(bucket_ranks.keys()):
+        if bucket_start < _bucket_start_for_dt(current_window_start, bucket):
+            continue
+        counts = _build_distribution_row(bucket_ranks[bucket_start])
+        series.append(RankingDistributionPoint(bucket_start=bucket_start, **counts))
+
+    latest_bucket_counts = {"top3_count": 0, "top10_count": 0, "top100_count": 0}
+    previous_bucket_counts = {"top3_count": 0, "top10_count": 0, "top100_count": 0}
+
+    if series:
+        latest_bucket = series[-1].bucket_start
+        latest_bucket_counts = {
+            "top3_count": series[-1].top3_count,
+            "top10_count": series[-1].top10_count,
+            "top100_count": series[-1].top100_count,
+        }
+        compare_bucket_start = latest_bucket - timedelta(days=7)
+        for point in series:
+            if point.bucket_start == compare_bucket_start:
+                previous_bucket_counts = {
+                    "top3_count": point.top3_count,
+                    "top10_count": point.top10_count,
+                    "top100_count": point.top100_count,
+                }
+                break
+
+    summary = RankingDistributionSummary(
+        top3_count=latest_bucket_counts["top3_count"],
+        top10_count=latest_bucket_counts["top10_count"],
+        top100_count=latest_bucket_counts["top100_count"],
+        top3_change=latest_bucket_counts["top3_count"] - previous_bucket_counts["top3_count"],
+        top10_change=latest_bucket_counts["top10_count"] - previous_bucket_counts["top10_count"],
+        top100_change=latest_bucket_counts["top100_count"] - previous_bucket_counts["top100_count"],
+    )
+
+    return RankingDistributionResponse(
+        project_id=project_id,
+        bucket=bucket,
+        window_days=window_days,
+        summary=summary,
+        series=series,
+    )
 
 
 @router.get("/{project_id}/competitors", response_model=PaginatedResponse[CompetitorDomainRead])

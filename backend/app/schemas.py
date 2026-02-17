@@ -195,6 +195,30 @@ class RankHistoryRead(BaseModel):
         from_attributes = True
 
 
+class RankingDistributionPoint(BaseModel):
+    bucket_start: datetime
+    top3_count: int
+    top10_count: int
+    top100_count: int
+
+
+class RankingDistributionSummary(BaseModel):
+    top3_count: int
+    top10_count: int
+    top100_count: int
+    top3_change: int
+    top10_change: int
+    top100_change: int
+
+
+class RankingDistributionResponse(BaseModel):
+    project_id: int
+    bucket: str
+    window_days: int
+    summary: RankingDistributionSummary
+    series: List[RankingDistributionPoint]
+
+
 class CompetitorDomainCreate(BaseModel):
     domain: str
 
