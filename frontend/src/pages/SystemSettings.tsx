@@ -8,6 +8,7 @@ import {
   updateWebhookConfig,
   type WebhookConfig,
 } from '../api';
+import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
 
 export default function SystemSettings() {
@@ -22,17 +23,16 @@ export default function SystemSettings() {
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
 
   const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
+    await runWithUiState(async () => {
       const [webhookEvents, webhookConfigs] = await Promise.all([listWebhookEvents(), listWebhookConfigs()]);
       setEvents(webhookEvents);
       setConfigs(webhookConfigs);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, t('systemSettings.errors.loadFailed')));
-    } finally {
-      setLoading(false);
-    }
+    }, {
+      setLoading,
+      setError,
+      clearErrorValue: null,
+      formatError: (error: unknown) => getErrorMessage(error, t('systemSettings.errors.loadFailed')),
+    });
   };
 
   useEffect(() => {

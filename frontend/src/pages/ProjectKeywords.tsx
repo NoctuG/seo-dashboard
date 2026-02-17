@@ -37,6 +37,8 @@ import {
     Bar,
 } from 'recharts';
 import PaginationControls from '../components/PaginationControls';
+import { runWithUiState } from '../utils/asyncAction';
+import { getErrorMessage } from '../utils/error';
 
 export default function ProjectKeywords() {
     const { id } = useParams<{ id: string }>();
@@ -44,6 +46,7 @@ export default function ProjectKeywords() {
     const [keywordTotal, setKeywordTotal] = useState(0);
     const [keywordPage, setKeywordPage] = useState(1);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [term, setTerm] = useState('');
     const [targetUrl, setTargetUrl] = useState('');
     const [locale, setLocale] = useState('');
@@ -97,55 +100,63 @@ export default function ProjectKeywords() {
     }, [id, competitorPage]);
 
     const fetchKeywords = async (page: number = keywordPage) => {
-        try {
+        await runWithUiState(async () => {
             const res = await api.get<PaginatedResponse<KeywordItem>>(`/projects/${id}/keywords`, {
                 params: { page, page_size: 20 },
             });
             setKeywords(res.data.items);
             setKeywordTotal(res.data.total);
             setKeywordPage(res.data.page);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
+        }, {
+            setLoading,
+            setError,
+            clearErrorValue: null,
+            formatError: (err: unknown) => getErrorMessage(err, '加载关键词失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const fetchCompetitors = async (page: number = competitorPage) => {
         if (!id) return;
-        try {
+        await runWithUiState(async () => {
             const res = await getProjectCompetitors(id, page, 20);
             setCompetitors(res.items);
             setCompetitorTotal(res.total);
             setCompetitorPage(res.page);
-        } catch (error) {
-            console.error(error);
-        }
+        }, {
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '加载竞争对手失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
 
     const fetchProject = async () => {
         if (!id) return;
-        try {
+        await runWithUiState(async () => {
             const res = await api.get<Project>(`/projects/${id}`);
             setProjectSettings(res.data);
-        } catch (error) {
-            console.error(error);
-        }
+        }, {
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '加载项目设置失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const fetchVisibility = async () => {
         if (!id) return;
-        try {
+        await runWithUiState(async () => {
             setVisibility(await getProjectVisibility(id));
-        } catch (error) {
-            console.error(error);
-        }
+        }, {
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '加载可见度数据失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const fetchSchedule = async () => {
         if (!id) return;
-        try {
+        await runWithUiState(async () => {
             const schedule = await getKeywordRankSchedule(id);
             setRankSchedule(schedule);
             if (schedule) {
@@ -157,14 +168,16 @@ export default function ProjectKeywords() {
                     active: schedule.active,
                 });
             }
-        } catch (error) {
-            console.error(error);
-        }
+        }, {
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '加载自动检查设置失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const addKeyword = async () => {
         if (!term.trim()) return;
-        try {
+        await runWithUiState(async () => {
             await api.post(`/projects/${id}/keywords`, {
                 term: term.trim(),
                 target_url: targetUrl.trim() || undefined,
@@ -175,106 +188,120 @@ export default function ProjectKeywords() {
             setTargetUrl('');
             setLocale('');
             setMarket('');
-            fetchKeywords(keywordPage);
-        } catch (error) {
-            console.error(error);
-        }
+            await fetchKeywords(keywordPage);
+        }, {
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '添加关键词失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const addCompetitor = async () => {
         if (!id || !competitorInput.trim()) return;
-        try {
+        await runWithUiState(async () => {
             await addProjectCompetitor(id, competitorInput.trim());
             setCompetitorInput('');
-            fetchCompetitors(competitorPage);
-        } catch (error) {
-            console.error(error);
-        }
+            await fetchCompetitors(competitorPage);
+        }, {
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '添加竞争对手失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const removeCompetitor = async (competitorId: number) => {
         if (!id) return;
-        try {
+        await runWithUiState(async () => {
             await deleteProjectCompetitor(id, competitorId);
-            fetchCompetitors(competitorPage);
-        } catch (error) {
-            console.error(error);
-        }
+            await fetchCompetitors(competitorPage);
+        }, {
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '删除竞争对手失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const deleteKeyword = async (keywordId: number) => {
-        try {
+        await runWithUiState(async () => {
             await api.delete(`/projects/${id}/keywords/${keywordId}`);
             if (selectedKeyword?.id === keywordId) {
                 setSelectedKeyword(null);
                 setHistory([]);
             }
-            fetchKeywords(keywordPage);
-        } catch (error) {
-            console.error(error);
-        }
+            await fetchKeywords(keywordPage);
+        }, {
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '删除关键词失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const checkRank = async (keywordId: number) => {
         setChecking(keywordId);
         try {
-            await api.post(`/projects/${id}/keywords/${keywordId}/check`);
-            fetchKeywords(keywordPage);
-            if (selectedKeyword?.id === keywordId) {
-                fetchHistory(keywordId, historyWindow);
-            }
-        } catch (error) {
-            console.error(error);
+            await runWithUiState(async () => {
+                await api.post(`/projects/${id}/keywords/${keywordId}/check`);
+                await fetchKeywords(keywordPage);
+                if (selectedKeyword?.id === keywordId) {
+                    await fetchHistory(keywordId, historyWindow);
+                }
+            }, {
+                setError,
+                formatError: (err: unknown) => getErrorMessage(err, '检查关键词排名失败，请稍后再试。'),
+                onError: (err: unknown) => console.error(err),
+            });
         } finally {
             setChecking(null);
         }
     };
 
     const checkAllRanks = async () => {
-        setCheckingAll(true);
-        try {
+        await runWithUiState(async () => {
             await api.post(`/projects/${id}/keywords/check-all`);
-            fetchKeywords(keywordPage);
+            await fetchKeywords(keywordPage);
             if (selectedKeyword) {
-                fetchHistory(selectedKeyword.id, historyWindow);
+                await fetchHistory(selectedKeyword.id, historyWindow);
             }
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setCheckingAll(false);
-        }
+        }, {
+            setLoading: setCheckingAll,
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '批量检查排名失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const runCompare = async () => {
         if (!id) return;
-        setComparing(true);
-        try {
+        await runWithUiState(async () => {
             const rows = await runProjectKeywordCompare(id);
             setCompareHistory(rows);
-            fetchKeywords(keywordPage);
-            fetchVisibility();
-            fetchProject();
-            fetchSchedule();
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setComparing(false);
-        }
+            await Promise.all([
+                fetchKeywords(keywordPage),
+                fetchVisibility(),
+                fetchProject(),
+                fetchSchedule(),
+            ]);
+        }, {
+            setLoading: setComparing,
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '执行批量对比失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const fetchHistory = useCallback(async (keywordId: number, days: 7 | 30 | 90) => {
         if (!id) return;
-        setHistoryLoading(true);
-        try {
+        await runWithUiState(async () => {
             const res = await api.get<RankHistoryItem[]>(`/projects/${id}/keywords/${keywordId}/history`, {
                 params: { days, limit: 180 },
             });
             setHistory(res.data);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setHistoryLoading(false);
-        }
+        }, {
+            setLoading: setHistoryLoading,
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '加载历史排名失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     }, [id]);
 
     const selectKeyword = (kw: KeywordItem) => {
@@ -289,8 +316,7 @@ export default function ProjectKeywords() {
 
     const saveSchedule = async () => {
         if (!id) return;
-        setSavingSchedule(true);
-        try {
+        await runWithUiState(async () => {
             const saved = await upsertKeywordRankSchedule(id, {
                 frequency: scheduleForm.frequency,
                 day_of_week: scheduleForm.frequency === 'weekly' ? scheduleForm.day_of_week : null,
@@ -299,25 +325,26 @@ export default function ProjectKeywords() {
                 active: scheduleForm.active,
             });
             setRankSchedule(saved);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setSavingSchedule(false);
-        }
+        }, {
+            setLoading: setSavingSchedule,
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '保存自动检查设置失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const toggleSchedule = async () => {
         if (!id || !rankSchedule) return;
-        setSavingSchedule(true);
-        try {
+        await runWithUiState(async () => {
             const saved = await toggleKeywordRankSchedule(id, !rankSchedule.active);
             setRankSchedule(saved);
             setScheduleForm((prev) => ({ ...prev, active: saved.active }));
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setSavingSchedule(false);
-        }
+        }, {
+            setLoading: setSavingSchedule,
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '切换自动检查状态失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
     };
 
     const chartData = history.map((h) => ({
@@ -375,6 +402,10 @@ export default function ProjectKeywords() {
                 </div>
             </div>
 
+
+            {error && (
+                <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            )}
 
             <div className="bg-white p-4 rounded shadow">
                 <h2 className="text-lg font-semibold mb-3">自动检查设置</h2>
