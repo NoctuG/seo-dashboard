@@ -8,6 +8,7 @@ import {
   type AiGenerateArticleResponse,
   type AiSocialPost,
 } from '../api';
+import { getErrorMessage } from '../utils/error';
 
 type TabKey = 'article' | 'social' | 'analyze';
 
@@ -232,8 +233,8 @@ function ArticleGenerator() {
       });
       setResult(data);
       setEditableContent(data.content);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || t('aiContent.errors.generateFailed'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('aiContent.errors.generateFailed')));
     } finally {
       setLoading(false);
     }
@@ -249,8 +250,8 @@ function ArticleGenerator() {
         language,
       });
       setEditableContent(data.result);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || t('aiContent.errors.rewriteFailed'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('aiContent.errors.rewriteFailed')));
     } finally {
       setRewriting(false);
     }
@@ -483,8 +484,8 @@ function SocialGenerator() {
         count,
       });
       setPosts(data.posts);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || t('aiContent.errors.generateFailed'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('aiContent.errors.generateFailed')));
     } finally {
       setLoading(false);
     }
@@ -737,8 +738,8 @@ function SeoAnalyzer() {
     try {
       const data = await analyzeSeoWithAi(content);
       setResult(data.result);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || t('aiContent.errors.analyzeFailed'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('aiContent.errors.analyzeFailed')));
     } finally {
       setLoading(false);
     }

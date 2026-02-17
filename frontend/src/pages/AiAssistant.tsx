@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sparkles } from 'lucide-react';
 import { analyzeSeoWithAi } from '../api';
+import { getErrorMessage } from '../utils/error';
 
 export default function AiAssistant() {
   const { t } = useTranslation();
@@ -18,8 +19,8 @@ export default function AiAssistant() {
     try {
       const data = await analyzeSeoWithAi(content);
       setResult(data.result);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || t('aiAssistant.errors.requestFailed'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('aiAssistant.errors.requestFailed')));
     } finally {
       setLoading(false);
     }
