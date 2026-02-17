@@ -645,6 +645,28 @@ export interface KeywordGapResponse {
   unique: KeywordGapRow[];
 }
 
+export interface TrafficOverviewTrendPoint {
+  month: string;
+  my_site: number;
+  competitor: number;
+}
+
+export interface TrafficOverviewTopKeyword {
+  keyword: string;
+  rank?: number | null;
+  search_volume: number;
+  estimated_clicks: number;
+}
+
+export interface CompetitorTrafficOverviewResponse {
+  project_id: number;
+  competitor_id: number;
+  data_source: string;
+  monthly_trend: TrafficOverviewTrendPoint[];
+  top_keywords: TrafficOverviewTopKeyword[];
+  notes: string[];
+}
+
 export interface VisibilityGroup {
   group: string;
   visibility_score: number;
@@ -1053,6 +1075,24 @@ export async function getProjectKeywordGap(
   const res = await api.get<KeywordGapResponse>(
     `/projects/${projectId}/competitors/${competitorId}/keyword-gap`,
     { params },
+  );
+  return res.data;
+}
+
+export async function getProjectCompetitorList(
+  projectId: string | number,
+  page = 1,
+  pageSize = 100,
+): Promise<PaginatedResponse<CompetitorDomainItem>> {
+  return getProjectCompetitors(projectId, page, pageSize);
+}
+
+export async function getProjectCompetitorTrafficOverview(
+  projectId: string | number,
+  competitorId: number,
+): Promise<CompetitorTrafficOverviewResponse> {
+  const res = await api.get<CompetitorTrafficOverviewResponse>(
+    `/projects/${projectId}/competitors/${competitorId}/traffic-overview`,
   );
   return res.data;
 }
