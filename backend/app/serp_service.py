@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import requests
 
 from app.config import settings
+from app.schemas import SERP_FEATURE_SOURCE_KEYS
 
 logger = logging.getLogger(__name__)
 
@@ -35,17 +36,7 @@ def _matches_domain(link: str, domain: str) -> bool:
 
 
 def _extract_serp_features(data: dict) -> list[str]:
-    known_features = {
-        "featured_snippet": "answer_box",
-        "people_also_ask": "related_questions",
-        "top_stories": "top_stories",
-        "video": "video_results",
-        "local_pack": "local_results",
-        "image_pack": "images_results",
-        "knowledge_graph": "knowledge_graph",
-        "shopping": "shopping_results",
-    }
-    return [name for name, source_key in known_features.items() if data.get(source_key)]
+    return [name for name, source_key in SERP_FEATURE_SOURCE_KEYS.items() if data.get(source_key)]
 
 
 def check_keyword_rank(term: str, domain: str, competitor_domains: Optional[list[str]] = None, gl: str = "us", hl: str = "en") -> RankResult:

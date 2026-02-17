@@ -28,7 +28,7 @@ import type {
     KeywordGapResponse,
     RankingDistributionResponse,
 } from '../api';
-import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield, Download, X, Pencil, Check, Sparkles, Images, MapPin, MessageCircleQuestion } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield, Download, X, Pencil, Check, Sparkles, Images, MapPin, MessageCircleQuestion, Newspaper, Video, Brain, ShoppingCart } from 'lucide-react';
 import { useProjectRole } from '../useProjectRole';
 import {
     LineChart,
@@ -48,14 +48,58 @@ import PaginationControls from '../components/PaginationControls';
 import KeywordGapVenn from '../components/KeywordGapVenn';
 import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
+import { SERP_FEATURES, type SerpFeature } from '../constants/serpFeatures';
 
 
-const SERP_FEATURE_ICON_MAP: Record<string, { label: string; icon: typeof Sparkles; className: string }> = {
+type SerpFeatureDisplayConfig = { label: string; icon: typeof Sparkles; className: string };
+
+export const SERP_FEATURE_ICON_MAP: Record<SerpFeature, SerpFeatureDisplayConfig> = {
     featured_snippet: { label: 'Featured Snippet', icon: Sparkles, className: 'text-amber-600' },
-    image_pack: { label: 'Image Pack', icon: Images, className: 'text-cyan-600' },
-    local_pack: { label: 'Local Pack', icon: MapPin, className: 'text-emerald-600' },
     people_also_ask: { label: 'People Also Ask', icon: MessageCircleQuestion, className: 'text-violet-600' },
+    top_stories: { label: 'Top Stories', icon: Newspaper, className: 'text-red-600' },
+    video: { label: 'Video', icon: Video, className: 'text-rose-600' },
+    local_pack: { label: 'Local Pack', icon: MapPin, className: 'text-emerald-600' },
+    image_pack: { label: 'Image Pack', icon: Images, className: 'text-cyan-600' },
+    knowledge_graph: { label: 'Knowledge Graph', icon: Brain, className: 'text-indigo-600' },
+    shopping: { label: 'Shopping', icon: ShoppingCart, className: 'text-orange-600' },
 };
+
+const FALLBACK_SERP_BADGE_CLASS = 'border border-gray-200 bg-gray-100 text-gray-700';
+
+export function parseSerpFeaturesJson(serpFeaturesJson: string | null | undefined): string[] {
+    if (!serpFeaturesJson) return [];
+    try {
+        const parsed = JSON.parse(serpFeaturesJson);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter((item): item is string => typeof item === 'string');
+    } catch {
+        return [];
+    }
+}
+
+
+export function getSerpFeatureDisplay(feature: string):
+    | { kind: 'known'; feature: SerpFeature; config: SerpFeatureDisplayConfig }
+    | { kind: 'unknown'; feature: string } {
+    if (feature in SERP_FEATURE_ICON_MAP) {
+        const knownFeature = feature as SerpFeature;
+        return { kind: 'known', feature: knownFeature, config: SERP_FEATURE_ICON_MAP[knownFeature] };
+    }
+    return { kind: 'unknown', feature };
+}
+
+export function filterKeywordsBySerpFeature<T extends { market?: string | null; serp_features_json: string }>(
+    keywordRows: T[],
+    marketFilter: string,
+    serpFeatureFilter: string,
+): T[] {
+    return keywordRows.filter((kw) => {
+        const marketMatched = marketFilter === 'all' || (kw.market || '').toLowerCase() === marketFilter.toLowerCase();
+        if (!marketMatched) return false;
+        if (serpFeatureFilter === 'all') return true;
+        return parseSerpFeaturesJson(kw.serp_features_json).includes(serpFeatureFilter);
+    });
+}
 
 export default function ProjectKeywords() {
     const { id } = useParams<{ id: string }>();
@@ -518,25 +562,12 @@ export default function ProjectKeywords() {
         [visibility]
     );
 
-    const parseKeywordSerpFeatures = useCallback((keyword: KeywordItem) => {
-        if (!keyword.serp_features_json) return [] as string[];
-        try {
-            const parsed = JSON.parse(keyword.serp_features_json);
-            if (!Array.isArray(parsed)) return [] as string[];
-            return parsed.filter((item): item is string => typeof item === 'string');
-        } catch {
-            return [] as string[];
-        }
-    }, []);
+    const parseKeywordSerpFeatures = useCallback((keyword: KeywordItem) => parseSerpFeaturesJson(keyword.serp_features_json), []);
 
-    const filteredKeywords = useMemo(() => {
-        return keywords.filter((kw: KeywordItem) => {
-            const marketMatched = marketFilter === 'all' || (kw.market || '').toLowerCase() === marketFilter.toLowerCase();
-            if (!marketMatched) return false;
-            if (serpFeatureFilter === 'all') return true;
-            return parseKeywordSerpFeatures(kw).includes(serpFeatureFilter);
-        });
-    }, [keywords, marketFilter, serpFeatureFilter, parseKeywordSerpFeatures]);
+    const filteredKeywords = useMemo(
+        () => filterKeywordsBySerpFeature(keywords, marketFilter, serpFeatureFilter),
+        [keywords, marketFilter, serpFeatureFilter],
+    );
 
     const exportKeywordGap = () => {
         if (!keywordGap || keywordGap.gap.length === 0) return;
@@ -1054,7 +1085,7 @@ export default function ProjectKeywords() {
                         <span className="text-gray-600">按 SERP 特性筛选</span>
                         <select className="border rounded px-3 py-2" value={serpFeatureFilter} onChange={(e) => setSerpFeatureFilter(e.target.value)}>
                             <option value="all">全部</option>
-                            {Object.entries(SERP_FEATURE_ICON_MAP).map(([feature, config]) => <option key={feature} value={feature}>{config.label}</option>)}
+                            {SERP_FEATURES.map((feature) => <option key={feature} value={feature}>{SERP_FEATURE_ICON_MAP[feature].label}</option>)}
                         </select>
                     </label>
                 </div>
@@ -1108,7 +1139,9 @@ export default function ProjectKeywords() {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {filteredKeywords.map((kw) => (
+                            {filteredKeywords.map((kw) => {
+                                const serpFeatures = parseKeywordSerpFeatures(kw);
+                                return (
                                 <tr key={kw.id} className={`hover:bg-gray-50 cursor-pointer ${selectedKeyword?.id === kw.id ? 'bg-blue-50' : ''}`} onClick={() => selectKeyword(kw)}>
                                     <td className="px-4 py-3 font-medium">{kw.term}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{kw.target_url || '-'}</td>
@@ -1116,15 +1149,23 @@ export default function ProjectKeywords() {
                                     <td className="px-4 py-3 text-sm">{kw.market || '-'}</td>
                                     <td className="px-4 py-3 text-center">{kw.current_rank != null ? `#${kw.current_rank}` : '未检测'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">
-                                        <div className="flex items-center gap-2">
-                                            {parseKeywordSerpFeatures(kw)
-                                                .filter((feature) => feature in SERP_FEATURE_ICON_MAP)
-                                                .map((feature) => {
-                                                    const config = SERP_FEATURE_ICON_MAP[feature];
-                                                    const Icon = config.icon;
-                                                    return <Icon key={`${kw.id}-${feature}`} size={16} className={config.className} aria-label={config.label} />;
-                                                })}
-                                            {parseKeywordSerpFeatures(kw).filter((feature) => feature in SERP_FEATURE_ICON_MAP).length === 0 && '-'}
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {serpFeatures.map((feature) => {
+                                                const display = getSerpFeatureDisplay(feature);
+                                                if (display.kind === 'known') {
+                                                    const Icon = display.config.icon;
+                                                    return <Icon key={`${kw.id}-${feature}`} size={16} className={display.config.className} aria-label={display.config.label} />;
+                                                }
+                                                return (
+                                                    <span
+                                                        key={`${kw.id}-${feature}`}
+                                                        className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${FALLBACK_SERP_BADGE_CLASS}`}
+                                                    >
+                                                        {display.feature}
+                                                    </span>
+                                                );
+                                            })}
+                                            {serpFeatures.length === 0 && '-'}
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{kw.last_checked ? new Date(kw.last_checked).toLocaleString() : '-'}</td>
@@ -1137,7 +1178,8 @@ export default function ProjectKeywords() {
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                     <PaginationControls page={keywordPage} pageSize={20} total={keywordTotal} onPageChange={setKeywordPage} />

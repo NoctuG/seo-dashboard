@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Generic, List, Optional, TypeVar
+from typing import Generic, List, Literal, Optional, TypeAlias, TypeVar
 from pydantic import BaseModel, Field
 from app.models import CrawlStatus, IssueCategory, IssueSeverity, IssueStatus, KeywordScheduleFrequency
 
@@ -10,6 +10,30 @@ class ProjectCreate(BaseModel):
     brand_regex: Optional[str] = None
     default_gl: str = "us"
     default_hl: str = "en"
+
+
+SERP_FEATURE_SOURCE_KEYS = {
+    "featured_snippet": "answer_box",
+    "people_also_ask": "related_questions",
+    "top_stories": "top_stories",
+    "video": "video_results",
+    "local_pack": "local_results",
+    "image_pack": "images_results",
+    "knowledge_graph": "knowledge_graph",
+    "shopping": "shopping_results",
+}
+
+SERP_FEATURES = tuple(SERP_FEATURE_SOURCE_KEYS.keys())
+SerpFeature: TypeAlias = Literal[
+    "featured_snippet",
+    "people_also_ask",
+    "top_stories",
+    "video",
+    "local_pack",
+    "image_pack",
+    "knowledge_graph",
+    "shopping",
+]
 
 
 T = TypeVar("T")
