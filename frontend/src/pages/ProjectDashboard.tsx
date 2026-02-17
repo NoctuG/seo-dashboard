@@ -88,30 +88,6 @@ export default function ProjectDashboard() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (id) {
-      fetchDashboard();
-      fetchContentPerformance();
-      fetchBacklinkData();
-      fetchRoiData();
-    }
-  }, [id]);
-
-  useEffect(() => {
-    if (id) fetchContentPerformance();
-  }, [id, window, sort]);
-
-  useEffect(() => {
-    if (id) fetchRoiData();
-  }, [id, roiRange, attributionModel]);
-
-  useEffect(() => {
-    if (!id) return;
-    fetchBacklinkStatus();
-    const timer = globalThis.setInterval(fetchBacklinkStatus, 10000);
-    return () => globalThis.clearInterval(timer);
-  }, [id]);
-
-  useEffect(() => {
     if (!id) return;
     const fetchCompetitors = async () => {
       setCompetitorsLoading(true);
@@ -154,7 +130,7 @@ export default function ProjectDashboard() {
     fetchOverview();
   }, [id, selectedCompetitorId]);
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
       const res = await api.get<DashboardStats>(`/projects/${id}/dashboard`);
       setStats(res.data);
