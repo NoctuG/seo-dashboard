@@ -619,6 +619,32 @@ export interface CompetitorDomainItem {
   created_at: string;
 }
 
+export interface KeywordGapRow {
+  keyword: string;
+  search_volume?: number | null;
+  my_rank?: number | null;
+  competitor_a_rank?: number | null;
+  competitor_b_rank?: number | null;
+  competitor_c_rank?: number | null;
+  difficulty?: number | null;
+  opportunity_score: number;
+}
+
+export interface KeywordGapResponse {
+  project_id: number;
+  competitor_ids: number[];
+  competitor_domains: string[];
+  data_source: string;
+  stats: {
+    common: number;
+    gap: number;
+    unique: number;
+  };
+  common: KeywordGapRow[];
+  gap: KeywordGapRow[];
+  unique: KeywordGapRow[];
+}
+
 export interface VisibilityGroup {
   group: string;
   visibility_score: number;
@@ -962,6 +988,20 @@ export async function updateProjectCompetitor(
   const res = await api.put<CompetitorDomainItem>(
     `/projects/${projectId}/competitors/${competitorId}`,
     { domain },
+  );
+  return res.data;
+}
+
+export async function getProjectKeywordGap(
+  projectId: string | number,
+  competitorId: number,
+  competitorIds?: number[],
+): Promise<KeywordGapResponse> {
+  const params = new URLSearchParams();
+  (competitorIds ?? []).forEach((id) => params.append("competitor_ids", String(id)));
+  const res = await api.get<KeywordGapResponse>(
+    `/projects/${projectId}/competitors/${competitorId}/keyword-gap`,
+    { params },
   );
   return res.data;
 }

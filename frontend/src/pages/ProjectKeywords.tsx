@@ -7,6 +7,7 @@ import {
     getProjectCompetitors,
     getProjectVisibility,
     getProjectRankingsDistribution,
+    getProjectKeywordGap,
     runProjectKeywordCompare,
     updateProjectCompetitor,
     updateProjectSettings,
@@ -24,6 +25,7 @@ import type {
     PaginatedResponse,
     KeywordRankSchedule,
     KeywordScheduleFrequency,
+    KeywordGapResponse,
     RankingDistributionResponse,
 } from '../api';
 import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield, Download, X, Pencil, Check, Sparkles, Images, MapPin, MessageCircleQuestion } from 'lucide-react';
@@ -85,6 +87,10 @@ export default function ProjectKeywords() {
     const [editingCompetitorId, setEditingCompetitorId] = useState<number | null>(null);
     const [editingCompetitorDomain, setEditingCompetitorDomain] = useState('');
     const [compareHistory, setCompareHistory] = useState<VisibilityHistoryItem[]>([]);
+    const [selectedGapCompetitorIds, setSelectedGapCompetitorIds] = useState<number[]>([]);
+    const [keywordGap, setKeywordGap] = useState<KeywordGapResponse | null>(null);
+    const [keywordGapLoading, setKeywordGapLoading] = useState(false);
+    const [keywordGapError, setKeywordGapError] = useState<string | null>(null);
     const [visibility, setVisibility] = useState<VisibilityResponse | null>(null);
     const [projectSettings, setProjectSettings] = useState<Project | null>(null);
     const [marketFilter, setMarketFilter] = useState('all');
@@ -352,6 +358,35 @@ export default function ProjectKeywords() {
         });
     };
 
+    const toggleKeywordGapCompetitor = (competitorId: number) => {
+        setKeywordGapError(null);
+        setSelectedGapCompetitorIds((prev) => {
+            if (prev.includes(competitorId)) {
+                return prev.filter((id) => id !== competitorId);
+            }
+            if (prev.length >= 3) {
+                setKeywordGapError('最多可选择 3 个竞争对手。');
+                return prev;
+            }
+            return [...prev, competitorId];
+        });
+    };
+
+    const fetchKeywordGap = async () => {
+        if (!id || selectedGapCompetitorIds.length === 0) return;
+        const [primaryCompetitorId, ...otherCompetitorIds] = selectedGapCompetitorIds;
+        await runWithUiState(async () => {
+            const data = await getProjectKeywordGap(id, primaryCompetitorId, otherCompetitorIds.length > 0 ? otherCompetitorIds : undefined);
+            setKeywordGap(data);
+        }, {
+            setLoading: setKeywordGapLoading,
+            setError: setKeywordGapError,
+            clearErrorValue: null,
+            formatError: (err: unknown) => getErrorMessage(err, '加载关键词差距分析失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
+    };
+
     const fetchHistory = useCallback(async (keywordId: number, days: 7 | 30 | 90) => {
         if (!id) return;
         await runWithUiState(async () => {
@@ -483,6 +518,39 @@ export default function ProjectKeywords() {
             return parseKeywordSerpFeatures(kw).includes(serpFeatureFilter);
         });
     }, [keywords, marketFilter, serpFeatureFilter, parseKeywordSerpFeatures]);
+
+    const exportKeywordGap = () => {
+        if (!keywordGap || keywordGap.gap.length === 0) return;
+        const rows = keywordGap.gap.map((item) => [
+            item.keyword,
+            item.my_rank ?? '',
+            item.competitor_a_rank ?? '',
+            item.competitor_b_rank ?? '',
+            item.competitor_c_rank ?? '',
+            item.opportunity_score,
+        ]);
+        const header = ['keyword', 'my_rank', 'competitor_a_rank', 'competitor_b_rank', 'competitor_c_rank', 'opportunity_score'];
+        const csv = [header, ...rows]
+            .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+            .join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `project-${id}-keyword-gap.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const selectedKeywordGapCompetitorDomains = useMemo(
+        () => selectedGapCompetitorIds
+            .map((competitorId) => competitors.find((item) => item.id === competitorId)?.domain ?? `竞争对手#${competitorId}`),
+        [competitors, selectedGapCompetitorIds],
+    );
+
+    const keywordGapTableRows = keywordGap?.gap ?? [];
 
     if (loading) return <div>Loading...</div>;
 
@@ -743,6 +811,107 @@ export default function ProjectKeywords() {
                     )}
                 </div>
                 <PaginationControls page={competitorPage} pageSize={20} total={competitorTotal} onPageChange={setCompetitorPage} />
+            </div>
+
+            <div className="bg-white p-4 rounded shadow space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-lg font-semibold">关键词差距分析</h2>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={fetchKeywordGap}
+                            disabled={selectedGapCompetitorIds.length === 0 || keywordGapLoading}
+                            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                            {keywordGapLoading ? '分析中...' : '开始分析'}
+                        </button>
+                        <button
+                            onClick={exportKeywordGap}
+                            disabled={keywordGapTableRows.length === 0}
+                            className="inline-flex items-center gap-2 rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <Download size={16} /> 导出 CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div className="text-sm text-gray-600">请选择 1~3 个竞争对手：</div>
+                <div className="flex flex-wrap gap-3">
+                    {competitors.length === 0 ? (
+                        <span className="text-sm text-gray-500">请先添加竞争对手，再进行差距分析。</span>
+                    ) : competitors.map((item) => (
+                        <label key={item.id} className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-sm">
+                            <input
+                                type="checkbox"
+                                checked={selectedGapCompetitorIds.includes(item.id)}
+                                onChange={() => toggleKeywordGapCompetitor(item.id)}
+                            />
+                            {item.domain}
+                        </label>
+                    ))}
+                </div>
+
+                {keywordGapError && (
+                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{keywordGapError}</div>
+                )}
+
+                {!keywordGap && !keywordGapLoading && !keywordGapError ? (
+                    <div className="text-sm text-gray-500">选择竞争对手后，点击“开始分析”查看关键词差距。</div>
+                ) : null}
+
+                {keywordGap && (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="rounded border p-3">
+                                <div className="text-sm text-gray-500">共同关键词</div>
+                                <div className="text-xl font-semibold">{keywordGap.stats.common}</div>
+                            </div>
+                            <div className="rounded border p-3">
+                                <div className="text-sm text-gray-500">差距关键词（Gap）</div>
+                                <div className="text-xl font-semibold">{keywordGap.stats.gap}</div>
+                            </div>
+                            <div className="rounded border p-3">
+                                <div className="text-sm text-gray-500">我方独有关键词</div>
+                                <div className="text-xl font-semibold">{keywordGap.stats.unique}</div>
+                            </div>
+                        </div>
+
+                        {keywordGapTableRows.length === 0 ? (
+                            <div className="rounded border border-dashed p-6 text-center text-sm text-gray-500">暂无差距关键词数据。</div>
+                        ) : (
+                            <div className="overflow-auto rounded border">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-3 py-2">关键词</th>
+                                            <th className="px-3 py-2">我方排名</th>
+                                            <th className="px-3 py-2">竞品排名</th>
+                                            <th className="px-3 py-2">机会分</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {keywordGapTableRows.map((row) => {
+                                            const competitorRanks = [
+                                                { domain: selectedKeywordGapCompetitorDomains[0], rank: row.competitor_a_rank },
+                                                { domain: selectedKeywordGapCompetitorDomains[1], rank: row.competitor_b_rank },
+                                                { domain: selectedKeywordGapCompetitorDomains[2], rank: row.competitor_c_rank },
+                                            ].filter((item) => item.domain);
+                                            return (
+                                                <tr key={row.keyword}>
+                                                    <td className="px-3 py-2">{row.keyword}</td>
+                                                    <td className="px-3 py-2">{row.my_rank != null ? `#${row.my_rank}` : '-'}</td>
+                                                    <td className="px-3 py-2 text-gray-600">
+                                                        {competitorRanks.map((item) => `${item.domain}: ${item.rank != null ? `#${item.rank}` : '-'}`).join(' / ')}
+                                                    </td>
+                                                    <td className="px-3 py-2 font-medium">{row.opportunity_score.toFixed(2)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
