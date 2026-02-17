@@ -16,6 +16,8 @@ const AiAssistant = lazy(() => import('./pages/AiAssistant'));
 const AiContentGeneration = lazy(() => import('./pages/AiContentGeneration'));
 const ProjectReports = lazy(() => import('./pages/ProjectReports'));
 const ProjectApiKeys = lazy(() => import('./pages/ProjectApiKeys'));
+const ProjectBacklinkRefDomains = lazy(() => import('./pages/ProjectBacklinkRefDomains'));
+const ProjectBacklinkRefDomainDetail = lazy(() => import('./pages/ProjectBacklinkRefDomainDetail'));
 const Login = lazy(() => import('./pages/Login'));
 const Users = lazy(() => import('./pages/Users'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
@@ -102,6 +104,8 @@ function App() {
             <Route path="projects/:id/keyword-research" element={<ProjectKeywordResearch />} />
             <Route path="projects/:id/reports" element={<ProjectReports />} />
             <Route path="projects/:id/api-keys" element={<ProjectApiKeys />} />
+            <Route path="projects/:id/backlinks/ref-domains" element={<ProjectBacklinkRefDomains />} />
+            <Route path="projects/:id/backlinks/ref-domains/:domain" element={<ProjectBacklinkRefDomainDetail />} />
             <Route path="ai" element={<AiAssistant />} />
             <Route path="ai/content" element={<AiContentGeneration />} />
             <Route path="users" element={<Users />} />

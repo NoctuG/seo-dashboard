@@ -3,6 +3,7 @@ from sqlmodel import Session, func, select
 from typing import List, Dict, Any, Optional, Literal
 import json
 from datetime import date, datetime
+from urllib.parse import unquote, urlparse
 from fastapi.responses import Response
 from collections import Counter
 
@@ -19,6 +20,9 @@ from app.schemas import (
     BacklinkSummaryResponse,
     BacklinkChangesResponse,
     BacklinkStatusResponse,
+    RefDomainListItem,
+    RefDomainDetailResponse,
+    RefDomainLinkItem,
     VisibilityResponse,
     RoiFormulaBreakdownResponse,
     RoiCostBreakdown,
@@ -519,6 +523,100 @@ def _is_snapshot_fresh(snapshot: Optional[BacklinkSnapshot]) -> bool:
     return age_seconds <= BACKLINK_CACHE_TTL_SECONDS and snapshot.fetch_status == "success"
 
 
+def _extract_ref_domain(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    parsed = urlparse(raw if "://" in raw else f"//{raw}")
+    host = (parsed.netloc or parsed.path or "").lower().strip()
+    if not host:
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    return host.split(":")[0]
+
+
+def _normalize_date(raw: Optional[str]) -> Optional[str]:
+    if not raw or not isinstance(raw, str):
+        return None
+    normalized = raw.strip()
+    return normalized or None
+
+
+def _to_sort_ts(raw: Optional[str]) -> float:
+    if not raw:
+        return 0
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0
+
+
+def _aggregate_ref_domains(snapshot: Optional[BacklinkSnapshot]) -> dict[str, dict[str, Any]]:
+    if not snapshot:
+        return {}
+
+    entries = [
+        ("active", link) for link in _json_loads(snapshot.top_backlinks_json, [])
+    ] + [
+        ("new", link) for link in _json_loads(snapshot.new_links_json, [])
+    ] + [
+        ("lost", link) for link in _json_loads(snapshot.lost_links_json, [])
+    ]
+
+    grouped: dict[str, dict[str, Any]] = {}
+    for default_status, link in entries:
+        if not isinstance(link, dict):
+            continue
+
+        source_url = link.get("source_url") or link.get("source")
+        target_url = link.get("target_url") or link.get("url")
+        domain = _extract_ref_domain(source_url) or _extract_ref_domain(link.get("domain"))
+        if not domain:
+            continue
+
+        status = str(link.get("status") or default_status)
+        first_seen = _normalize_date(link.get("first_seen") or link.get("date"))
+        lost_seen = _normalize_date(link.get("lost_seen") or (link.get("date") if status == "lost" else None))
+        da_raw = link.get("da") or link.get("domain_authority")
+        try:
+            da_value = float(da_raw) if da_raw is not None else None
+        except (TypeError, ValueError):
+            da_value = None
+
+        row = grouped.setdefault(domain, {
+            "domain": domain,
+            "backlinks_count": 0,
+            "da": None,
+            "first_seen": None,
+            "last_seen": None,
+            "items": [],
+        })
+        row["backlinks_count"] += 1
+        if da_value is not None:
+            row["da"] = max(row["da"], da_value) if row["da"] is not None else da_value
+        if first_seen and (row["first_seen"] is None or first_seen < row["first_seen"]):
+            row["first_seen"] = first_seen
+        last_seen_candidate = lost_seen or first_seen
+        if last_seen_candidate and (row["last_seen"] is None or last_seen_candidate > row["last_seen"]):
+            row["last_seen"] = last_seen_candidate
+
+        row["items"].append(
+            {
+                "source_url": source_url,
+                "target_url": target_url,
+                "anchor": link.get("anchor"),
+                "first_seen": first_seen,
+                "lost_seen": lost_seen,
+                "status": status,
+            }
+        )
+
+    return grouped
+
+
 def _queue_backlink_refresh(project_id: int, domain: str) -> None:
     from app.db import engine
 
@@ -729,6 +827,91 @@ def get_project_backlink_changes(project_id: int, background_tasks: BackgroundTa
         new_links=_json_loads(latest.new_links_json, []),
         lost_links=_json_loads(latest.lost_links_json, []),
         notes=_json_loads(latest.notes_json, []),
+    )
+
+
+@router.get("/{project_id}/backlinks/ref-domains", response_model=PaginatedResponse[RefDomainListItem])
+def get_project_ref_domains(
+    project_id: int,
+    page: int = 1,
+    page_size: int = 20,
+    search: Optional[str] = None,
+    sort_by: Literal["backlinks_count", "da", "first_seen", "last_seen"] = "backlinks_count",
+    sort_order: Literal["asc", "desc"] = "desc",
+    background_tasks: Optional[BackgroundTasks] = None,
+    session: Session = Depends(get_session),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    _ensure_backlink_snapshot(session, project_id, project.domain, background_tasks)
+    latest = session.exec(
+        select(BacklinkSnapshot)
+        .where(BacklinkSnapshot.project_id == project_id)
+        .order_by(BacklinkSnapshot.date.desc())
+    ).first()
+
+    grouped = _aggregate_ref_domains(latest)
+    items = [RefDomainListItem(**{k: v for k, v in row.items() if k != "items"}) for row in grouped.values()]
+
+    if search:
+        query = search.lower().strip()
+        items = [item for item in items if query in item.domain.lower()]
+
+    reverse = sort_order == "desc"
+    if sort_by == "da":
+        items.sort(key=lambda x: x.da if x.da is not None else -1, reverse=reverse)
+    elif sort_by == "first_seen":
+        items.sort(key=lambda x: _to_sort_ts(x.first_seen), reverse=reverse)
+    elif sort_by == "last_seen":
+        items.sort(key=lambda x: _to_sort_ts(x.last_seen), reverse=reverse)
+    else:
+        items.sort(key=lambda x: x.backlinks_count, reverse=reverse)
+
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 100)
+    total = len(items)
+    offset = (page - 1) * page_size
+    return {
+        "items": items[offset: offset + page_size],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.get("/{project_id}/backlinks/ref-domains/{domain}", response_model=RefDomainDetailResponse)
+def get_project_ref_domain_detail(
+    project_id: int,
+    domain: str,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    _ensure_backlink_snapshot(session, project_id, project.domain, background_tasks)
+    latest = session.exec(
+        select(BacklinkSnapshot)
+        .where(BacklinkSnapshot.project_id == project_id)
+        .order_by(BacklinkSnapshot.date.desc())
+    ).first()
+
+    grouped = _aggregate_ref_domains(latest)
+    normalized_domain = _extract_ref_domain(unquote(domain))
+    domain_row = grouped.get(normalized_domain) if normalized_domain else None
+    if not domain_row:
+        raise HTTPException(status_code=404, detail="Ref domain not found")
+
+    items = [RefDomainLinkItem(**item) for item in domain_row["items"]]
+    items.sort(key=lambda x: _to_sort_ts(x.first_seen or x.lost_seen), reverse=True)
+    return RefDomainDetailResponse(
+        project_id=project_id,
+        domain=domain_row["domain"],
+        total=len(items),
+        items=items,
     )
 
 

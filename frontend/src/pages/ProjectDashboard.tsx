@@ -543,6 +543,9 @@ export default function ProjectDashboard() {
         <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
           <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Ref Domains</h3>
           <p className="text-3xl font-bold">{backlinks?.ref_domains ?? 0}</p>
+          <Link className="mt-2 inline-block text-xs text-blue-600 hover:underline" to={`/projects/${id}/backlinks/ref-domains`}>
+            查看引用域
+          </Link>
         </div>
         <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
           <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Ahrefs Rank</h3>
