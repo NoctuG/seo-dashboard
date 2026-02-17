@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   generateSeoArticle,
@@ -10,6 +10,9 @@ import {
 } from '../api';
 import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
+import CanvasContentEditor from '../components/ai/CanvasContentEditor';
+import { articleMarkdownToCanvas, canvasToText, exportCanvas, socialToCanvas } from '../components/ai/canvasConverters';
+import type { CanvasDocument } from '../components/ai/canvasTypes';
 
 type TabKey = 'article' | 'social' | 'analyze';
 
@@ -81,126 +84,6 @@ export default function AiContentGeneration() {
   );
 }
 
-/* ───────────────────── Rich Text Editor ───────────────────── */
-
-function RichTextEditor({
-  content,
-  onChange,
-  placeholder,
-}: {
-  content: string;
-  onChange: (val: string) => void;
-  placeholder?: string;
-}) {
-  const { t } = useTranslation();
-  const editorRef = useRef<HTMLDivElement>(null);
-  const [isMarkdownMode, setIsMarkdownMode] = useState(false);
-
-  const execCmd = useCallback((command: string, value?: string) => {
-    document.execCommand(command, false, value);
-    editorRef.current?.focus();
-    if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
-    }
-  }, [onChange]);
-
-  const handleEditorInput = useCallback(() => {
-    if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
-    }
-  }, [onChange]);
-
-  const handleMarkdownChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange(e.target.value);
-  }, [onChange]);
-
-  const toolbarButtons = [
-    { icon: 'fa-solid fa-bold', cmd: 'bold', title: t('aiContent.editor.bold') },
-    { icon: 'fa-solid fa-italic', cmd: 'italic', title: t('aiContent.editor.italic') },
-    { icon: 'fa-solid fa-underline', cmd: 'underline', title: t('aiContent.editor.underline') },
-    { icon: 'fa-solid fa-strikethrough', cmd: 'strikeThrough', title: t('aiContent.editor.strikethrough') },
-    { divider: true },
-    { icon: 'fa-solid fa-heading', cmd: 'formatBlock', value: 'h2', title: 'H2' },
-    { icon: 'fa-solid fa-h', cmd: 'formatBlock', value: 'h3', title: 'H3' },
-    { divider: true },
-    { icon: 'fa-solid fa-list-ul', cmd: 'insertUnorderedList', title: t('aiContent.editor.bulletList') },
-    { icon: 'fa-solid fa-list-ol', cmd: 'insertOrderedList', title: t('aiContent.editor.numberedList') },
-    { divider: true },
-    { icon: 'fa-solid fa-quote-left', cmd: 'formatBlock', value: 'blockquote', title: t('aiContent.editor.quote') },
-    { icon: 'fa-solid fa-link', cmd: 'createLink', title: t('aiContent.editor.link') },
-    { icon: 'fa-solid fa-eraser', cmd: 'removeFormat', title: t('aiContent.editor.clearFormat') },
-  ];
-
-  return (
-    <div className="shape-medium overflow-hidden border border-[color:var(--md-sys-color-outline)]">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface-variant)] px-4 py-2">
-        {toolbarButtons.map((btn, i) => {
-          if ('divider' in btn) {
-            return <div key={i} className="w-px h-5 mx-1" style={{ background: 'var(--md-sys-color-outline)' }} />;
-          }
-          return (
-            <button
-              key={i}
-              type="button"
-              title={btn.title}
-              onClick={() => {
-                if (btn.cmd === 'createLink') {
-                  const url = prompt(t('aiContent.editor.enterUrl'));
-                  if (url) execCmd(btn.cmd, url);
-                } else if (btn.value) {
-                  execCmd(btn.cmd!, `<${btn.value}>`);
-                } else {
-                  execCmd(btn.cmd!);
-                }
-              }}
-              className="w-8 h-8 rounded flex items-center justify-center md-body-medium hover:bg-white transition-colors"
-              style={{ color: 'var(--md-sys-color-on-surface-variant)' }}
-            >
-              <i className={btn.icon} />
-            </button>
-          );
-        })}
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={() => setIsMarkdownMode(!isMarkdownMode)}
-          className="shape-small flex items-center gap-1 px-4 py-2 md-label-medium transition-colors"
-          style={{
-            background: isMarkdownMode ? 'var(--md-sys-color-primary)' : 'transparent',
-            color: isMarkdownMode ? 'var(--md-sys-color-on-primary)' : 'var(--md-sys-color-on-surface-variant)',
-            border: `1px solid ${isMarkdownMode ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-outline)'}`,
-          }}
-        >
-          <i className="fa-solid fa-code" />
-          {t('aiContent.editor.markdown')}
-        </button>
-      </div>
-
-      {/* Editor area */}
-      {isMarkdownMode ? (
-        <textarea
-          className="w-full min-h-[400px] px-4 py-4 md-body-medium font-mono resize-y focus:outline-none bg-[color:var(--md-sys-color-surface)] text-[color:var(--md-sys-color-on-surface)]"
-          value={content}
-          onChange={handleMarkdownChange}
-          placeholder={placeholder}
-        />
-      ) : (
-        <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          onInput={handleEditorInput}
-          dangerouslySetInnerHTML={{ __html: content }}
-          className="w-full min-h-[400px] max-w-none px-4 py-4 md-body-medium prose prose-sm focus:outline-none bg-[color:var(--md-sys-color-surface)] text-[color:var(--md-sys-color-on-surface)]"
-          data-placeholder={placeholder}
-          
-        />
-      )}
-    </div>
-  );
-}
-
 /* ───────────────────── SEO Article Generator Tab ───────────────────── */
 
 function ArticleGenerator() {
@@ -214,7 +97,7 @@ function ArticleGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AiGenerateArticleResponse | null>(null);
-  const [editableContent, setEditableContent] = useState('');
+  const [editableDocument, setEditableDocument] = useState<CanvasDocument | null>(null);
   const [rewriting, setRewriting] = useState(false);
   const [rewriteInstruction, setRewriteInstruction] = useState('');
 
@@ -231,7 +114,7 @@ function ArticleGenerator() {
         outline: outline || undefined,
       });
       setResult(data);
-      setEditableContent(data.content);
+      setEditableDocument(articleMarkdownToCanvas(data.content, data.title));
     }, {
       setLoading,
       setError,
@@ -241,14 +124,14 @@ function ArticleGenerator() {
   };
 
   const handleRewrite = async () => {
-    if (!editableContent) return;
+    if (!editableDocument) return;
     await runWithUiState(async () => {
       const data = await rewriteContent({
-        content: editableContent,
+        content: canvasToText(editableDocument),
         instruction: rewriteInstruction,
         language,
       });
-      setEditableContent(data.result);
+      setEditableDocument(articleMarkdownToCanvas(data.result, result?.title));
     }, {
       setLoading: setRewriting,
       setError,
@@ -256,9 +139,7 @@ function ArticleGenerator() {
     });
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(editableContent);
-  };
+  const handleExport = (content: string) => navigator.clipboard.writeText(content);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -377,7 +258,7 @@ function ArticleGenerator() {
               <div className="flex items-start justify-between mb-4">
                 <h2 className="md-title-large">{result.title}</h2>
                 <button
-                  onClick={handleCopy}
+                  onClick={() => editableDocument && handleExport(exportCanvas(editableDocument, 'text'))}
                   className="flex items-center gap-1 px-3 py-2 shape-small md-label-medium transition-colors hover:shadow"
                   style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}
                 >
@@ -424,12 +305,14 @@ function ArticleGenerator() {
               </button>
             </div>
 
-            {/* Rich text editor */}
-            <RichTextEditor
-              content={editableContent}
-              onChange={setEditableContent}
-              placeholder={t('aiContent.article.editorPlaceholder')}
-            />
+            {editableDocument && (
+              <CanvasContentEditor
+                document={editableDocument}
+                onChange={setEditableDocument}
+                placeholder={t('aiContent.article.editorPlaceholder')}
+                onExport={({ content }) => handleExport(content)}
+              />
+            )}
           </div>
         )}
 
@@ -465,8 +348,7 @@ function SocialGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [posts, setPosts] = useState<AiSocialPost[]>([]);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editContent, setEditContent] = useState('');
+  const [postDocuments, setPostDocuments] = useState<CanvasDocument[]>([]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -481,6 +363,7 @@ function SocialGenerator() {
         count,
       });
       setPosts(data.posts);
+      setPostDocuments(data.posts.map((post) => socialToCanvas(post.content, post.hashtags)));
     }, {
       setLoading,
       setError,
@@ -489,23 +372,14 @@ function SocialGenerator() {
     });
   };
 
-  const startEditing = (index: number) => {
-    setEditingIndex(index);
-    setEditContent(posts[index].content);
+  const copyPost = (index: number) => {
+    const doc = postDocuments[index];
+    if (!doc) return;
+    navigator.clipboard.writeText(exportCanvas(doc, 'text'));
   };
 
-  const saveEditing = () => {
-    if (editingIndex !== null) {
-      const updated = [...posts];
-      updated[editingIndex] = { ...updated[editingIndex], content: editContent };
-      setPosts(updated);
-      setEditingIndex(null);
-    }
-  };
-
-  const copyPost = (post: AiSocialPost) => {
-    const text = post.content + (post.hashtags.length ? '\n\n' + post.hashtags.map((h) => `#${h}`).join(' ') : '');
-    navigator.clipboard.writeText(text);
+  const updatePostDocument = (index: number, doc: CanvasDocument) => {
+    setPostDocuments((prev) => prev.map((item, i) => (i === index ? doc : item)));
   };
 
   return (
@@ -642,27 +516,8 @@ function SocialGenerator() {
                   <span className="md-label-medium opacity-40">#{i + 1}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {editingIndex === i ? (
-                    <button
-                      onClick={saveEditing}
-                      className="flex items-center gap-1 px-4 py-2 shape-small md-label-medium"
-                      style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}
-                    >
-                      <i className="fa-solid fa-check" />
-                      {t('aiContent.save')}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => startEditing(i)}
-                      className="flex items-center gap-1 px-4 py-2 shape-small md-label-medium border transition-colors hover:bg-gray-50 dark:hover:bg-slate-800"
-                      style={{ borderColor: 'var(--md-sys-color-outline)' }}
-                    >
-                      <i className="fa-solid fa-pen" />
-                      {t('aiContent.edit')}
-                    </button>
-                  )}
                   <button
-                    onClick={() => copyPost(post)}
+                    onClick={() => copyPost(i)}
                     className="flex items-center gap-1 px-4 py-2 shape-small md-label-medium border transition-colors hover:bg-gray-50 dark:hover:bg-slate-800"
                     style={{ borderColor: 'var(--md-sys-color-outline)' }}
                   >
@@ -672,15 +527,13 @@ function SocialGenerator() {
                 </div>
               </div>
 
-              {editingIndex === i ? (
-                <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  className="w-full shape-small border px-3 py-2 md-body-medium h-32 resize-y focus:outline-none bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)] text-[color:var(--md-sys-color-on-surface)]"
-                  style={{ borderColor: 'var(--md-sys-color-primary)' }}
+              {postDocuments[i] && (
+                <CanvasContentEditor
+                  document={postDocuments[i]}
+                  onChange={(doc) => updatePostDocument(i, doc)}
+                  placeholder={t('aiContent.social.topicPlaceholder')}
+                  onExport={({ content }) => navigator.clipboard.writeText(content)}
                 />
-              ) : (
-                <p className="md-body-medium leading-7 whitespace-pre-wrap">{post.content}</p>
               )}
 
               {post.hashtags.length > 0 && (
