@@ -519,6 +519,10 @@ export interface KeywordItem {
   current_rank?: number;
   last_checked?: string;
   serp_features_json?: string;
+  ranking_history?: Array<{
+    checked_at: string;
+    rank?: number | null;
+  }>;
 }
 
 
@@ -924,6 +928,10 @@ export interface RefDomainListItem {
   da?: number | null;
   first_seen?: string | null;
   last_seen?: string | null;
+  backlinks_history?: Array<{
+    date: string;
+    backlinks_count: number;
+  }>;
 }
 
 export interface RefDomainDetailItem {
