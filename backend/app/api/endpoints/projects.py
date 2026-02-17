@@ -42,6 +42,7 @@ from app.api.deps import get_current_user, require_project_role, write_audit_log
 from app.config import settings
 from app.metrics import update_crawl_status
 from app.rate_limit import limiter
+from app.site_audit import build_category_scores
 
 router = APIRouter()
 
@@ -258,6 +259,7 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
             "issues_breakdown": {"critical": 0, "warning": 0, "info": 0},
             "site_health_score": site_health_score,
             "site_health_band": site_health_band,
+            "category_scores": [],
             "technical_health": empty_technical_health,
             "analytics": analytics,
         }
@@ -269,6 +271,7 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
     site_health_score, site_health_band = _calculate_site_health(critical, warning, info)
 
     issue_counter = Counter(i.issue_type for i in issues)
+    category_scores = build_category_scores(issues)
     total_checks = max(last_crawl.total_pages, 1)
     failed_items = len([i for i in issues if i.severity in {"critical", "warning"}])
     pass_rate = round(max((total_checks - failed_items) / total_checks, 0) * 100, 2)
@@ -324,6 +327,7 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
         "issues_breakdown": {"critical": critical, "warning": warning, "info": info},
         "site_health_score": site_health_score,
         "site_health_band": site_health_band,
+        "category_scores": category_scores,
         "technical_health": {
             "pass_rate": pass_rate,
             "failed_items": failed_items,
@@ -333,6 +337,49 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
             "structured_data_errors": structured_data_errors,
         },
         "analytics": analytics,
+    }
+
+
+@router.get("/{project_id}/site-audit/overview", response_model=Dict[str, Any])
+def get_site_audit_overview(project_id: int, session: Session = Depends(get_session), _: User = Depends(require_project_role(ProjectRoleType.VIEWER))):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    last_crawl = session.exec(
+        select(Crawl).where(Crawl.project_id == project_id).order_by(Crawl.start_time.desc()).limit(1)
+    ).first()
+
+    if not last_crawl:
+        return {
+            "last_crawl": None,
+            "issues_count": 0,
+            "site_health_score": 100,
+            "category_scores": [
+                {"name": "Technical SEO", "score": 100, "issue_count": 0},
+                {"name": "Content Quality", "score": 100, "issue_count": 0},
+                {"name": "Performance", "score": 100, "issue_count": 0},
+                {"name": "Accessibility", "score": 100, "issue_count": 0},
+                {"name": "Indexability", "score": 100, "issue_count": 0},
+            ],
+        }
+
+    issues = session.exec(select(Issue).where(Issue.crawl_id == last_crawl.id)).all()
+    critical = len([i for i in issues if i.severity == "critical"])
+    warning = len([i for i in issues if i.severity == "warning"])
+    info = len([i for i in issues if i.severity == "info"])
+    site_health_score = max(0, min(100, 100 - (critical * 10 + warning * 3 + info)))
+
+    category_scores = build_category_scores(issues)
+
+    return {
+        "last_crawl": last_crawl,
+        "issues_count": last_crawl.issues_count,
+        "site_health_score": site_health_score,
+        "category_scores": [
+            {"name": score["name"], "score": score["score"], "issue_count": score["issue_count"]}
+            for score in category_scores
+        ],
     }
 
 

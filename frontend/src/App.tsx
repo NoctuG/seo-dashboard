@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './Layout';
 import Projects from './pages/Projects';
 import ProjectDashboard from './pages/ProjectDashboard';
+import SiteAuditOverview from './pages/SiteAuditOverview';
 import ProjectPages from './pages/ProjectPages';
 import ProjectIssues from './pages/ProjectIssues';
 import ProjectKeywords from './pages/ProjectKeywords';
@@ -78,6 +79,7 @@ function App() {
         >
           <Route index element={<Projects />} />
           <Route path="projects/:id" element={<ProjectDashboard />} />
+          <Route path="projects/:id/site-audit" element={<SiteAuditOverview />} />
           <Route path="projects/:id/pages" element={<ProjectPages />} />
           <Route path="projects/:id/issues" element={<ProjectIssues />} />
           <Route path="projects/:id/keywords" element={<ProjectKeywords />} />
