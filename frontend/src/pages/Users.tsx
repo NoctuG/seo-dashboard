@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createUser,
@@ -23,6 +23,8 @@ export default function Users() {
   const [form, setForm] = useState<CreateUserPayload>(initialForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'email' | 'name' | 'active'>('email');
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -73,6 +75,16 @@ export default function Users() {
     }
   };
 
+
+  const displayUsers = useMemo(() => {
+    const filtered = users.filter((u) => !query.trim() || `${u.email} ${u.full_name ?? ''}`.toLowerCase().includes(query.toLowerCase()));
+    return filtered.sort((a, b) => {
+      if (sortBy === 'name') return (a.full_name ?? '').localeCompare(b.full_name ?? '');
+      if (sortBy === 'active') return Number(b.is_active) - Number(a.is_active);
+      return a.email.localeCompare(b.email);
+    });
+  }, [users, query, sortBy]);
+
   return (
     <div className="space-y-6">
       <h1 className="md-headline-large">{t('users.title')}</h1>
@@ -108,19 +120,28 @@ export default function Users() {
 
       {error && <p className="md-body-medium text-[color:var(--md-sys-color-error)]">{error}</p>}
 
+      <div className="flex flex-wrap gap-2">
+        <input className="app-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search email / name" />
+        <select className="app-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as "email" | "name" | "active")}>
+          <option value="email">Sort by email</option>
+          <option value="name">Sort by name</option>
+          <option value="active">Sort by active</option>
+        </select>
+      </div>
+
       <div className="app-card overflow-hidden">
         <table className="w-full md-body-medium">
           <thead className="border-b border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface-variant)]">
             <tr>
-              <th className="p-4 text-left md-label-large">{t('users.email')}</th>
-              <th className="p-4 text-left md-label-large">{t('users.name')}</th>
-              <th className="p-4 text-left md-label-large">{t('users.active')}</th>
+              <th className="p-4 cursor-pointer text-left md-label-large" onClick={() => setSortBy('email')}>{t('users.email')}</th>
+              <th className="p-4 cursor-pointer text-left md-label-large" onClick={() => setSortBy('name')}>{t('users.name')}</th>
+              <th className="p-4 cursor-pointer text-left md-label-large" onClick={() => setSortBy('active')}>{t('users.active')}</th>
               <th className="p-4 text-left md-label-large">{t('users.superuser')}</th>
               <th className="p-4 text-left md-label-large">{t('users.actions')}</th>
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {displayUsers.map((user) => (
               <tr key={user.id} className="border-b border-[color:var(--md-sys-color-outline)] last:border-b-0">
                 <td className="p-4">{user.email}</td>
                 <td className="p-4">{user.full_name || '-'}</td>

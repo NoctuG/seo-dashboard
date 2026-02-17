@@ -18,14 +18,25 @@ export default function ProjectKeywordResearch() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"keyword" | "volume" | "difficulty">("volume");
 
   const selectedKeywords = useMemo(
     () => items.filter((item) => selected[item.keyword]).map((item) => item.keyword),
     [items, selected],
   );
 
-  const onResearch = async () => {
-    if (!id || !seedTerm.trim()) return;
+
+  const displayItems = useMemo(() => {
+    const filtered = items.filter((item) => !query.trim() || `${item.keyword} ${item.intent}`.toLowerCase().includes(query.toLowerCase()));
+    return filtered.sort((a, b) => {
+      if (sortBy === "keyword") return a.keyword.localeCompare(b.keyword);
+      if (sortBy === "difficulty") return b.difficulty - a.difficulty;
+      return b.search_volume - a.search_volume;
+    });
+  }, [items, query, sortBy]);
+
+  const onResearch = async () => {    if (!id || !seedTerm.trim()) return;
     setLoading(true);
     setMessage(null);
     try {
@@ -108,6 +119,14 @@ export default function ProjectKeywordResearch() {
       <div className="bg-white p-4 rounded shadow">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">建议词列表</h2>
+          <div className="flex gap-2">
+            <input className="border rounded px-3 py-1 text-sm" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="筛选关键词" />
+            <select className="border rounded px-3 py-1 text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value as "keyword" | "volume" | "difficulty")}>
+              <option value="volume">按搜索量</option>
+              <option value="difficulty">按难度</option>
+              <option value="keyword">按关键词</option>
+            </select>
+          </div>
           <button
             onClick={onBulkCreate}
             disabled={loading || selectedKeywords.length === 0}
@@ -124,15 +143,15 @@ export default function ProjectKeywordResearch() {
             <thead>
               <tr className="border-b text-left">
                 <th className="py-2 w-10"></th>
-                <th>关键词</th>
-                <th>搜索量</th>
+                <th className="cursor-pointer" onClick={() => setSortBy("keyword")}>关键词</th>
+                <th className="cursor-pointer" onClick={() => setSortBy("volume")}>搜索量</th>
                 <th>CPC</th>
-                <th>难度</th>
+                <th className="cursor-pointer" onClick={() => setSortBy("difficulty")}>难度</th>
                 <th>意图</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {displayItems.map((item) => (
                 <tr key={item.keyword} className="border-b">
                   <td>
                     <input

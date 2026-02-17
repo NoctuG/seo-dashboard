@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   createProjectApiKey,
@@ -17,6 +17,8 @@ export default function ProjectApiKeys() {
   const [scopesInput, setScopesInput] = useState("read");
   const [expiresAt, setExpiresAt] = useState("");
   const [createdPlainKey, setCreatedPlainKey] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "status" | "expires">("name");
 
   const fetchItems = async () => {
     if (!id) return;
@@ -63,6 +65,16 @@ export default function ProjectApiKeys() {
       console.error(error);
     }
   };
+
+
+  const displayItems = useMemo(() => {
+    const filtered = items.filter((item) => !query.trim() || `${item.name} ${item.key_prefix} ${item.scopes.join(' ')}`.toLowerCase().includes(query.toLowerCase()));
+    return filtered.sort((a, b) => {
+      if (sortBy === 'status') return Number(!!a.revoked_at) - Number(!!b.revoked_at);
+      if (sortBy === 'expires') return (a.expires_at ?? '').localeCompare(b.expires_at ?? '');
+      return a.name.localeCompare(b.name);
+    });
+  }, [items, query, sortBy]);
 
   if (!isAdmin) return <div className="p-6">仅项目管理员可管理 API Key。</div>;
 
@@ -138,7 +150,17 @@ export default function ProjectApiKeys() {
       </div>
 
       <div className="bg-white p-4 rounded shadow">
-        <h2 className="text-lg font-semibold mb-3">已有 API Keys</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">已有 API Keys</h2>
+          <div className="flex gap-2">
+            <input className="border rounded px-3 py-1 text-sm" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="筛选 key" />
+            <select className="border rounded px-3 py-1 text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value as "name" | "status" | "expires")}>
+              <option value="name">按名称</option>
+              <option value="status">按状态</option>
+              <option value="expires">按失效时间</option>
+            </select>
+          </div>
+        </div>
         {loading ? (
           <p>加载中...</p>
         ) : items.length === 0 ? (
@@ -147,16 +169,16 @@ export default function ProjectApiKeys() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left border-b">
-                <th className="py-2">名称</th>
+                <th className="py-2 cursor-pointer" onClick={() => setSortBy("name")}>名称</th>
                 <th>前缀</th>
                 <th>权限</th>
-                <th>失效时间</th>
-                <th>状态</th>
+                <th className="cursor-pointer" onClick={() => setSortBy("expires")}>失效时间</th>
+                <th className="cursor-pointer" onClick={() => setSortBy("status")}>状态</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {displayItems.map((item) => (
                 <tr key={item.id} className="border-b">
                   <td className="py-2">{item.name}</td>
                   <td>{item.key_prefix}</td>

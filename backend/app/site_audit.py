@@ -7,18 +7,17 @@ from app.models import Issue
 
 
 SEVERITY_PENALTY = {
-    "critical": 10,
-    "warning": 3,
+    "critical": 12,
+    "warning": 4,
     "info": 1,
 }
 
 
 SITE_AUDIT_CATEGORY_DEFS = [
-    ("technical_seo", "Technical SEO"),
-    ("content_quality", "Content Quality"),
+    ("crawlability", "Crawlability"),
     ("performance", "Performance"),
-    ("accessibility", "Accessibility"),
-    ("indexability", "Indexability"),
+    ("internal_linking", "Internal Linking"),
+    ("content", "Content"),
 ]
 
 
@@ -26,11 +25,8 @@ def map_issue_type_to_site_audit_category(issue_type: str, fallback_category: st
     issue_type = (issue_type or "").lower()
     fallback = (fallback_category or "").lower()
 
-    if issue_type.startswith("accessibility.") or fallback == "accessibility":
-        return "accessibility"
-
     if issue_type.startswith("content.") or fallback == "content":
-        return "content_quality"
+        return "content"
 
     if issue_type in {
         "technical_seo.slow_page_load",
@@ -42,22 +38,17 @@ def map_issue_type_to_site_audit_category(issue_type: str, fallback_category: st
         return "performance"
 
     if issue_type in {
-        "technical_seo.http_404_not_found",
-        "technical_seo.http_server_error",
-        "technical_seo.missing_canonical",
-        "technical_seo.cross_domain_canonical",
-        "technical_seo.canonical_mismatch",
         "technical_seo.internal_link_broken",
-        "technical_seo.redirect_chain",
         "technical_seo.internal_redirect_chain",
-        "technical_seo.noindex_detected",
-        "technical_seo.nofollow_detected",
-        "technical_seo.structured_data_invalid",
-        "technical_seo.structured_data_missing",
+        "technical_seo.redirect_chain",
     }:
-        return "indexability"
+        return "internal_linking"
 
-    return "technical_seo"
+    return "crawlability"
+
+
+def _score_from_penalty(penalty: int) -> int:
+    return max(0, min(100, 100 - penalty))
 
 
 def calculate_site_health_score(issues: Iterable[Issue]) -> int:
@@ -65,7 +56,7 @@ def calculate_site_health_score(issues: Iterable[Issue]) -> int:
     for issue in issues:
         severity = issue.severity.value if hasattr(issue.severity, "value") else str(issue.severity)
         total_penalty += SEVERITY_PENALTY.get(severity, 1)
-    return max(0, min(100, 100 - total_penalty))
+    return _score_from_penalty(total_penalty)
 
 
 def build_category_scores(issues: Iterable[Issue]) -> list[dict[str, int | str]]:
@@ -83,12 +74,11 @@ def build_category_scores(issues: Iterable[Issue]) -> list[dict[str, int | str]]
 
     scores: list[dict[str, int | str]] = []
     for key, display_name in SITE_AUDIT_CATEGORY_DEFS:
-        score = max(0, 100 - penalty_map[key])
         scores.append(
             {
                 "key": key,
                 "name": display_name,
-                "score": score,
+                "score": _score_from_penalty(penalty_map[key]),
                 "issue_count": issue_count_map[key],
             }
         )
