@@ -9,6 +9,14 @@ import { applyThemePreference, getStoredThemePreference } from './theme';
 
 applyThemePreference(getStoredThemePreference());
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Service worker registration failed — offline caching won't be available.
+    });
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>

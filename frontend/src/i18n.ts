@@ -162,6 +162,14 @@ const resources = {
         result: 'Analysis result',
         errors: { requestFailed: 'AI request failed, please check configuration.' },
       },
+      twoFactorVerify: {
+        title: 'Two-step verification',
+        description: 'Enter the 6-digit code from your authenticator app or a backup code.',
+        placeholder: '123456 or ABCD-1234',
+        submit: 'Verify & sign in',
+        loading: 'Verifying...',
+        errors: { invalidCode: 'Invalid code, please try again.' },
+      },
       errorBoundary: {
         title: 'Something went wrong',
         description: 'Sorry, an unexpected issue occurred. You can retry or go back to home.',
@@ -333,6 +341,14 @@ const resources = {
       },
       aiAssistant: {
         title: 'AI SEO 助手', inputLabel: '输入页面内容或 SEO 文案', placeholder: '粘贴页面主要内容、标题、描述或产品文案...', submit: 'AI 分析', loading: '分析中...', result: '分析结果', errors: { requestFailed: 'AI 请求失败，请检查配置。' },
+      },
+      twoFactorVerify: {
+        title: '两步验证',
+        description: '请输入认证器中的 6 位验证码或备份码。',
+        placeholder: '123456 或 ABCD-1234',
+        submit: '验证并登录',
+        loading: '验证中...',
+        errors: { invalidCode: '验证码无效，请重试。' },
       },
       errorBoundary: { title: '页面发生错误', description: '抱歉，出现了意外问题。你可以重试，或返回首页继续使用。', retry: '重试', goHome: '返回首页' },
       roiNote: {

@@ -263,4 +263,114 @@
   .shape-full {
     border-radius: var(--shape-full);
   }
+
+  /* ── Shared auth page wrapper ── */
+  .auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(
+      circle at 20% 20%,
+      var(--md-sys-color-primary-container) 0%,
+      var(--md-sys-color-surface) 42%,
+      var(--md-sys-color-surface) 100%
+    );
+    color: var(--md-sys-color-on-surface);
+    padding: var(--space-3);
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 420px;
+    background: color-mix(in srgb, var(--md-sys-color-surface) 85%, transparent);
+    border: 1px solid var(--md-sys-color-outline);
+    border-radius: var(--shape-large);
+    padding: var(--space-4);
+    @apply shadow-[0_24px_64px_-24px_rgba(15,23,42,0.35)] backdrop-blur-md;
+    animation: fadeSlideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .auth-card h1 {
+    font-size: var(--md-sys-typescale-title-large-size);
+    line-height: var(--md-sys-typescale-title-large-line-height);
+    font-weight: var(--md-sys-typescale-title-large-weight);
+    color: var(--md-sys-color-on-surface);
+    margin-bottom: var(--space-3);
+  }
+
+  /* ── Entrance animations ── */
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out both;
+  }
+
+  .animate-fade-slide-up {
+    animation: fadeSlideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-fade-slide-down {
+    animation: fadeSlideDown 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-stagger-1 { animation-delay: 0.06s; }
+  .animate-stagger-2 { animation-delay: 0.12s; }
+  .animate-stagger-3 { animation-delay: 0.18s; }
+  .animate-stagger-4 { animation-delay: 0.24s; }
+  .animate-stagger-5 { animation-delay: 0.30s; }
+
+  /* ── Loading spinner ── */
+  .loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--md-sys-color-outline);
+    border-top-color: var(--md-sys-color-primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* ── Suspense fallback ── */
+  .suspense-loader {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    background: radial-gradient(
+      circle at 20% 20%,
+      var(--md-sys-color-primary-container) 0%,
+      var(--md-sys-color-surface) 42%,
+      var(--md-sys-color-surface) 100%
+    );
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--md-sys-typescale-body-medium-size);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

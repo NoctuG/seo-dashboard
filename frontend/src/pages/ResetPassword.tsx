@@ -40,19 +40,46 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form className="bg-white rounded shadow p-8 w-full max-w-sm" onSubmit={onSubmit}>
-        <h1 className="text-xl font-semibold mb-4">{t('resetPassword.title')}</h1>
-        <input className="w-full border p-2 mb-3 rounded" placeholder={t('resetPassword.token')} value={token} onChange={(e) => setToken(e.target.value)} />
-        <input type="password" className="w-full border p-2 mb-3 rounded" placeholder={t('resetPassword.newPassword')} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-        <input type="password" className="w-full border p-2 mb-3 rounded" placeholder={t('resetPassword.confirmPassword')} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-        {message && <p className="text-sm text-green-600 mb-3">{message}</p>}
-        <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded disabled:opacity-50">
+    <div className="auth-page">
+      <form className="auth-card" onSubmit={onSubmit}>
+        <h1>{t('resetPassword.title')}</h1>
+        <input
+          className="app-input mb-3 w-full animate-fade-slide-up animate-stagger-1"
+          placeholder={t('resetPassword.token')}
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+        />
+        <input
+          type="password"
+          className="app-input mb-3 w-full animate-fade-slide-up animate-stagger-2"
+          placeholder={t('resetPassword.newPassword')}
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+        />
+        <input
+          type="password"
+          className="app-input mb-3 w-full animate-fade-slide-up animate-stagger-3"
+          placeholder={t('resetPassword.confirmPassword')}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+        {error && (
+          <p className="animate-fade-slide-down md-body-medium mb-3 text-[color:var(--md-sys-color-error)]">{error}</p>
+        )}
+        {message && (
+          <p className="animate-fade-slide-down md-body-medium mb-3 text-[color:#16a34a]">{message}</p>
+        )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="app-btn app-btn-primary w-full animate-fade-slide-up animate-stagger-4 py-2.5"
+        >
           {loading ? t('resetPassword.loading') : t('resetPassword.submit')}
         </button>
-        <p className="mt-4 text-sm text-center">
-          <Link className="text-blue-600 hover:underline" to="/login">{t('resetPassword.backToLogin')}</Link>
+        <p className="mt-4 text-center md-body-medium animate-fade-in animate-stagger-5">
+          <Link className="text-[color:var(--md-sys-color-primary)] hover:underline" to="/login">
+            {t('resetPassword.backToLogin')}
+          </Link>
         </p>
       </form>
     </div>
