@@ -429,6 +429,30 @@ class BacklinkChangesResponse(BaseModel):
     notes: List[str]
 
 
+class RefDomainListItem(BaseModel):
+    domain: str
+    backlinks_count: int
+    da: Optional[float] = None
+    first_seen: Optional[str] = None
+    last_seen: Optional[str] = None
+
+
+class RefDomainLinkItem(BaseModel):
+    source_url: Optional[str] = None
+    target_url: Optional[str] = None
+    anchor: Optional[str] = None
+    first_seen: Optional[str] = None
+    lost_seen: Optional[str] = None
+    status: str
+
+
+class RefDomainDetailResponse(BaseModel):
+    project_id: int
+    domain: str
+    total: int
+    items: List[RefDomainLinkItem] = Field(default_factory=list)
+
+
 class RoiCostBreakdown(BaseModel):
     monthly_human_cost: float
     monthly_tool_cost: float

@@ -896,6 +896,30 @@ export interface BacklinkStatusResponse {
   fetch_status: string;
 }
 
+export interface RefDomainListItem {
+  domain: string;
+  backlinks_count: number;
+  da?: number | null;
+  first_seen?: string | null;
+  last_seen?: string | null;
+}
+
+export interface RefDomainDetailItem {
+  source_url?: string | null;
+  target_url?: string | null;
+  anchor?: string | null;
+  first_seen?: string | null;
+  lost_seen?: string | null;
+  status: string;
+}
+
+export interface RefDomainDetailResponse {
+  project_id: number;
+  domain: string;
+  total: number;
+  items: RefDomainDetailItem[];
+}
+
 export interface BacklinkChangesResponse {
   project_id: number;
   provider: string;
@@ -946,6 +970,33 @@ export async function getProjectBacklinkChanges(
 ): Promise<BacklinkChangesResponse> {
   const res = await api.get<BacklinkChangesResponse>(
     `/projects/${projectId}/backlinks/changes`,
+  );
+  return res.data;
+}
+
+export async function getProjectRefDomains(
+  projectId: string | number,
+  params?: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+    sort_by?: 'backlinks_count' | 'da' | 'first_seen' | 'last_seen';
+    sort_order?: 'asc' | 'desc';
+  },
+): Promise<PaginatedResponse<RefDomainListItem>> {
+  const res = await api.get<PaginatedResponse<RefDomainListItem>>(
+    `/projects/${projectId}/backlinks/ref-domains`,
+    { params },
+  );
+  return res.data;
+}
+
+export async function getProjectRefDomainDetail(
+  projectId: string | number,
+  domain: string,
+): Promise<RefDomainDetailResponse> {
+  const res = await api.get<RefDomainDetailResponse>(
+    `/projects/${projectId}/backlinks/ref-domains/${encodeURIComponent(domain)}`,
   );
   return res.data;
 }
