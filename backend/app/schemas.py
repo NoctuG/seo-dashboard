@@ -121,6 +121,7 @@ class KeywordRead(BaseModel):
     market: Optional[str]
     current_rank: Optional[int]
     last_checked: Optional[datetime]
+    serp_features_json: str = "[]"
 
     class Config:
         from_attributes = True
