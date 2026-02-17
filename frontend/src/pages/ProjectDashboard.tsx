@@ -281,6 +281,12 @@ export default function ProjectDashboard() {
           >
             Reports
           </Link>
+          <Link
+            to={`/projects/${id}/site-audit`}
+            className="text-sm text-blue-600 underline"
+          >
+            Site Audit Overview
+          </Link>
         </div>
         {isAdmin && (
           <button

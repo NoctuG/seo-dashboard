@@ -454,6 +454,12 @@ export interface DashboardStats {
   issues_count: number;
   site_health_score: number;
   site_health_band: "red" | "yellow" | "green";
+  category_scores?: Array<{
+    key?: string;
+    name: string;
+    score: number;
+    issue_count: number;
+  }>;
   issues_breakdown: {
     critical: number;
     warning: number;
@@ -473,6 +479,22 @@ export interface DashboardStats {
     structured_data_errors: Array<{ issue_type: string; count: number }>;
   };
   analytics: AnalyticsData;
+}
+
+export interface SiteAuditOverview {
+  last_crawl?: Crawl | null;
+  issues_count: number;
+  site_health_score: number;
+  category_scores: Array<{
+    name: string;
+    score: number;
+    issue_count: number;
+  }>;
+}
+
+export async function getSiteAuditOverview(projectId: string) {
+  const { data } = await api.get<SiteAuditOverview>(`/projects/${projectId}/site-audit/overview`);
+  return data;
 }
 
 export interface KeywordItem {
