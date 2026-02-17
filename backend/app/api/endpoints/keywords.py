@@ -579,6 +579,10 @@ def check_all_compare(
 
 
 @router.get(
+    "/{project_id}/keywords/{keyword_id}/ranking-history",
+    response_model=List[RankHistoryRead],
+)
+@router.get(
     "/{project_id}/keywords/{keyword_id}/history",
     response_model=List[RankHistoryRead],
 )
