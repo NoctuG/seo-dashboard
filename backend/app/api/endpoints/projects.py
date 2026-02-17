@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlmodel import Session, func, select
 from typing import List, Dict, Any, Optional, Literal
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from urllib.parse import unquote, urlparse
 from fastapi.responses import Response
 from collections import Counter
 
 from app.core.error_codes import ErrorCode
 from app.db import get_session
-from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog, ProjectMember, ProjectRoleType, Role, User, AuditActionType, SiteAuditHistory
+from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog, ProjectMember, ProjectRoleType, Role, User, AuditActionType, SiteAuditHistory, Keyword, RankHistory
 from app.schemas import (
     ProjectCreate,
     ProjectRead,
@@ -503,6 +503,146 @@ def get_project_visibility(project_id: int, session: Session = Depends(get_sessi
         raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     return visibility_service.get_project_visibility(session=session, project_id=project_id)
+
+
+@router.get("/{project_id}/search-insights", response_model=Dict[str, Any])
+def get_project_search_insights(
+    project_id: int,
+    days: int = 30,
+    page: int = 1,
+    page_size: int = 20,
+    keyword_sample_step: int = 1,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    days = min(max(days, 7), 120)
+    page = max(page, 1)
+    page_size = min(max(page_size, 5), 80)
+    keyword_sample_step = min(max(keyword_sample_step, 1), 7)
+
+    start_date = datetime.utcnow().date() - timedelta(days=days - 1)
+
+    keyword_count_stmt = (
+        select(func.count(func.distinct(Keyword.id)))
+        .select_from(RankHistory)
+        .join(Keyword, Keyword.id == RankHistory.keyword_id)
+        .where(Keyword.project_id == project_id)
+        .where(func.date(RankHistory.checked_at) >= start_date)
+    )
+    total_keywords = int(session.exec(keyword_count_stmt).one() or 0)
+
+    keyword_rank_stmt = (
+        select(
+            Keyword.id.label("keyword_id"),
+            Keyword.term.label("keyword"),
+            func.avg(RankHistory.rank).label("avg_rank"),
+        )
+        .join(RankHistory, RankHistory.keyword_id == Keyword.id)
+        .where(Keyword.project_id == project_id)
+        .where(RankHistory.rank.is_not(None))
+        .where(func.date(RankHistory.checked_at) >= start_date)
+        .group_by(Keyword.id, Keyword.term)
+        .order_by(func.avg(RankHistory.rank).asc(), Keyword.term.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    keyword_rows = session.exec(keyword_rank_stmt).all()
+
+    selected_keyword_ids = [row.keyword_id for row in keyword_rows]
+    selected_term_map = {row.keyword_id: row.keyword for row in keyword_rows}
+    heatmap: Dict[str, Dict[str, Optional[int]]] = {term: {} for term in selected_term_map.values()}
+
+    if selected_keyword_ids:
+        history_stmt = (
+            select(
+                RankHistory.keyword_id,
+                func.date(RankHistory.checked_at).label("bucket_date"),
+                func.min(RankHistory.rank).label("best_rank"),
+            )
+            .where(RankHistory.keyword_id.in_(selected_keyword_ids))
+            .where(func.date(RankHistory.checked_at) >= start_date)
+            .where(RankHistory.rank.is_not(None))
+            .group_by(RankHistory.keyword_id, func.date(RankHistory.checked_at))
+            .order_by(func.date(RankHistory.checked_at).asc())
+        )
+        history_rows = session.exec(history_stmt).all()
+        for row in history_rows:
+            keyword = selected_term_map.get(row.keyword_id)
+            if not keyword:
+                continue
+            heatmap[keyword][str(row.bucket_date)] = int(row.best_rank) if row.best_rank is not None else None
+
+    analytics = analytics_service.get_project_analytics(
+        project_id,
+        project.domain,
+        project.brand_keywords_json,
+        project.brand_regex,
+        None,
+    )
+    countries = analytics.get("audience", {}).get("top_countries", [])
+    geo_rows = []
+    for idx, row in enumerate(countries):
+        country = str(row.get("country") or "Unknown")
+        sessions = int(row.get("sessions") or 0)
+        geo_rows.append(
+            {
+                "country": country,
+                "region": country,
+                "sessions": sessions,
+                "share": round((sessions / analytics.get("period", {}).get("current_sessions", 1)) * 100, 2),
+                "rank": idx + 1,
+            }
+        )
+
+    dates = [
+        (start_date + timedelta(days=offset)).isoformat()
+        for offset in range(0, days, keyword_sample_step)
+    ]
+
+    return {
+        "project_id": project_id,
+        "keyword_heatmap": {
+            "dates": dates,
+            "rows": [
+                {
+                    "keyword": keyword,
+                    "cells": [{"date": d, "rank": heatmap[keyword].get(d)} for d in dates],
+                }
+                for keyword in heatmap
+            ],
+            "paging": {
+                "page": page,
+                "page_size": page_size,
+                "total_keywords": total_keywords,
+                "has_more": page * page_size < total_keywords,
+            },
+            "sampling": {
+                "days": days,
+                "keyword_sample_step": keyword_sample_step,
+            },
+        },
+        "geo_distribution": {
+            "rows": geo_rows,
+            "total_sessions": analytics.get("period", {}).get("current_sessions", 0),
+            "provider": analytics.get("provider", "sample"),
+        },
+        "legend": {
+            "rank_thresholds": [3, 10, 20, 50],
+            "palette": {
+                "top3": "#0f766e",
+                "top10": "#0ea5a4",
+                "top20": "#22d3ee",
+                "top50": "#67e8f9",
+                "out": "#e2e8f0",
+                "missing": "#f8fafc",
+            },
+            "tooltip_fields": ["keyword", "date", "rank", "country", "sessions", "share"],
+        },
+    }
 
 
 BACKLINK_CACHE_TTL_SECONDS = max(60, getattr(settings, "BACKLINK_CACHE_TTL_SECONDS", 6 * 3600))
