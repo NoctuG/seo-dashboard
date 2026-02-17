@@ -101,7 +101,7 @@ export default function ProjectDashboard() {
 
   const fetchDashboard = async () => {
     try {
-      const res = await api.get(`/projects/${id}/dashboard`);
+      const res = await api.get<DashboardStats>(`/projects/${id}/dashboard`);
       setStats(res.data);
     } catch (error) {
       console.error(error);
@@ -177,6 +177,22 @@ export default function ProjectDashboard() {
 
   const { last_crawl, issues_breakdown, analytics } = stats;
   const hasGrowth = analytics.period.growth_pct >= 0;
+  const siteHealthColorClass =
+    stats.site_health_band === "green"
+      ? "text-green-600"
+      : stats.site_health_band === "yellow"
+        ? "text-yellow-600"
+        : "text-red-600";
+  const siteHealthStroke =
+    stats.site_health_band === "green"
+      ? "#16a34a"
+      : stats.site_health_band === "yellow"
+        ? "#ca8a04"
+        : "#dc2626";
+  const healthRadius = 40;
+  const healthCircumference = 2 * Math.PI * healthRadius;
+  const healthDashOffset =
+    healthCircumference - (stats.site_health_score / 100) * healthCircumference;
 
   const brandWindowDays =
     brandWindow === "7d" ? 7 : brandWindow === "30d" ? 30 : 90;
@@ -298,6 +314,41 @@ export default function ProjectDashboard() {
           />
         </label>
       </div>
+
+      <Link
+        to={`/projects/${id}/issues`}
+        className="mb-6 block bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 hover:border-blue-400 transition"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm uppercase text-slate-500">Site Health</p>
+            <p className={`text-3xl font-bold ${siteHealthColorClass}`}>
+              {stats.site_health_score}
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Band: {stats.site_health_band.toUpperCase()} · 点击查看审计详情
+            </p>
+          </div>
+          <svg width="110" height="110" viewBox="0 0 110 110" aria-label="Site health score chart">
+            <circle cx="55" cy="55" r={healthRadius} stroke="#e2e8f0" strokeWidth="10" fill="none" />
+            <circle
+              cx="55"
+              cy="55"
+              r={healthRadius}
+              stroke={siteHealthStroke}
+              strokeWidth="10"
+              fill="none"
+              strokeLinecap="round"
+              strokeDasharray={healthCircumference}
+              strokeDashoffset={healthDashOffset}
+              transform="rotate(-90 55 55)"
+            />
+            <text x="55" y="60" textAnchor="middle" className="fill-slate-700" fontSize="18" fontWeight="700">
+              {stats.site_health_score}
+            </text>
+          </svg>
+        </div>
+      </Link>
 
       {(authority?.notes?.length ||
         backlinks?.notes?.length ||

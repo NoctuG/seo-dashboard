@@ -238,12 +238,26 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
         "structured_data_errors": [],
     }
 
+    def _calculate_site_health(critical_count: int, warning_count: int, info_count: int) -> tuple[int, str]:
+        raw_score = 100 - (critical_count * 10 + warning_count * 3 + info_count)
+        score = max(0, min(100, raw_score))
+        if score >= 80:
+            band = "green"
+        elif score >= 50:
+            band = "yellow"
+        else:
+            band = "red"
+        return score, band
+
     if not last_crawl:
+        site_health_score, site_health_band = _calculate_site_health(0, 0, 0)
         return {
             "last_crawl": None,
             "total_pages": 0,
             "issues_count": 0,
             "issues_breakdown": {"critical": 0, "warning": 0, "info": 0},
+            "site_health_score": site_health_score,
+            "site_health_band": site_health_band,
             "technical_health": empty_technical_health,
             "analytics": analytics,
         }
@@ -252,6 +266,7 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
     critical = len([i for i in issues if i.severity == "critical"])
     warning = len([i for i in issues if i.severity == "warning"])
     info = len([i for i in issues if i.severity == "info"])
+    site_health_score, site_health_band = _calculate_site_health(critical, warning, info)
 
     issue_counter = Counter(i.issue_type for i in issues)
     total_checks = max(last_crawl.total_pages, 1)
@@ -307,6 +322,8 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
         "total_pages": last_crawl.total_pages,
         "issues_count": last_crawl.issues_count,
         "issues_breakdown": {"critical": critical, "warning": warning, "info": info},
+        "site_health_score": site_health_score,
+        "site_health_band": site_health_band,
         "technical_health": {
             "pass_rate": pass_rate,
             "failed_items": failed_items,
