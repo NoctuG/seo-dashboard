@@ -199,6 +199,34 @@ class CompetitorDomainRead(BaseModel):
         from_attributes = True
 
 
+class KeywordGapRow(BaseModel):
+    keyword: str
+    search_volume: Optional[int] = None
+    my_rank: Optional[int] = None
+    competitor_a_rank: Optional[int] = None
+    competitor_b_rank: Optional[int] = None
+    competitor_c_rank: Optional[int] = None
+    difficulty: Optional[float] = None
+    opportunity_score: float = 0
+
+
+class KeywordGapStats(BaseModel):
+    common: int = 0
+    gap: int = 0
+    unique: int = 0
+
+
+class KeywordGapResponse(BaseModel):
+    project_id: int
+    competitor_ids: List[int]
+    competitor_domains: List[str]
+    data_source: str
+    stats: KeywordGapStats
+    common: List[KeywordGapRow]
+    gap: List[KeywordGapRow]
+    unique: List[KeywordGapRow]
+
+
 class VisibilityHistoryRead(BaseModel):
     keyword_id: Optional[int]
     keyword_term: str

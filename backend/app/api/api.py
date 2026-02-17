@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_user
-from app.api.endpoints import admin_backup, ai, ai_drafts, api_keys, auth, crawls, health, issues, keywords, pages, projects, users, version, webhooks
+from app.api.endpoints import admin_backup, ai, ai_drafts, api_keys, auth, competitors, crawls, health, issues, keywords, pages, projects, users, version, webhooks
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
@@ -12,6 +12,7 @@ api_router.include_router(crawls.router, prefix="/crawls", tags=["crawls"], depe
 api_router.include_router(pages.router, prefix="/pages", tags=["pages"], dependencies=[Depends(get_current_user)])
 api_router.include_router(issues.router, prefix="/issues", tags=["issues"], dependencies=[Depends(get_current_user)])
 api_router.include_router(keywords.router, prefix="/projects", tags=["keywords"], dependencies=[Depends(get_current_user)])
+api_router.include_router(competitors.router, prefix="/projects", tags=["competitors"], dependencies=[Depends(get_current_user)])
 
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"], dependencies=[Depends(get_current_user)])
 api_router.include_router(users.router, prefix="/users", tags=["users"], dependencies=[Depends(get_current_user)])
