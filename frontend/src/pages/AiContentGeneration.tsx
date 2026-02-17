@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   generateSeoArticle,
   generateSocialContent,
   rewriteContent,
   analyzeSeoWithAi,
+  type AiContentDraft,
   type AiGenerateArticleResponse,
   type AiSocialPost,
+  createAiContentDraft,
+  listAiContentDrafts,
+  updateAiContentDraft,
+  api,
 } from '../api';
 import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
@@ -55,7 +60,6 @@ export default function AiContentGeneration() {
     { key: 'social', icon: 'fa-solid fa-share-nodes', labelKey: 'aiContent.tabs.social' },
     { key: 'analyze', icon: 'fa-solid fa-magnifying-glass-chart', labelKey: 'aiContent.tabs.analyze' },
   ];
-
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-6">
@@ -91,6 +95,21 @@ export default function AiContentGeneration() {
   );
 }
 
+
+type LightweightProject = { id: number; name: string };
+
+function useProjectOptions() {
+  const [projects, setProjects] = useState<LightweightProject[]>([]);
+
+  useEffect(() => {
+    api.get<LightweightProject[]>('/projects')
+      .then((res) => setProjects(res.data))
+      .catch(() => setProjects([]));
+  }, []);
+
+  return projects;
+}
+
 /* ───────────────────── SEO Article Generator Tab ───────────────────── */
 
 function ArticleGenerator() {
@@ -107,6 +126,13 @@ function ArticleGenerator() {
   const [editableDocument, setEditableDocument] = useState<CanvasDocument | null>(null);
   const [rewriting, setRewriting] = useState(false);
   const [rewriteInstruction, setRewriteInstruction] = useState('');
+  const projects = useProjectOptions();
+  const [projectId, setProjectId] = useState<number | ''>('');
+  const [drafts, setDrafts] = useState<AiContentDraft[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<number | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+
+  const activeDraft = useMemo(() => drafts.find((item) => item.id === activeDraftId) ?? null, [drafts, activeDraftId]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +177,80 @@ function ArticleGenerator() {
     });
   };
 
+
+  const refreshDrafts = async (targetProjectId?: number) => {
+    const pid = targetProjectId ?? (typeof projectId === 'number' ? projectId : null);
+    if (!pid) return;
+    const data = await listAiContentDrafts(pid, { content_type: 'article' });
+    setDrafts(data);
+  };
+
+  const handleSaveDraft = async (saveAsNewVersion = false) => {
+    const pid = typeof projectId === 'number' ? projectId : null;
+    if (!pid || !editableDocument) return;
+    await runWithUiState(async () => {
+      if (activeDraft) {
+        const updated = await updateAiContentDraft(activeDraft.id, {
+          title: result?.title || topic || activeDraft.title,
+          canvas_document_json: editableDocument as unknown as Record<string, unknown>,
+          export_text: exportCanvas(editableDocument, 'text'),
+          expected_version: activeDraft.version,
+          save_as_new_version: saveAsNewVersion,
+        });
+        setActiveDraftId(updated.id);
+      } else {
+        const created = await createAiContentDraft(pid, {
+          content_type: 'article',
+          title: result?.title || topic || 'Untitled Article Draft',
+          canvas_document_json: editableDocument as unknown as Record<string, unknown>,
+          export_text: exportCanvas(editableDocument, 'text'),
+        });
+        setActiveDraftId(created.id);
+      }
+      await refreshDrafts(pid);
+    }, {
+      setLoading: setSavingDraft,
+      setError,
+      formatError: (err: unknown) => getErrorMessage(err, '保存草稿失败，可能存在版本冲突。'),
+    });
+  };
+
+  const handleLoadDraft = (draft: AiContentDraft) => {
+    setActiveDraftId(draft.id);
+    setEditableDocument(draft.canvas_document_json as unknown as CanvasDocument);
+    setResult((prev) => (prev ? { ...prev, title: draft.title } : {
+      title: draft.title,
+      content: draft.export_text,
+      meta_description: '',
+      keywords_used: [],
+      blocks: [],
+    }));
+  };
+
+  const handleRollback = async (targetVersion: number) => {
+    if (!activeDraft) return;
+    await runWithUiState(async () => {
+      const rolled = await updateAiContentDraft(activeDraft.id, {
+        expected_version: activeDraft.version,
+        rollback_to_version: targetVersion,
+      });
+      setActiveDraftId(rolled.id);
+      await refreshDrafts(rolled.project_id);
+      handleLoadDraft(rolled);
+    }, {
+      setLoading: setSavingDraft,
+      setError,
+      formatError: (err: unknown) => getErrorMessage(err, '版本回滚失败。'),
+    });
+  };
+
   const handleExport = (content: string) => navigator.clipboard.writeText(content);
+
+  useEffect(() => {
+    if (typeof projectId === 'number') {
+      void refreshDrafts(projectId);
+    }
+  }, [projectId]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -163,6 +262,20 @@ function ArticleGenerator() {
             {t('aiContent.article.settings')}
           </h2>
           <form onSubmit={handleGenerate} className="space-y-4">
+            <div>
+              <label className="block md-label-large mb-1">项目（用于草稿保存）</label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : '')}
+                className="app-select w-full"
+                style={{ borderColor: 'var(--md-sys-color-outline)' }}
+              >
+                <option value="">请选择项目</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block md-label-large mb-1">{t('aiContent.article.topic')}</label>
               <input
@@ -317,6 +430,38 @@ function ArticleGenerator() {
               </button>
             </div>
 
+            <div className="shape-medium border p-4 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)] space-y-3" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={() => void handleSaveDraft(false)} disabled={savingDraft || !editableDocument || !projectId} className="app-btn app-btn-outline">
+                  保存草稿
+                </button>
+                <button onClick={() => void handleSaveDraft(true)} disabled={savingDraft || !activeDraft || !editableDocument} className="app-btn app-btn-outline">
+                  另存版本
+                </button>
+                {activeDraft && (
+                  <button onClick={() => void handleRollback(Math.max(1, activeDraft.version - 1))} disabled={savingDraft || activeDraft.version <= 1} className="app-btn app-btn-outline">
+                    回滚到上一版本
+                  </button>
+                )}
+              </div>
+              <div>
+                <label className="block md-label-large mb-1">加载草稿</label>
+                <select
+                  value={activeDraftId ?? ''}
+                  onChange={(e) => {
+                    const selected = drafts.find((item) => item.id === Number(e.target.value));
+                    if (selected) handleLoadDraft(selected);
+                  }}
+                  className="app-select w-full"
+                >
+                  <option value="">选择草稿版本</option>
+                  {drafts.map((draft) => (
+                    <option key={draft.id} value={draft.id}>{`${draft.title} (v${draft.version})`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {editableDocument && (
               <CanvasContentEditor
                 document={editableDocument}
@@ -361,6 +506,10 @@ function SocialGenerator() {
   const [error, setError] = useState('');
   const [posts, setPosts] = useState<AiSocialPost[]>([]);
   const [postDocuments, setPostDocuments] = useState<CanvasDocument[]>([]);
+  const projects = useProjectOptions();
+  const [projectId, setProjectId] = useState<number | ''>('');
+  const [drafts, setDrafts] = useState<AiContentDraft[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<number | null>(null);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -401,6 +550,36 @@ function SocialGenerator() {
     setPostDocuments((prev) => prev.map((item, i) => (i === index ? doc : item)));
   };
 
+  const refreshDrafts = async (pid: number) => {
+    const data = await listAiContentDrafts(pid, { content_type: 'social' });
+    setDrafts(data);
+  };
+
+  const saveSocialDraft = async (saveAsNewVersion = false) => {
+    if (typeof projectId !== 'number' || !postDocuments[0]) return;
+    const payload = {
+      title: topic || 'Untitled Social Draft',
+      canvas_document_json: postDocuments[0] as unknown as Record<string, unknown>,
+      export_text: exportCanvas(postDocuments[0], 'text'),
+    };
+    if (activeDraftId) {
+      const current = drafts.find((item) => item.id === activeDraftId);
+      if (!current) return;
+      const updated = await updateAiContentDraft(activeDraftId, { ...payload, expected_version: current.version, save_as_new_version: saveAsNewVersion });
+      setActiveDraftId(updated.id);
+    } else {
+      const created = await createAiContentDraft(projectId, { ...payload, content_type: 'social' });
+      setActiveDraftId(created.id);
+    }
+    await refreshDrafts(projectId);
+  };
+
+  useEffect(() => {
+    if (typeof projectId === 'number') {
+      void refreshDrafts(projectId);
+    }
+  }, [projectId]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Settings panel */}
@@ -411,6 +590,15 @@ function SocialGenerator() {
             {t('aiContent.social.settings')}
           </h2>
           <form onSubmit={handleGenerate} className="space-y-4">
+            <div>
+              <label className="block md-label-large mb-1">项目（用于草稿保存）</label>
+              <select value={projectId} onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : '')} className="app-select w-full">
+                <option value="">请选择项目</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block md-label-large mb-1">{t('aiContent.social.topic')}</label>
               <input
@@ -517,6 +705,32 @@ function SocialGenerator() {
           <div className="shape-medium p-4 flex items-center gap-2 md-body-medium" style={{ background: 'color-mix(in srgb, var(--md-sys-color-error) 14%, transparent)', color: 'var(--md-sys-color-error)', border: '1px solid color-mix(in srgb, var(--md-sys-color-error) 35%, white)' }}>
             <i className="fa-solid fa-circle-exclamation" />
             {error}
+          </div>
+        )}
+
+
+        {postDocuments[0] && (
+          <div className="shape-medium border p-4 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)] space-y-2" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+            <div className="flex gap-2 flex-wrap">
+              <button className="app-btn app-btn-outline" onClick={() => void saveSocialDraft(false)} disabled={!projectId}>保存草稿</button>
+              <button className="app-btn app-btn-outline" onClick={() => void saveSocialDraft(true)} disabled={!activeDraftId}>另存版本</button>
+            </div>
+            <select
+              value={activeDraftId ?? ''}
+              onChange={(e) => {
+                const selected = drafts.find((item) => item.id === Number(e.target.value));
+                if (selected) {
+                  setActiveDraftId(selected.id);
+                  setPostDocuments([selected.canvas_document_json as unknown as CanvasDocument]);
+                }
+              }}
+              className="app-select w-full"
+            >
+              <option value="">加载草稿版本</option>
+              {drafts.map((draft) => (
+                <option key={draft.id} value={draft.id}>{`${draft.title} (v${draft.version})`}</option>
+              ))}
+            </select>
           </div>
         )}
 

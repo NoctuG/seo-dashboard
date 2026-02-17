@@ -31,6 +31,11 @@ class ProjectRoleType(str, Enum):
     VIEWER = "viewer"
 
 
+class AiDraftContentType(str, Enum):
+    ARTICLE = "article"
+    SOCIAL = "social"
+
+
 class AuditActionType(str, Enum):
     LOGIN = "login"
     PROJECT_CREATE = "project_create"
@@ -72,6 +77,7 @@ class Project(SQLModel, table=True):
     )
     organization: Optional["Organization"] = Relationship(back_populates="projects")
     members: List["ProjectMember"] = Relationship(back_populates="project")
+    ai_content_drafts: List["AiContentDraft"] = Relationship(back_populates="project")
 
 
 class Organization(SQLModel, table=True):
@@ -143,6 +149,27 @@ class ProjectMember(SQLModel, table=True):
     project: Project = Relationship(back_populates="members")
     user: User = Relationship(back_populates="project_memberships")
     role: Role = Relationship(back_populates="project_memberships")
+
+
+class AiContentDraft(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_ai_content_draft_project_lineage_version", "project_id", "lineage_id", "version", unique=True),
+        Index("ix_ai_content_draft_project_updated", "project_id", "updated_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    lineage_id: str = Field(index=True)
+    content_type: AiDraftContentType = Field(index=True)
+    title: str
+    canvas_document_json: str
+    export_text: str
+    version: int = 1
+    updated_by: int = Field(foreign_key="user.id", index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    project: Project = Relationship(back_populates="ai_content_drafts")
 
 
 class AuditLog(SQLModel, table=True):
