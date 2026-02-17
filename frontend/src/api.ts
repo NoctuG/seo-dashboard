@@ -452,6 +452,8 @@ export interface DashboardStats {
   last_crawl?: Crawl | null;
   total_pages: number;
   issues_count: number;
+  site_health_score: number;
+  site_health_band: "red" | "yellow" | "green";
   issues_breakdown: {
     critical: number;
     warning: number;
