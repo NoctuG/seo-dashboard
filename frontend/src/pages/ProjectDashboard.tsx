@@ -7,6 +7,8 @@ import {
   getProjectBacklinks,
   getProjectBacklinkChanges,
   getProjectBacklinkStatus,
+  getProjectCompetitorList,
+  getProjectCompetitorTrafficOverview,
   getProjectContentPerformance,
   getProjectRoi,
 } from "../api";
@@ -18,6 +20,8 @@ import type {
   BacklinkResponse,
   BacklinkChangesResponse,
   BacklinkStatusResponse,
+  CompetitorDomainItem,
+  CompetitorTrafficOverviewResponse,
   RoiBreakdownResponse,
 } from "../api";
 import {
@@ -74,10 +78,83 @@ export default function ProjectDashboard() {
   const [roi, setRoi] = useState<RoiBreakdownResponse | null>(null);
   const [backlinkQuery, setBacklinkQuery] = useState('');
   const [backlinkSort, setBacklinkSort] = useState<'status' | 'source' | 'date'>('date');
+  const [competitors, setCompetitors] = useState<CompetitorDomainItem[]>([]);
+  const [selectedCompetitorId, setSelectedCompetitorId] = useState<number | null>(null);
+  const [competitorOverview, setCompetitorOverview] = useState<CompetitorTrafficOverviewResponse | null>(null);
+  const [competitorsLoading, setCompetitorsLoading] = useState(false);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [competitorError, setCompetitorError] = useState<string | null>(null);
   const { isAdmin } = useProjectRole(id);
   const { t } = useTranslation();
 
-  const fetchDashboard = useCallback(async () => {
+  useEffect(() => {
+    if (id) {
+      fetchDashboard();
+      fetchContentPerformance();
+      fetchBacklinkData();
+      fetchRoiData();
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) fetchContentPerformance();
+  }, [id, window, sort]);
+
+  useEffect(() => {
+    if (id) fetchRoiData();
+  }, [id, roiRange, attributionModel]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchBacklinkStatus();
+    const timer = globalThis.setInterval(fetchBacklinkStatus, 10000);
+    return () => globalThis.clearInterval(timer);
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    const fetchCompetitors = async () => {
+      setCompetitorsLoading(true);
+      setCompetitorError(null);
+      try {
+        const listData = await getProjectCompetitorList(id);
+        setCompetitors(listData.items);
+        setSelectedCompetitorId((prev) => prev ?? listData.items[0]?.id ?? null);
+      } catch (error) {
+        console.error(error);
+        setCompetitorError("Failed to load competitors.");
+        setCompetitors([]);
+        setSelectedCompetitorId(null);
+      } finally {
+        setCompetitorsLoading(false);
+      }
+    };
+    fetchCompetitors();
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || !selectedCompetitorId) {
+      setCompetitorOverview(null);
+      return;
+    }
+    const fetchOverview = async () => {
+      setOverviewLoading(true);
+      setCompetitorError(null);
+      try {
+        const overview = await getProjectCompetitorTrafficOverview(id, selectedCompetitorId);
+        setCompetitorOverview(overview);
+      } catch (error) {
+        console.error(error);
+        setCompetitorError("Failed to load competitor overview.");
+        setCompetitorOverview(null);
+      } finally {
+        setOverviewLoading(false);
+      }
+    };
+    fetchOverview();
+  }, [id, selectedCompetitorId]);
+
+  const fetchDashboard = async () => {
     try {
       const res = await api.get<DashboardStats>(`/projects/${id}/dashboard`);
       setStats(res.data);
@@ -256,6 +333,18 @@ export default function ProjectDashboard() {
     },
     { label: "Key Events", value: analytics.quality_metrics.key_events },
   ];
+
+  const competitorCurrentMonthTraffic = competitorOverview?.monthly_trend.at(-1)?.competitor ?? null;
+  const competitorPrevMonthTraffic = competitorOverview && competitorOverview.monthly_trend.length > 1
+    ? competitorOverview.monthly_trend.at(-2)?.competitor ?? null
+    : null;
+  const competitorMoM =
+    competitorCurrentMonthTraffic !== null &&
+    competitorPrevMonthTraffic !== null &&
+    competitorPrevMonthTraffic > 0
+      ? ((competitorCurrentMonthTraffic - competitorPrevMonthTraffic) / competitorPrevMonthTraffic) * 100
+      : null;
+  const topKeyword = competitorOverview?.top_keywords[0] ?? null;
 
   const renderContentList = (
     title: string,
@@ -781,6 +870,67 @@ export default function ProjectDashboard() {
             <p className="text-3xl font-bold">{card.value ?? "—"}</p>
           </div>
         ))}
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h3 className="font-semibold">Competitor Overview</h3>
+          <select
+            value={selectedCompetitorId ?? ""}
+            onChange={(e) => setSelectedCompetitorId(Number(e.target.value) || null)}
+            className="border rounded px-3 py-1 text-sm min-w-48"
+            disabled={competitorsLoading || competitors.length === 0}
+          >
+            {competitors.length === 0 ? (
+              <option value="">No competitors</option>
+            ) : (
+              competitors.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.domain}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+
+        {(competitorsLoading || overviewLoading) && (
+          <p className="text-sm text-slate-500">Loading competitor overview...</p>
+        )}
+
+        {!competitorsLoading && !overviewLoading && competitorError && (
+          <p className="text-sm text-red-600">{competitorError}</p>
+        )}
+
+        {!competitorsLoading && !overviewLoading && !competitorError && competitors.length === 0 && (
+          <p className="text-sm text-slate-500">Add competitors to view traffic benchmarks.</p>
+        )}
+
+        {!competitorsLoading && !overviewLoading && !competitorError && competitorOverview && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded bg-slate-50 dark:bg-slate-800 p-4">
+                <p className="text-xs text-slate-500">本月流量</p>
+                <p className="text-2xl font-bold">{Math.round(competitorCurrentMonthTraffic ?? 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded bg-slate-50 dark:bg-slate-800 p-4">
+                <p className="text-xs text-slate-500">环比</p>
+                <p className={`text-2xl font-bold ${((competitorMoM ?? 0) >= 0) ? "text-green-600" : "text-red-600"}`}>
+                  {competitorMoM === null ? "—" : `${competitorMoM.toFixed(1)}%`}
+                </p>
+              </div>
+              <div className="rounded bg-slate-50 dark:bg-slate-800 p-4">
+                <p className="text-xs text-slate-500">Top 关键词</p>
+                <p className="text-lg font-semibold break-all">{topKeyword?.keyword ?? "—"}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {topKeyword ? `Rank ${topKeyword.rank ?? "—"} · SV ${topKeyword.search_volume}` : "暂无关键词数据"}
+                </p>
+              </div>
+            </div>
+            {competitorOverview.data_source === "local_estimation" && (
+              <p className="mt-3 inline-flex rounded-full bg-amber-100 text-amber-800 text-xs px-2 py-1">估算数据</p>
+            )}
+          </>
+        )}
       </div>
 
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8">
