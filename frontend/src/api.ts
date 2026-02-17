@@ -718,6 +718,61 @@ export async function rewriteContent(
   return res.data;
 }
 
+
+export type AiDraftContentType = "article" | "social";
+
+export interface AiContentDraft {
+  id: number;
+  project_id: number;
+  lineage_id: string;
+  content_type: AiDraftContentType;
+  title: string;
+  canvas_document_json: Record<string, unknown>;
+  export_text: string;
+  version: number;
+  updated_by: number;
+  updated_at: string;
+}
+
+export interface CreateAiContentDraftPayload {
+  content_type: AiDraftContentType;
+  title: string;
+  canvas_document_json: Record<string, unknown>;
+  export_text: string;
+}
+
+export interface UpdateAiContentDraftPayload {
+  title?: string;
+  canvas_document_json?: Record<string, unknown>;
+  export_text?: string;
+  expected_version: number;
+  save_as_new_version?: boolean;
+  rollback_to_version?: number;
+}
+
+export async function createAiContentDraft(
+  projectId: string | number,
+  payload: CreateAiContentDraftPayload,
+): Promise<AiContentDraft> {
+  const res = await api.post<AiContentDraft>(`/projects/${projectId}/ai-drafts`, payload);
+  return res.data;
+}
+
+export async function listAiContentDrafts(
+  projectId: string | number,
+  params?: { content_type?: AiDraftContentType; lineage_id?: string },
+): Promise<AiContentDraft[]> {
+  const res = await api.get<{ drafts: AiContentDraft[] }>(`/projects/${projectId}/ai-drafts`, { params });
+  return res.data.drafts;
+}
+
+export async function updateAiContentDraft(
+  draftId: number,
+  payload: UpdateAiContentDraftPayload,
+): Promise<AiContentDraft> {
+  const res = await api.put<AiContentDraft>(`/ai-drafts/${draftId}`, payload);
+  return res.data;
+}
 export interface AuthorityResponse {
   project_id: number;
   provider: string;
