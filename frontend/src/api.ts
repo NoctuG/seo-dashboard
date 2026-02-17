@@ -917,6 +917,20 @@ export interface AuthorityResponse {
   notes: string[];
 }
 
+export interface BacklinkTrendPoint {
+  date: string;
+  backlinks_total: number;
+  ref_domains: number;
+}
+
+export interface BacklinkTrendSummary {
+  latest_backlinks_total?: number;
+  latest_ref_domains?: number;
+  net_growth?: number;
+  mom_growth_pct?: number | null;
+  yoy_growth_pct?: number | null;
+}
+
 export interface BacklinkResponse {
   project_id: number;
   provider: string;
@@ -927,11 +941,11 @@ export interface BacklinkResponse {
   last_fetched_at?: string | null;
   fetch_status?: string;
   anchor_distribution: Record<string, number>;
-  history: Array<{
-    date: string;
-    backlinks_total: number;
-    ref_domains: number;
-  }>;
+  history: BacklinkTrendPoint[];
+  trend_series?: BacklinkTrendPoint[];
+  trend_window_days?: number;
+  trend_interval?: 'day' | 'week';
+  trend_summary?: BacklinkTrendSummary;
   notes: string[];
 }
 
@@ -999,9 +1013,14 @@ export async function getProjectAuthority(
 
 export async function getProjectBacklinks(
   projectId: string | number,
+  params?: {
+    window_days?: 7 | 30 | 90;
+    interval?: 'day' | 'week';
+  },
 ): Promise<BacklinkResponse> {
   const res = await api.get<BacklinkResponse>(
     `/projects/${projectId}/backlinks`,
+    { params },
   );
   return res.data;
 }
