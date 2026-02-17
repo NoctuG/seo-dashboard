@@ -6,6 +6,7 @@ import {
     deleteProjectCompetitor,
     getProjectCompetitors,
     getProjectVisibility,
+    getProjectRankingsDistribution,
     runProjectKeywordCompare,
     updateProjectSettings,
     getKeywordRankSchedule,
@@ -22,6 +23,7 @@ import type {
     PaginatedResponse,
     KeywordRankSchedule,
     KeywordScheduleFrequency,
+    RankingDistributionResponse,
 } from '../api';
 import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield } from 'lucide-react';
 import { useProjectRole } from '../useProjectRole';
@@ -33,8 +35,11 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
+    AreaChart,
+    Area,
     BarChart,
     Bar,
+    Legend,
 } from 'recharts';
 import PaginationControls from '../components/PaginationControls';
 import { runWithUiState } from '../utils/asyncAction';
@@ -59,6 +64,10 @@ export default function ProjectKeywords() {
     const [history, setHistory] = useState<RankHistoryItem[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [historyWindow, setHistoryWindow] = useState<7 | 30 | 90>(30);
+    const [distributionWindow, setDistributionWindow] = useState<7 | 30 | 90>(30);
+    const [distributionBucket, setDistributionBucket] = useState<'day' | 'week'>('day');
+    const [distribution, setDistribution] = useState<RankingDistributionResponse | null>(null);
+    const [distributionLoading, setDistributionLoading] = useState(false);
 
     const [competitors, setCompetitors] = useState<CompetitorDomainItem[]>([]);
     const [competitorTotal, setCompetitorTotal] = useState(0);
@@ -98,6 +107,12 @@ export default function ProjectKeywords() {
             fetchCompetitors(competitorPage);
         }
     }, [id, competitorPage]);
+
+    useEffect(() => {
+        if (id) {
+            fetchDistribution(distributionWindow, distributionBucket);
+        }
+    }, [id, distributionWindow, distributionBucket]);
 
     const fetchKeywords = async (page: number = keywordPage) => {
         await runWithUiState(async () => {
@@ -153,6 +168,19 @@ export default function ProjectKeywords() {
             onError: (err: unknown) => console.error(err),
         });
     };
+
+    async function fetchDistribution(windowDays: 7 | 30 | 90, bucket: 'day' | 'week') {
+        if (!id) return;
+        await runWithUiState(async () => {
+            const data = await getProjectRankingsDistribution(id, windowDays, bucket);
+            setDistribution(data);
+        }, {
+            setLoading: setDistributionLoading,
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '加载排名分布失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
+    }
 
     const fetchSchedule = async () => {
         if (!id) return;
@@ -352,6 +380,17 @@ export default function ProjectKeywords() {
         rank: h.rank ?? null,
     }));
 
+    const distributionChartData = useMemo(() => (distribution?.series ?? []).map((point) => ({
+        label: distributionBucket === 'week'
+            ? `W${new Date(point.bucket_start).toLocaleDateString()}`
+            : new Date(point.bucket_start).toLocaleDateString(),
+        top3_count: point.top3_count,
+        top10_count: point.top10_count,
+        top100_count: point.top100_count,
+    })), [distribution, distributionBucket]);
+
+    const formatDelta = (value: number) => `${value > 0 ? '+' : ''}${value}`;
+
     const serpCoverageData = useMemo(
         () =>
             Object.entries(visibility?.serp_feature_coverage ?? {}).map(([name, ratio]) => ({
@@ -406,6 +445,66 @@ export default function ProjectKeywords() {
             {error && (
                 <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
             )}
+
+            <div className="bg-white p-4 rounded shadow space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-lg font-semibold">排名分布概览</h2>
+                    <div className="flex items-center gap-2">
+                        {([7, 30, 90] as const).map((d) => (
+                            <button key={d} onClick={() => setDistributionWindow(d)} className={`px-3 py-1 rounded text-sm ${distributionWindow === d ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>{d}天</button>
+                        ))}
+                        {(['day', 'week'] as const).map((bucket) => (
+                            <button key={bucket} onClick={() => setDistributionBucket(bucket)} className={`px-3 py-1 rounded text-sm ${distributionBucket === bucket ? 'bg-indigo-600 text-white' : 'bg-gray-100'}`}>{bucket === 'day' ? '按日' : '按周'}</button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[
+                        { key: 'top3', title: 'Top 3', count: distribution?.summary.top3_count ?? 0, change: distribution?.summary.top3_change ?? 0 },
+                        { key: 'top10', title: 'Top 10', count: distribution?.summary.top10_count ?? 0, change: distribution?.summary.top10_change ?? 0 },
+                        { key: 'top100', title: 'Top 100', count: distribution?.summary.top100_count ?? 0, change: distribution?.summary.top100_change ?? 0 },
+                    ].map((item) => (
+                        <div key={item.key} className="border rounded p-4">
+                            <div className="text-sm text-gray-500">{item.title} 关键词</div>
+                            <div className="text-2xl font-semibold">{item.count}</div>
+                            <div className={`text-sm ${item.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>较上周 {formatDelta(item.change)}</div>
+                        </div>
+                    ))}
+                </div>
+
+                {distributionLoading ? (
+                    <div className="text-sm text-gray-500">加载分布中...</div>
+                ) : distributionChartData.length === 0 ? (
+                    <div className="text-sm text-gray-500">暂无分布数据，请先执行排名检查。</div>
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <ResponsiveContainer width="100%" height={240}>
+                            <AreaChart data={distributionChartData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Area type="monotone" dataKey="top10_count" stroke="#2563eb" fill="#93c5fd" name="Top10" />
+                                <Area type="monotone" dataKey="top3_count" stroke="#16a34a" fill="#86efac" name="Top3" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                        <ResponsiveContainer width="100%" height={240}>
+                            <BarChart data={distributionChartData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="top3_count" stackId="a" fill="#16a34a" name="Top3" />
+                                <Bar dataKey="top10_count" stackId="a" fill="#2563eb" name="Top10" />
+                                <Bar dataKey="top100_count" stackId="a" fill="#0ea5e9" name="Top100" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                )}
+            </div>
 
             <div className="bg-white p-4 rounded shadow">
                 <h2 className="text-lg font-semibold mb-3">自动检查设置</h2>

@@ -587,6 +587,30 @@ export interface RankHistoryItem {
   checked_at: string;
 }
 
+export interface RankingDistributionPoint {
+  bucket_start: string;
+  top3_count: number;
+  top10_count: number;
+  top100_count: number;
+}
+
+export interface RankingDistributionSummary {
+  top3_count: number;
+  top10_count: number;
+  top100_count: number;
+  top3_change: number;
+  top10_change: number;
+  top100_change: number;
+}
+
+export interface RankingDistributionResponse {
+  project_id: number;
+  bucket: "day" | "week";
+  window_days: 7 | 30 | 90;
+  summary: RankingDistributionSummary;
+  series: RankingDistributionPoint[];
+}
+
 export interface CompetitorDomainItem {
   id: number;
   project_id: number;
@@ -990,6 +1014,20 @@ export async function runProjectKeywordCompare(
 ): Promise<VisibilityHistoryItem[]> {
   const res = await api.post<VisibilityHistoryItem[]>(
     `/projects/${projectId}/keywords/check-all-compare`,
+  );
+  return res.data;
+}
+
+export async function getProjectRankingsDistribution(
+  projectId: string | number,
+  windowDays: 7 | 30 | 90 = 30,
+  bucket: "day" | "week" = "day",
+): Promise<RankingDistributionResponse> {
+  const res = await api.get<RankingDistributionResponse>(
+    `/projects/${projectId}/rankings/distribution`,
+    {
+      params: { window_days: windowDays, bucket },
+    },
   );
   return res.data;
 }
