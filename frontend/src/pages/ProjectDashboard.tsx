@@ -72,6 +72,8 @@ export default function ProjectDashboard() {
     "linear" | "first_click" | "last_click"
   >("linear");
   const [roi, setRoi] = useState<RoiBreakdownResponse | null>(null);
+  const [backlinkQuery, setBacklinkQuery] = useState('');
+  const [backlinkSort, setBacklinkSort] = useState<'status' | 'source' | 'date'>('date');
   const { isAdmin } = useProjectRole(id);
   const { t } = useTranslation();
 
@@ -219,6 +221,27 @@ export default function ProjectDashboard() {
     );
   }, [brandSeries]);
 
+
+  const categoryScores = stats.category_scores ?? [];
+
+  const backlinkRows = useMemo(() => {
+    const rows = [
+      ...(changes?.new_links ?? []).map((l) => ({ ...l, status: '新增' })),
+      ...(changes?.lost_links ?? []).map((l) => ({ ...l, status: '失效' })),
+    ];
+    const filtered = rows.filter((row) => {
+      if (!backlinkQuery.trim()) return true;
+      const q = backlinkQuery.toLowerCase();
+      return `${row.status} ${row.source ?? ''} ${row.url} ${row.anchor ?? ''} ${row.date ?? ''}`.toLowerCase().includes(q);
+    });
+
+    return filtered.sort((a, b) => {
+      if (backlinkSort === 'source') return (a.source ?? '').localeCompare(b.source ?? '');
+      if (backlinkSort === 'status') return a.status.localeCompare(b.status);
+      return (b.date ?? '').localeCompare(a.date ?? '');
+    });
+  }, [backlinkQuery, backlinkSort, changes?.lost_links, changes?.new_links]);
+
   const qualityCards = [
     {
       label: "Engaged Sessions",
@@ -355,6 +378,18 @@ export default function ProjectDashboard() {
           </svg>
         </div>
       </Link>
+
+      {categoryScores.length > 0 && (
+        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
+          {categoryScores.map((item) => (
+            <div key={item.key ?? item.name} className="rounded border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <p className="text-xs uppercase text-slate-500">{item.name}</p>
+              <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{item.score}</p>
+              <p className="text-xs text-slate-500">Issues: {item.issue_count}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {(authority?.notes?.length ||
         backlinks?.notes?.length ||
@@ -574,7 +609,17 @@ export default function ProjectDashboard() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8 overflow-x-auto">
-        <h3 className="font-semibold mb-3">最近新增 / 失效外链</h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold">最近新增 / 失效外链</h3>
+          <div className="flex gap-2">
+            <input value={backlinkQuery} onChange={(e) => setBacklinkQuery(e.target.value)} placeholder="筛选 source / url / anchor" className="rounded border px-3 py-1 text-sm" />
+            <select value={backlinkSort} onChange={(e) => setBacklinkSort(e.target.value as 'status' | 'source' | 'date')} className="rounded border px-3 py-1 text-sm">
+              <option value="date">按日期</option>
+              <option value="status">按状态</option>
+              <option value="source">按来源</option>
+            </select>
+          </div>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left border-b">
@@ -586,16 +631,7 @@ export default function ProjectDashboard() {
             </tr>
           </thead>
           <tbody>
-            {[
-              ...(changes?.new_links ?? []).map((l) => ({
-                ...l,
-                status: "新增",
-              })),
-              ...(changes?.lost_links ?? []).map((l) => ({
-                ...l,
-                status: "失效",
-              })),
-            ].map((item, idx) => (
+            {backlinkRows.map((item, idx) => (
               <tr
                 key={`${item.status}-${item.url}-${idx}`}
                 className="border-b"

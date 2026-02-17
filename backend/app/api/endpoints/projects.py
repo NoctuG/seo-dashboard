@@ -240,19 +240,16 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
         "structured_data_errors": [],
     }
 
-    def _calculate_site_health(critical_count: int, warning_count: int, info_count: int) -> tuple[int, str]:
-        raw_score = 100 - (critical_count * 10 + warning_count * 3 + info_count)
-        score = max(0, min(100, raw_score))
+    def _score_to_band(score: int) -> str:
         if score >= 80:
-            band = "green"
-        elif score >= 50:
-            band = "yellow"
-        else:
-            band = "red"
-        return score, band
+            return "green"
+        if score >= 50:
+            return "yellow"
+        return "red"
 
     if not last_crawl:
-        site_health_score, site_health_band = _calculate_site_health(0, 0, 0)
+        site_health_score = 100
+        site_health_band = _score_to_band(site_health_score)
         return {
             "last_crawl": None,
             "total_pages": 0,
@@ -266,7 +263,11 @@ def get_dashboard(project_id: int, session: Session = Depends(get_session), _: U
         }
 
     issues = session.exec(select(Issue).where(Issue.crawl_id == last_crawl.id)).all()
-    site_health_score, site_health_band = _calculate_site_health(critical, warning, info)
+    critical = sum(1 for issue in issues if str(issue.severity) == "critical" or getattr(issue.severity, "value", None) == "critical")
+    warning = sum(1 for issue in issues if str(issue.severity) == "warning" or getattr(issue.severity, "value", None) == "warning")
+    info = sum(1 for issue in issues if str(issue.severity) == "info" or getattr(issue.severity, "value", None) == "info")
+    site_health_score = calculate_site_health_score(issues)
+    site_health_band = _score_to_band(site_health_score)
 
     issue_counter = Counter(i.issue_type for i in issues)
     category_scores = build_category_scores(issues)
@@ -363,6 +364,9 @@ def get_site_audit_overview(project_id: int, session: Session = Depends(get_sess
         }
 
     issues = session.exec(select(Issue).where(Issue.crawl_id == last_crawl.id)).all()
+    critical = sum(1 for issue in issues if str(issue.severity) == "critical" or getattr(issue.severity, "value", None) == "critical")
+    warning = sum(1 for issue in issues if str(issue.severity) == "warning" or getattr(issue.severity, "value", None) == "warning")
+    info = sum(1 for issue in issues if str(issue.severity) == "info" or getattr(issue.severity, "value", None) == "info")
     site_health_score = calculate_site_health_score(issues)
 
     category_scores = build_category_scores(issues)

@@ -24,6 +24,8 @@ export default function ProjectIssues() {
     const [categoryFilter, setCategoryFilter] = useState<'all' | Issue['category']>('all');
     const [severityFilter, setSeverityFilter] = useState<'all' | Issue['severity']>('all');
     const [statusFilter, setStatusFilter] = useState<'all' | Issue['status']>('all');
+    const [query, setQuery] = useState('');
+    const [sortBy, setSortBy] = useState<'type' | 'severity' | 'status'>('severity');
 
     const selectedCrawlId = searchParams.get('crawlId');
 
@@ -60,13 +62,21 @@ export default function ProjectIssues() {
     };
 
     const filteredIssues = useMemo(() => {
-        return issues.filter(issue => {
+        const filtered = issues.filter(issue => {
             const byCategory = categoryFilter === 'all' || issue.category === categoryFilter;
             const bySeverity = severityFilter === 'all' || issue.severity === severityFilter;
             const byStatus = statusFilter === 'all' || issue.status === statusFilter;
-            return byCategory && bySeverity && byStatus;
+            const byQuery = !query.trim() || `${issue.issue_type} ${issue.description} ${issue.fix_template ?? ''}`.toLowerCase().includes(query.toLowerCase());
+            return byCategory && bySeverity && byStatus && byQuery;
         });
-    }, [issues, categoryFilter, severityFilter, statusFilter]);
+
+        return filtered.sort((a, b) => {
+            if (sortBy === 'type') return a.issue_type.localeCompare(b.issue_type);
+            if (sortBy === 'status') return a.status.localeCompare(b.status);
+            const weight = { critical: 3, warning: 2, info: 1 } as const;
+            return weight[b.severity] - weight[a.severity];
+        });
+    }, [issues, categoryFilter, severityFilter, statusFilter, query, sortBy]);
 
     const toggleIssueSelection = (issueId: number) => {
         setSelectedIssueIds(prev => prev.includes(issueId) ? prev.filter(selectedId => selectedId !== issueId) : [...prev, issueId]);
@@ -99,7 +109,7 @@ export default function ProjectIssues() {
         <div>
             <h1 className="text-2xl font-bold mb-6">Issues</h1>
 
-            <div className="bg-white rounded shadow p-4 mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="bg-white rounded shadow p-4 mb-4 grid grid-cols-1 md:grid-cols-5 gap-3">
                 <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value as typeof categoryFilter)} className="border rounded px-3 py-2 text-sm">
                     <option value="all">All categories</option>
                     <option value="technical_seo">Technical SEO</option>
@@ -118,10 +128,16 @@ export default function ProjectIssues() {
                     <option value="ignored">Ignored</option>
                     <option value="resolved">Resolved</option>
                 </select>
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search type or description" className="border rounded px-3 py-2 text-sm" />
                 <div className="flex gap-2">
                     <button onClick={selectAllFiltered} className="px-3 py-2 text-xs rounded bg-gray-100">Select filtered</button>
                     <button onClick={clearSelection} className="px-3 py-2 text-xs rounded bg-gray-100">Clear</button>
                 </div>
+                <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} className="border rounded px-3 py-2 text-sm">
+                    <option value="severity">Sort by severity</option>
+                    <option value="type">Sort by type</option>
+                    <option value="status">Sort by status</option>
+                </select>
             </div>
 
             <div className="bg-white rounded shadow p-4 mb-4 flex flex-wrap items-center gap-2">
@@ -136,12 +152,12 @@ export default function ProjectIssues() {
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="px-4 py-3" />
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => setSortBy('type')}>Type</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => setSortBy('severity')}>Severity</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fix template</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => setSortBy('status')}>Status</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">

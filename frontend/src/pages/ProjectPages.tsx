@@ -35,6 +35,8 @@ export default function ProjectPages() {
     const [logs, setLogs] = useState<string[]>([]);
     const [progress, setProgress] = useState({ pagesProcessed: 0, maxPages: 0, currentUrl: '', errorCount: 0 });
     const [connectionMode, setConnectionMode] = useState<'idle' | 'connecting' | 'live' | 'polling'>('idle');
+    const [query, setQuery] = useState('');
+    const [sortBy, setSortBy] = useState<'url' | 'status' | 'load'>('load');
 
     const fetchPages = useCallback(async () => {
         if (!id) return;
@@ -196,6 +198,20 @@ export default function ProjectPages() {
         return Math.min(100, Math.round((progress.pagesProcessed / progress.maxPages) * 100));
     }, [progress.maxPages, progress.pagesProcessed]);
 
+
+    const displayPages = useMemo(() => {
+        const filtered = pages.filter((item) => {
+            if (!query.trim()) return true;
+            const q = query.toLowerCase();
+            return `${item.url} ${item.title ?? ''} ${item.status_code}`.toLowerCase().includes(q);
+        });
+        return filtered.sort((a, b) => {
+            if (sortBy === 'url') return a.url.localeCompare(b.url);
+            if (sortBy === 'status') return a.status_code - b.status_code;
+            return (b.load_time_ms ?? 0) - (a.load_time_ms ?? 0);
+        });
+    }, [pages, query, sortBy]);
+
     if (loading) return <div>Loading...</div>;
 
     return (
@@ -225,18 +241,27 @@ export default function ProjectPages() {
                 </div>
             )}
 
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+                <input value={query} onChange={(e) => setQuery(e.target.value)} className="border rounded px-3 py-2 text-sm" placeholder="Filter URL / title" />
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "url" | "status" | "load")} className="border rounded px-3 py-2 text-sm">
+                    <option value="load">Sort by Load Time</option>
+                    <option value="status">Sort by Status</option>
+                    <option value="url">Sort by URL</option>
+                </select>
+            </div>
+
             <div className="bg-white rounded shadow overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => setSortBy('url')}>URL</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => setSortBy('status')}>Status</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Load Time (ms)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => setSortBy('load')}>Load Time (ms)</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {pages.map(pageItem => (
+                        {displayPages.map(pageItem => (
                             <tr key={pageItem.id}>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate max-w-xs" title={pageItem.url}>{pageItem.url}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
