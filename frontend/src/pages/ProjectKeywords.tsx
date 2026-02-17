@@ -45,6 +45,7 @@ import {
     Legend,
 } from 'recharts';
 import PaginationControls from '../components/PaginationControls';
+import KeywordGapVenn from '../components/KeywordGapVenn';
 import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
 
@@ -91,6 +92,10 @@ export default function ProjectKeywords() {
     const [keywordGap, setKeywordGap] = useState<KeywordGapResponse | null>(null);
     const [keywordGapLoading, setKeywordGapLoading] = useState(false);
     const [keywordGapError, setKeywordGapError] = useState<string | null>(null);
+    const [vennCompetitorId, setVennCompetitorId] = useState<number | null>(null);
+    const [vennStats, setVennStats] = useState<KeywordGapResponse['stats'] | null>(null);
+    const [vennStatsLoading, setVennStatsLoading] = useState(false);
+    const [vennStatsError, setVennStatsError] = useState<string | null>(null);
     const [visibility, setVisibility] = useState<VisibilityResponse | null>(null);
     const [projectSettings, setProjectSettings] = useState<Project | null>(null);
     const [marketFilter, setMarketFilter] = useState('all');
@@ -387,6 +392,20 @@ export default function ProjectKeywords() {
         });
     };
 
+    const fetchVennStats = useCallback(async (competitorId: number) => {
+        if (!id) return;
+        await runWithUiState(async () => {
+            const data = await getProjectKeywordGap(id, competitorId);
+            setVennStats(data.stats);
+        }, {
+            setLoading: setVennStatsLoading,
+            setError: setVennStatsError,
+            clearErrorValue: null,
+            formatError: (err: unknown) => getErrorMessage(err, '加载维恩图数据失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
+    }, [id]);
+
     const fetchHistory = useCallback(async (keywordId: number, days: 7 | 30 | 90) => {
         if (!id) return;
         await runWithUiState(async () => {
@@ -549,8 +568,35 @@ export default function ProjectKeywords() {
             .map((competitorId) => competitors.find((item) => item.id === competitorId)?.domain ?? `竞争对手#${competitorId}`),
         [competitors, selectedGapCompetitorIds],
     );
+    const selectedVennCompetitorDomain = useMemo(
+        () => competitors.find((item) => item.id === vennCompetitorId)?.domain ?? '竞品',
+        [competitors, vennCompetitorId],
+    );
 
     const keywordGapTableRows = keywordGap?.gap ?? [];
+
+    useEffect(() => {
+        if (selectedGapCompetitorIds.length === 0) {
+            setVennCompetitorId(null);
+            return;
+        }
+        if (!vennCompetitorId || !selectedGapCompetitorIds.includes(vennCompetitorId)) {
+            setVennCompetitorId(selectedGapCompetitorIds[0]);
+        }
+    }, [selectedGapCompetitorIds, vennCompetitorId]);
+
+    useEffect(() => {
+        setVennStatsError(null);
+        if (!keywordGap || !vennCompetitorId) {
+            setVennStats(null);
+            return;
+        }
+        if (selectedGapCompetitorIds.length <= 1 && vennCompetitorId === selectedGapCompetitorIds[0]) {
+            setVennStats(keywordGap.stats);
+            return;
+        }
+        fetchVennStats(vennCompetitorId);
+    }, [fetchVennStats, keywordGap, selectedGapCompetitorIds, vennCompetitorId]);
 
     if (loading) return <div>Loading...</div>;
 
@@ -873,6 +919,41 @@ export default function ProjectKeywords() {
                                 <div className="text-sm text-gray-500">我方独有关键词</div>
                                 <div className="text-xl font-semibold">{keywordGap.stats.unique}</div>
                             </div>
+                        </div>
+
+                        <div className="rounded border p-4 space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <h3 className="text-base font-semibold">关键词集合维恩图（2 集合）</h3>
+                                {selectedGapCompetitorIds.length > 1 && (
+                                    <label className="text-sm text-gray-700">
+                                        <span className="mr-2">集合切换器：</span>
+                                        <select
+                                            value={vennCompetitorId ?? ''}
+                                            onChange={(e) => setVennCompetitorId(Number(e.target.value))}
+                                            className="rounded border px-2 py-1"
+                                        >
+                                            {selectedGapCompetitorIds.map((competitorId) => {
+                                                const domain = competitors.find((item) => item.id === competitorId)?.domain ?? `竞品 #${competitorId}`;
+                                                return <option key={competitorId} value={competitorId}>{domain}</option>;
+                                            })}
+                                        </select>
+                                    </label>
+                                )}
+                            </div>
+                            {selectedGapCompetitorIds.length > 1 && (
+                                <p className="text-xs text-gray-500">
+                                    第一版策略：多竞品场景下采用“单竞品切换视图”，避免一次展示 4 集合维恩图导致可读性下降。
+                                </p>
+                            )}
+                            {vennStatsError && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{vennStatsError}</div>}
+                            {vennStatsLoading && <div className="text-sm text-gray-500">正在加载维恩图数据...</div>}
+                            {vennStats && !vennStatsLoading && (
+                                <KeywordGapVenn
+                                    stats={vennStats}
+                                    myDomainLabel="我方"
+                                    competitorLabel={selectedVennCompetitorDomain}
+                                />
+                            )}
                         </div>
 
                         {keywordGapTableRows.length === 0 ? (
