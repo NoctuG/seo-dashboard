@@ -25,7 +25,7 @@ import type {
     KeywordScheduleFrequency,
     RankingDistributionResponse,
 } from '../api';
-import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield, Sparkles, Images, MapPin, MessageCircleQuestion } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield, Download, X } from 'lucide-react';
 import { useProjectRole } from '../useProjectRole';
 import {
     LineChart,
@@ -329,7 +329,7 @@ export default function ProjectKeywords() {
     const fetchHistory = useCallback(async (keywordId: number, days: 7 | 30 | 90) => {
         if (!id) return;
         await runWithUiState(async () => {
-            const res = await api.get<RankHistoryItem[]>(`/projects/${id}/keywords/${keywordId}/history`, {
+            const res = await api.get<RankHistoryItem[]>(`/projects/${id}/keywords/${keywordId}/ranking-history`, {
                 params: { days, limit: 180 },
             });
             setHistory(res.data);
@@ -344,6 +344,11 @@ export default function ProjectKeywords() {
     const selectKeyword = (kw: KeywordItem) => {
         setSelectedKeyword(kw);
         fetchHistory(kw.id, historyWindow);
+    };
+
+    const closeHistoryDialog = () => {
+        setSelectedKeyword(null);
+        setHistory([]);
     };
 
     useEffect(() => {
@@ -388,6 +393,30 @@ export default function ProjectKeywords() {
         date: new Date(h.checked_at).toLocaleDateString(),
         rank: h.rank ?? null,
     }));
+
+    const exportHistory = () => {
+        if (!selectedKeyword || history.length === 0) return;
+        const header = ['checked_at', 'rank', 'url', 'gl', 'hl'];
+        const rows = history.map((item) => [
+            item.checked_at,
+            item.rank ?? '',
+            item.url ?? '',
+            item.gl ?? '',
+            item.hl ?? '',
+        ]);
+        const csv = [header, ...rows]
+            .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+            .join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${selectedKeyword.term}-ranking-history-${historyWindow}d.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
 
     const distributionChartData = useMemo(() => (distribution?.series ?? []).map((point) => ({
         label: distributionBucket === 'week'
@@ -801,23 +830,77 @@ export default function ProjectKeywords() {
             )}
 
             {selectedKeyword && (
-                <div className="bg-white p-6 rounded shadow">
-                    <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">排名趋势：{selectedKeyword.term}</h2><div className="flex gap-2">{([7, 30, 90] as const).map((d) => (<button key={d} onClick={() => setHistoryWindow(d)} className={`px-3 py-1 rounded text-sm ${historyWindow === d ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>{d} 天</button>))}</div></div>
-                    {historyLoading ? (
-                        <div className="text-center py-8 text-gray-500">加载中...</div>
-                    ) : history.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">暂无排名历史数据，请先点击查询排名。</div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                                <YAxis reversed domain={[1, 'auto']} tick={{ fontSize: 12 }} />
-                                <Tooltip formatter={(value) => (typeof value === 'number' ? [`#${value}`, '排名'] : ['未上榜', '排名'])} />
-                                <Line type="monotone" dataKey="rank" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    )}
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeHistoryDialog}>
+                    <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-lg bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-start justify-between border-b px-6 py-4">
+                            <div>
+                                <h2 className="text-lg font-semibold">关键词历史分析</h2>
+                                <p className="text-sm text-gray-600">{selectedKeyword.term}</p>
+                                <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-700">
+                                    <span>当前排名：{selectedKeyword.current_rank != null ? `#${selectedKeyword.current_rank}` : '未检测'}</span>
+                                    <span>搜索量：-</span>
+                                </div>
+                            </div>
+                            <button onClick={closeHistoryDialog} className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4 overflow-y-auto px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex gap-2">{([7, 30, 90] as const).map((d) => (<button key={d} onClick={() => setHistoryWindow(d)} className={`px-3 py-1 rounded text-sm ${historyWindow === d ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>{d} 天</button>))}</div>
+                                <button onClick={exportHistory} disabled={history.length === 0} className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                    <Download size={16} /> 导出数据
+                                </button>
+                            </div>
+
+                            <div className="rounded border p-3">
+                                {historyLoading ? (
+                                    <div className="text-center py-8 text-gray-500">加载中...</div>
+                                ) : history.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">暂无排名历史数据，请先点击查询排名。</div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <LineChart data={chartData}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                            <YAxis reversed domain={[1, 'auto']} tick={{ fontSize: 12 }} />
+                                            <Tooltip formatter={(value) => (typeof value === 'number' ? [`#${value}`, '排名'] : ['未上榜', '排名'])} />
+                                            <Line type="monotone" dataKey="rank" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </div>
+
+                            <div className="rounded border">
+                                <div className="border-b px-3 py-2 text-sm font-medium">历史明细</div>
+                                <div className="max-h-56 overflow-auto">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-3 py-2">时间</th>
+                                                <th className="px-3 py-2">排名</th>
+                                                <th className="px-3 py-2">URL</th>
+                                                <th className="px-3 py-2">市场</th>
+                                                <th className="px-3 py-2">语言</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {history.map((item) => (
+                                                <tr key={item.id}>
+                                                    <td className="px-3 py-2 text-gray-600">{new Date(item.checked_at).toLocaleString()}</td>
+                                                    <td className="px-3 py-2">{item.rank != null ? `#${item.rank}` : '未上榜'}</td>
+                                                    <td className="px-3 py-2 max-w-sm truncate text-gray-600">{item.url || '-'}</td>
+                                                    <td className="px-3 py-2">{item.gl || '-'}</td>
+                                                    <td className="px-3 py-2">{item.hl || '-'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
