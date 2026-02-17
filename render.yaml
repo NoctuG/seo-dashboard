@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: seo-dashboard-backend
+    runtime: python
+    plan: free
+    buildCommand: cd backend && pip install -r requirements.txt && alembic upgrade heads
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        value: sqlite:///./data/seo_tool.db
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_EXPIRE_MINUTES
+        value: 1440
+      - key: JWT_REFRESH_EXPIRE_MINUTES
+        value: 10080
+      - key: INITIAL_ADMIN_EMAIL
+        value: admin@example.com
+      - key: INITIAL_ADMIN_PASSWORD
+        value: admin123456
+      - key: INITIAL_ADMIN_NAME
+        value: Administrator
+      - key: PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
+        value: 60
+      - key: ANALYTICS_PROVIDER
+        value: sample
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_FORMAT
+        value: json
+    disk:
+      name: seo-dashboard-data
+      mountPath: /opt/render/project/src/backend/data
+      sizeGB: 1
