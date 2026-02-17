@@ -429,6 +429,10 @@ class BacklinkSummaryResponse(BaseModel):
     fetch_status: str = "pending"
     anchor_distribution: dict[str, int]
     history: List[dict]
+    trend_series: List[dict] = Field(default_factory=list)
+    trend_window_days: int = 30
+    trend_interval: str = "day"
+    trend_summary: dict[str, Optional[float]] = Field(default_factory=dict)
     notes: List[str]
 
 

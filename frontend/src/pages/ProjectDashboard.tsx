@@ -21,6 +21,7 @@ import type {
   ContentPerformanceItem,
   AuthorityResponse,
   BacklinkResponse,
+  BacklinkTrendPoint,
   BacklinkChangesResponse,
   BacklinkStatusResponse,
   CompetitorDomainItem,
@@ -78,6 +79,8 @@ export default function ProjectDashboard() {
   const [backlinks, setBacklinks] = useState<BacklinkResponse | null>(null);
   const [changes, setChanges] = useState<BacklinkChangesResponse | null>(null);
   const [backlinkStatus, setBacklinkStatus] = useState<BacklinkStatusResponse | null>(null);
+  const [backlinkTrendWindow, setBacklinkTrendWindow] = useState<7 | 30 | 90>(30);
+  const [backlinkTrendInterval, setBacklinkTrendInterval] = useState<'day' | 'week'>('day');
   const [brandWindow, setBrandWindow] = useState<"7d" | "30d" | "90d">("30d");
   const [roiRange, setRoiRange] = useState<"30d" | "90d" | "12m">("30d");
   const [attributionModel, setAttributionModel] = useState<
@@ -209,7 +212,10 @@ export default function ProjectDashboard() {
     try {
       const [authorityData, backlinkData, changesData, statusData] = await Promise.all([
         getProjectAuthority(id),
-        getProjectBacklinks(id),
+        getProjectBacklinks(id, {
+          window_days: backlinkTrendWindow,
+          interval: backlinkTrendInterval,
+        }),
         getProjectBacklinkChanges(id),
         getProjectBacklinkStatus(id),
       ]);
@@ -220,7 +226,7 @@ export default function ProjectDashboard() {
     } catch (error) {
       console.error(error);
     }
-  }, [id]);
+  }, [id, backlinkTrendInterval, backlinkTrendWindow]);
 
   const fetchBacklinkStatus = useCallback(async () => {
     if (!id) return;
@@ -264,6 +270,10 @@ export default function ProjectDashboard() {
   useEffect(() => {
     if (id) fetchContentPerformance();
   }, [id, window, sort, fetchContentPerformance]);
+
+  useEffect(() => {
+    if (id) fetchBacklinkData();
+  }, [id, backlinkTrendWindow, backlinkTrendInterval, fetchBacklinkData]);
 
   useEffect(() => {
     if (id) fetchRoiData();
@@ -359,6 +369,21 @@ export default function ProjectDashboard() {
   const geoMaxSessions = Math.max(
     ...(searchInsights?.geo_distribution.rows.map((row) => row.sessions) ?? [1]),
   );
+
+  const backlinkTrendSeries: BacklinkTrendPoint[] =
+    backlinks?.trend_series && backlinks.trend_series.length > 0
+      ? backlinks.trend_series
+      : (backlinks?.history ?? []);
+  const backlinkTrendLatest = backlinkTrendSeries.at(-1);
+  const backlinkTrendFirst = backlinkTrendSeries[0];
+  const backlinkTrendSummary = backlinks?.trend_summary;
+  const totalBacklinksMetric = backlinkTrendSummary?.latest_backlinks_total ?? backlinkTrendLatest?.backlinks_total ?? backlinks?.backlinks_total ?? 0;
+  const totalRefDomainsMetric = backlinkTrendSummary?.latest_ref_domains ?? backlinkTrendLatest?.ref_domains ?? backlinks?.ref_domains ?? 0;
+  const netGrowthMetric = backlinkTrendSummary?.net_growth ?? ((backlinkTrendLatest?.backlinks_total ?? 0) - (backlinkTrendFirst?.backlinks_total ?? 0));
+  const formatPct = (value?: number | null) => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '—';
+    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  };
 
   if (loading || !stats) return <div>{t("app.loading")}</div>;
 
@@ -754,28 +779,77 @@ export default function ProjectDashboard() {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 h-72">
-          <h3 className="font-semibold mb-3">Backlink Trend</h3>
-          <ResponsiveContainer width="100%" height="90%">
-            <LineChart data={backlinks?.history ?? []}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="backlinks_total"
-                stroke="#16a34a"
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey="ref_domains"
-                stroke="#f59e0b"
-                strokeWidth={2}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 min-h-72">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-semibold">Backlink Trend</h3>
+            <div className="flex items-center gap-2">
+              <select
+                value={backlinkTrendWindow}
+                onChange={(e) => setBacklinkTrendWindow(Number(e.target.value) as 7 | 30 | 90)}
+                className="rounded border px-2 py-1 text-xs"
+              >
+                <option value={7}>7 天</option>
+                <option value={30}>30 天</option>
+                <option value={90}>90 天</option>
+              </select>
+              <select
+                value={backlinkTrendInterval}
+                onChange={(e) => setBacklinkTrendInterval(e.target.value as 'day' | 'week')}
+                className="rounded border px-2 py-1 text-xs"
+              >
+                <option value="day">按日</option>
+                <option value="week">按周</option>
+              </select>
+              <Link className="text-xs text-blue-600 hover:underline" to={`/projects/${id}/backlinks/ref-domains`}>
+                前往引用域分析
+              </Link>
+            </div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded border p-3">
+              <p className="text-xs uppercase text-slate-500">总外链</p>
+              <p className="text-xl font-semibold">{totalBacklinksMetric}</p>
+            </div>
+            <div className="rounded border p-3">
+              <p className="text-xs uppercase text-slate-500">引用域</p>
+              <p className="text-xl font-semibold">{totalRefDomainsMetric}</p>
+            </div>
+            <div className="rounded border p-3">
+              <p className="text-xs uppercase text-slate-500">净增长</p>
+              <p className={`text-xl font-semibold ${netGrowthMetric >= 0 ? 'text-green-600' : 'text-red-600'}`}>{netGrowthMetric >= 0 ? '+' : ''}{netGrowthMetric}</p>
+              <p className="text-xs text-slate-500">环比 {formatPct(backlinkTrendSummary?.mom_growth_pct)} · 同比 {formatPct(backlinkTrendSummary?.yoy_growth_pct)}</p>
+            </div>
+          </div>
+
+          {backlinkTrendSeries.length === 0 ? (
+            <div className="flex h-40 items-center justify-center rounded border border-dashed text-sm text-slate-500">
+              历史外链为空，暂无法绘图
+            </div>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={backlinkTrendSeries}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="backlinks_total"
+                    stroke="#16a34a"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ref_domains"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </div>
 

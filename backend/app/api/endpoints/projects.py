@@ -896,7 +896,13 @@ def get_project_authority(project_id: int, background_tasks: BackgroundTasks, se
 
 
 @router.get("/{project_id}/backlinks", response_model=BacklinkSummaryResponse)
-def get_project_backlinks(project_id: int, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
+def get_project_backlinks(
+    project_id: int,
+    background_tasks: BackgroundTasks,
+    window_days: Literal[7, 30, 90] = 30,
+    interval: Literal["day", "week"] = "day",
+    session: Session = Depends(get_session),
+):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
@@ -913,8 +919,60 @@ def get_project_backlinks(project_id: int, background_tasks: BackgroundTasks, se
         select(BacklinkSnapshot)
         .where(BacklinkSnapshot.project_id == project_id)
         .order_by(BacklinkSnapshot.date.asc())
-        .limit(90)
+        .limit(500)
     ).all()
+
+    if history_rows:
+        latest_date = history_rows[-1].date
+        window_start = latest_date - timedelta(days=window_days - 1)
+        window_rows = [row for row in history_rows if row.date >= window_start]
+        if not window_rows:
+            window_rows = [history_rows[-1]]
+    else:
+        latest_date = date.today()
+        window_start = latest_date
+        window_rows = []
+
+    if interval == "week":
+        weekly_points: dict[date, BacklinkSnapshot] = {}
+        for row in window_rows:
+            week_start = row.date - timedelta(days=row.date.weekday())
+            weekly_points[week_start] = row
+        trend_rows = [weekly_points[key] for key in sorted(weekly_points.keys())]
+    else:
+        trend_rows = window_rows
+
+    def _latest_value_before(target_date: date) -> Optional[int]:
+        for row in reversed(history_rows):
+            if row.date <= target_date:
+                return row.backlinks_total
+        return None
+
+    first_total = trend_rows[0].backlinks_total if trend_rows else 0
+    latest_total = trend_rows[-1].backlinks_total if trend_rows else 0
+    net_growth = latest_total - first_total
+
+    previous_window_end = window_start - timedelta(days=1)
+    previous_window_start = previous_window_end - timedelta(days=window_days - 1)
+    prev_start_value = _latest_value_before(previous_window_start)
+    prev_end_value = _latest_value_before(previous_window_end)
+    prev_growth = (
+        prev_end_value - prev_start_value
+        if prev_start_value is not None and prev_end_value is not None
+        else None
+    )
+    mom_growth_pct = (
+        ((net_growth - prev_growth) / abs(prev_growth)) * 100
+        if prev_growth not in (None, 0)
+        else None
+    )
+
+    yoy_end_value = _latest_value_before(latest_date - timedelta(days=365))
+    yoy_pct = (
+        ((latest_total - yoy_end_value) / yoy_end_value) * 100
+        if yoy_end_value not in (None, 0)
+        else None
+    )
 
     return BacklinkSummaryResponse(
         project_id=project_id,
@@ -934,6 +992,23 @@ def get_project_backlinks(project_id: int, background_tasks: BackgroundTasks, se
             }
             for row in history_rows
         ],
+        trend_series=[
+            {
+                "date": str(row.date),
+                "backlinks_total": row.backlinks_total,
+                "ref_domains": row.ref_domains,
+            }
+            for row in trend_rows
+        ],
+        trend_window_days=window_days,
+        trend_interval=interval,
+        trend_summary={
+            "latest_backlinks_total": latest_total,
+            "latest_ref_domains": trend_rows[-1].ref_domains if trend_rows else 0,
+            "net_growth": net_growth,
+            "mom_growth_pct": mom_growth_pct,
+            "yoy_growth_pct": yoy_pct,
+        },
         notes=_json_loads(latest.notes_json, []) if latest else [],
     )
 
