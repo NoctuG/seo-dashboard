@@ -265,6 +265,7 @@ class Keyword(SQLModel, table=True):
     market: Optional[str] = None
     current_rank: Optional[int] = None
     last_checked: Optional[datetime] = None
+    serp_features_json: str = "[]"
 
     project: Project = Relationship(back_populates="keywords")
     rank_history: List["RankHistory"] = Relationship(back_populates="keyword")

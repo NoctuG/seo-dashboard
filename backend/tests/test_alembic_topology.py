@@ -32,7 +32,7 @@ def _db_versions(db_file: Path) -> list[str]:
 def test_alembic_scripts_have_single_head(tmp_path):
     result = _run_alembic(tmp_path / "heads_probe.db", "heads")
 
-    assert result.stdout.strip().splitlines() == ["ab12cd34ef56 (head)"]
+    assert result.stdout.strip().splitlines() == ["f4d5e6f7a8b9 (head)"]
 
 
 def test_fresh_database_upgrade_reaches_single_head(tmp_path):
@@ -40,7 +40,7 @@ def test_fresh_database_upgrade_reaches_single_head(tmp_path):
 
     _run_alembic(db_file, "upgrade", "head")
 
-    assert _db_versions(db_file) == ["ab12cd34ef56"]
+    assert _db_versions(db_file) == ["f4d5e6f7a8b9"]
 
 
 def test_existing_database_upgrade_path_merges_to_single_head(tmp_path):
@@ -49,4 +49,4 @@ def test_existing_database_upgrade_path_merges_to_single_head(tmp_path):
     _run_alembic(db_file, "upgrade", "c3d4e5f6a7b8")
     _run_alembic(db_file, "upgrade", "head")
 
-    assert _db_versions(db_file) == ["ab12cd34ef56"]
+    assert _db_versions(db_file) == ["f4d5e6f7a8b9"]

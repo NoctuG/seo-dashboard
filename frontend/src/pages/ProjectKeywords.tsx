@@ -45,6 +45,14 @@ import PaginationControls from '../components/PaginationControls';
 import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
 
+
+const SERP_FEATURE_ICON_MAP: Record<string, { label: string; icon: typeof Sparkles; className: string }> = {
+    featured_snippet: { label: 'Featured Snippet', icon: Sparkles, className: 'text-amber-600' },
+    image_pack: { label: 'Image Pack', icon: Images, className: 'text-cyan-600' },
+    local_pack: { label: 'Local Pack', icon: MapPin, className: 'text-emerald-600' },
+    people_also_ask: { label: 'People Also Ask', icon: MessageCircleQuestion, className: 'text-violet-600' },
+};
+
 export default function ProjectKeywords() {
     const { id } = useParams<{ id: string }>();
     const [keywords, setKeywords] = useState<KeywordItem[]>([]);
@@ -77,6 +85,7 @@ export default function ProjectKeywords() {
     const [visibility, setVisibility] = useState<VisibilityResponse | null>(null);
     const [projectSettings, setProjectSettings] = useState<Project | null>(null);
     const [marketFilter, setMarketFilter] = useState('all');
+    const [serpFeatureFilter, setSerpFeatureFilter] = useState('all');
     const [rankSchedule, setRankSchedule] = useState<KeywordRankSchedule | null>(null);
     const [scheduleForm, setScheduleForm] = useState({
         frequency: "daily" as KeywordScheduleFrequency,
@@ -429,10 +438,25 @@ export default function ProjectKeywords() {
         [visibility]
     );
 
+    const parseKeywordSerpFeatures = useCallback((keyword: KeywordItem) => {
+        if (!keyword.serp_features_json) return [] as string[];
+        try {
+            const parsed = JSON.parse(keyword.serp_features_json);
+            if (!Array.isArray(parsed)) return [] as string[];
+            return parsed.filter((item): item is string => typeof item === 'string');
+        } catch {
+            return [] as string[];
+        }
+    }, []);
+
     const filteredKeywords = useMemo(() => {
-        if (marketFilter === 'all') return keywords;
-        return keywords.filter((kw: KeywordItem) => (kw.market || '').toLowerCase() === marketFilter.toLowerCase());
-    }, [keywords, marketFilter]);
+        return keywords.filter((kw: KeywordItem) => {
+            const marketMatched = marketFilter === 'all' || (kw.market || '').toLowerCase() === marketFilter.toLowerCase();
+            if (!marketMatched) return false;
+            if (serpFeatureFilter === 'all') return true;
+            return parseKeywordSerpFeatures(kw).includes(serpFeatureFilter);
+        });
+    }, [keywords, marketFilter, serpFeatureFilter, parseKeywordSerpFeatures]);
 
     if (loading) return <div>Loading...</div>;
 
@@ -711,6 +735,13 @@ export default function ProjectKeywords() {
                             {[...new Set(keywords.map((k) => k.market).filter(Boolean) as string[])].map((m) => <option key={m} value={m}>{m}</option>)}
                         </select>
                     </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-gray-600">按 SERP 特性筛选</span>
+                        <select className="border rounded px-3 py-2" value={serpFeatureFilter} onChange={(e) => setSerpFeatureFilter(e.target.value)}>
+                            <option value="all">全部</option>
+                            {Object.entries(SERP_FEATURE_ICON_MAP).map(([feature, config]) => <option key={feature} value={feature}>{config.label}</option>)}
+                        </select>
+                    </label>
                 </div>
             </div>
 
@@ -756,6 +787,7 @@ export default function ProjectKeywords() {
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">locale</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">market</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500 text-center">当前排名</th>
+                                <th className="px-4 py-3 text-sm font-medium text-gray-500">SERP 特性</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">最后检查时间</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500 text-right">操作</th>
                             </tr>
@@ -768,6 +800,18 @@ export default function ProjectKeywords() {
                                     <td className="px-4 py-3 text-sm">{kw.locale || '-'}</td>
                                     <td className="px-4 py-3 text-sm">{kw.market || '-'}</td>
                                     <td className="px-4 py-3 text-center">{kw.current_rank != null ? `#${kw.current_rank}` : '未检测'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">
+                                        <div className="flex items-center gap-2">
+                                            {parseKeywordSerpFeatures(kw)
+                                                .filter((feature) => feature in SERP_FEATURE_ICON_MAP)
+                                                .map((feature) => {
+                                                    const config = SERP_FEATURE_ICON_MAP[feature];
+                                                    const Icon = config.icon;
+                                                    return <Icon key={`${kw.id}-${feature}`} size={16} className={config.className} aria-label={config.label} />;
+                                                })}
+                                            {parseKeywordSerpFeatures(kw).filter((feature) => feature in SERP_FEATURE_ICON_MAP).length === 0 && '-'}
+                                        </div>
+                                    </td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{kw.last_checked ? new Date(kw.last_checked).toLocaleString() : '-'}</td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex items-center justify-end gap-2">

@@ -453,6 +453,7 @@ def check_rank(
 
     keyword.current_rank = result.rank
     keyword.last_checked = datetime.utcnow()
+    keyword.serp_features_json = json.dumps(result.serp_features, ensure_ascii=False)
 
     history = RankHistory(
         keyword_id=keyword.id,
@@ -487,6 +488,7 @@ def check_all_ranks(
         result = check_keyword_rank(keyword.term, project.domain, gl=gl, hl=hl)
         keyword.current_rank = result.rank
         keyword.last_checked = datetime.utcnow()
+        keyword.serp_features_json = json.dumps(result.serp_features, ensure_ascii=False)
 
         history = RankHistory(
             keyword_id=keyword.id,
@@ -526,6 +528,7 @@ def check_all_compare(
 
         keyword.current_rank = result.rank
         keyword.last_checked = now
+        keyword.serp_features_json = json.dumps(result.serp_features, ensure_ascii=False)
         session.add(keyword)
         session.add(RankHistory(keyword_id=keyword.id, rank=result.rank, url=result.url, gl=gl, hl=hl, checked_at=now))
 
