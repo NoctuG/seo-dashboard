@@ -8,6 +8,7 @@ import {
   updateWebhookConfig,
   type WebhookConfig,
 } from '../api';
+import { getErrorMessage } from '../utils/error';
 
 export default function SystemSettings() {
   const { t } = useTranslation();
@@ -27,8 +28,8 @@ export default function SystemSettings() {
       const [webhookEvents, webhookConfigs] = await Promise.all([listWebhookEvents(), listWebhookConfigs()]);
       setEvents(webhookEvents);
       setConfigs(webhookConfigs);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || t('systemSettings.errors.loadFailed'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('systemSettings.errors.loadFailed')));
     } finally {
       setLoading(false);
     }
