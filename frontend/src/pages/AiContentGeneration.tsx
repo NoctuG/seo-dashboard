@@ -8,6 +8,7 @@ import {
   type AiGenerateArticleResponse,
   type AiSocialPost,
 } from '../api';
+import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
 
 type TabKey = 'article' | 'social' | 'analyze';
@@ -219,10 +220,8 @@ function ArticleGenerator() {
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setResult(null);
-    setLoading(true);
-    try {
+    await runWithUiState(async () => {
       const data = await generateSeoArticle({
         topic,
         keywords: keywords.split(',').map((k) => k.trim()).filter(Boolean),
@@ -233,28 +232,28 @@ function ArticleGenerator() {
       });
       setResult(data);
       setEditableContent(data.content);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, t('aiContent.errors.generateFailed')));
-    } finally {
-      setLoading(false);
-    }
+    }, {
+      setLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (error: unknown) => getErrorMessage(error, t('aiContent.errors.generateFailed')),
+    });
   };
 
   const handleRewrite = async () => {
     if (!editableContent) return;
-    setRewriting(true);
-    try {
+    await runWithUiState(async () => {
       const data = await rewriteContent({
         content: editableContent,
         instruction: rewriteInstruction,
         language,
       });
       setEditableContent(data.result);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, t('aiContent.errors.rewriteFailed')));
-    } finally {
-      setRewriting(false);
-    }
+    }, {
+      setLoading: setRewriting,
+      setError,
+      formatError: (error: unknown) => getErrorMessage(error, t('aiContent.errors.rewriteFailed')),
+    });
   };
 
   const handleCopy = () => {
@@ -471,10 +470,8 @@ function SocialGenerator() {
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setPosts([]);
-    setLoading(true);
-    try {
+    await runWithUiState(async () => {
       const data = await generateSocialContent({
         topic,
         platform,
@@ -484,11 +481,12 @@ function SocialGenerator() {
         count,
       });
       setPosts(data.posts);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, t('aiContent.errors.generateFailed')));
-    } finally {
-      setLoading(false);
-    }
+    }, {
+      setLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (error: unknown) => getErrorMessage(error, t('aiContent.errors.generateFailed')),
+    });
   };
 
   const startEditing = (index: number) => {
@@ -732,17 +730,16 @@ function SeoAnalyzer() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setResult('');
-    setLoading(true);
-    try {
+    await runWithUiState(async () => {
       const data = await analyzeSeoWithAi(content);
       setResult(data.result);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, t('aiContent.errors.analyzeFailed')));
-    } finally {
-      setLoading(false);
-    }
+    }, {
+      setLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (error: unknown) => getErrorMessage(error, t('aiContent.errors.analyzeFailed')),
+    });
   };
 
   return (

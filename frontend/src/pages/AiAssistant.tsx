@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sparkles } from 'lucide-react';
 import { analyzeSeoWithAi } from '../api';
+import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
 
 export default function AiAssistant() {
@@ -13,17 +14,16 @@ export default function AiAssistant() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setResult('');
-    setLoading(true);
-    try {
+    await runWithUiState(async () => {
       const data = await analyzeSeoWithAi(content);
       setResult(data.result);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, t('aiAssistant.errors.requestFailed')));
-    } finally {
-      setLoading(false);
-    }
+    }, {
+      setLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (error: unknown) => getErrorMessage(error, t('aiAssistant.errors.requestFailed')),
+    });
   };
 
   return (
