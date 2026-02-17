@@ -214,6 +214,26 @@ export interface ProjectPermissions {
   role: "admin" | "viewer";
 }
 
+
+export interface DashboardLayoutConfig {
+  order: string[];
+  hidden: string[];
+  can_persist?: boolean;
+}
+
+export async function getProjectDashboardLayout(projectId: string | number): Promise<DashboardLayoutConfig> {
+  const res = await api.get<DashboardLayoutConfig>(`/projects/${projectId}/dashboard-layout`);
+  return res.data;
+}
+
+export async function saveProjectDashboardLayout(
+  projectId: string | number,
+  payload: Pick<DashboardLayoutConfig, 'order' | 'hidden'>,
+): Promise<DashboardLayoutConfig> {
+  const res = await api.put<DashboardLayoutConfig>(`/projects/${projectId}/dashboard-layout`, payload);
+  return res.data;
+}
+
 export interface ProjectApiKey {
   id: number;
   project_id: number;

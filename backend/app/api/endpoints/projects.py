@@ -6,10 +6,11 @@ from datetime import date, datetime, timedelta
 from urllib.parse import unquote, urlparse
 from fastapi.responses import Response
 from collections import Counter
+from pydantic import BaseModel, Field
 
 from app.core.error_codes import ErrorCode
 from app.db import get_session
-from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog, ProjectMember, ProjectRoleType, Role, User, AuditActionType, SiteAuditHistory, Keyword, RankHistory
+from app.models import Project, Crawl, Issue, CrawlStatus, DomainMetricSnapshot, BacklinkSnapshot, SeoCostConfig, Page, PagePerformanceSnapshot, ReportTemplate, ReportSchedule, ReportDeliveryLog, ProjectMember, ProjectRoleType, Role, User, AuditActionType, SiteAuditHistory, Keyword, RankHistory, UserDashboardLayout
 from app.schemas import (
     ProjectCreate,
     ProjectRead,
@@ -50,6 +51,15 @@ from app.rate_limit import limiter
 from app.site_audit import build_category_scores, calculate_site_health_score
 
 router = APIRouter()
+
+
+class DashboardLayoutPayload(BaseModel):
+    order: list[str] = Field(default_factory=list)
+    hidden: list[str] = Field(default_factory=list)
+
+
+class DashboardLayoutResponse(DashboardLayoutPayload):
+    can_persist: bool = False
 
 
 def _project_to_read(project: Project) -> ProjectRead:
@@ -1202,6 +1212,64 @@ def list_report_logs(project_id: int, session: Session = Depends(get_session)):
         select(ReportDeliveryLog).where(ReportDeliveryLog.project_id == project_id).order_by(ReportDeliveryLog.created_at.desc()).limit(200)
     ).all()
     return logs
+
+
+@router.get("/{project_id}/dashboard-layout", response_model=DashboardLayoutResponse)
+def get_dashboard_layout(
+    project_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
+    row = session.exec(
+        select(UserDashboardLayout).where(
+            UserDashboardLayout.project_id == project_id,
+            UserDashboardLayout.user_id == user.id,
+        )
+    ).first()
+    if not row:
+        return DashboardLayoutResponse(order=[], hidden=[], can_persist=user.is_superuser or get_project_permissions(project_id, session, user)["role"] == "admin")
+
+    try:
+        data = json.loads(row.layout_json or "{}")
+    except json.JSONDecodeError:
+        data = {}
+
+    role = get_project_permissions(project_id, session, user)["role"]
+    return DashboardLayoutResponse(
+        order=data.get("order", []),
+        hidden=data.get("hidden", []),
+        can_persist=user.is_superuser or role == "admin",
+    )
+
+
+@router.put("/{project_id}/dashboard-layout", response_model=DashboardLayoutResponse)
+def save_dashboard_layout(
+    project_id: int,
+    payload: DashboardLayoutPayload,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_project_role(ProjectRoleType.ADMIN)),
+):
+    row = session.exec(
+        select(UserDashboardLayout).where(
+            UserDashboardLayout.project_id == project_id,
+            UserDashboardLayout.user_id == user.id,
+        )
+    ).first()
+    if not row:
+        row = UserDashboardLayout(project_id=project_id, user_id=user.id)
+
+    row.layout_json = json.dumps(
+        {
+            "order": payload.order,
+            "hidden": payload.hidden,
+        },
+        ensure_ascii=False,
+    )
+    row.updated_at = datetime.utcnow()
+    session.add(row)
+    session.commit()
+
+    return DashboardLayoutResponse(order=payload.order, hidden=payload.hidden, can_persist=True)
 
 
 @router.get("/{project_id}/permissions")

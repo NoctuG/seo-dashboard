@@ -12,6 +12,8 @@ import {
   getProjectContentPerformance,
   getProjectRoi,
   getProjectSearchInsights,
+  getProjectDashboardLayout,
+  saveProjectDashboardLayout,
 } from "../api";
 import type {
   DashboardStats,
@@ -40,6 +42,8 @@ import {
   BadgePercent,
 } from "lucide-react";
 import RoiAttributionNote from "../components/RoiAttributionNote";
+import DashboardLayout from "../components/DashboardLayout";
+import { useAuth } from "../auth";
 import { useProjectRole } from "../useProjectRole";
 import {
   ResponsiveContainer,
@@ -55,6 +59,8 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+
+const DEFAULT_WIDGET_ORDER = ["domain-authority", "backlinks", "ref-domains", "ahrefs-rank"];
 
 export default function ProjectDashboard() {
   const { id } = useParams<{ id: string }>();
@@ -91,7 +97,12 @@ export default function ProjectDashboard() {
   const [insightsPage, setInsightsPage] = useState(1);
   const [heatmapStep, setHeatmapStep] = useState(2);
   const { isAdmin } = useProjectRole(id);
+  const { isAuthenticated } = useAuth();
   const { t } = useTranslation();
+  const [dashboardLayout, setDashboardLayout] = useState<{ order: string[]; hidden: string[] }>({
+    order: DEFAULT_WIDGET_ORDER,
+    hidden: [],
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -157,6 +168,30 @@ export default function ProjectDashboard() {
     };
     fetchSearchInsights();
   }, [id, insightsPage, heatmapStep]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (!isAuthenticated || !isAdmin) {
+      setDashboardLayout({ order: DEFAULT_WIDGET_ORDER, hidden: [] });
+      return;
+    }
+
+    getProjectDashboardLayout(id)
+      .then((layout) => setDashboardLayout({
+        order: layout.order?.length ? layout.order : DEFAULT_WIDGET_ORDER,
+        hidden: layout.hidden ?? [],
+      }))
+      .catch(() => setDashboardLayout({ order: DEFAULT_WIDGET_ORDER, hidden: [] }));
+  }, [id, isAuthenticated, isAdmin]);
+
+  useEffect(() => {
+    if (!id || !isAuthenticated || !isAdmin) return;
+    const timer = globalThis.setTimeout(() => {
+      saveProjectDashboardLayout(id, dashboardLayout).catch((error) => console.error(error));
+    }, 800);
+
+    return () => globalThis.clearTimeout(timer);
+  }, [id, isAuthenticated, isAdmin, dashboardLayout]);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -642,35 +677,63 @@ export default function ProjectDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded shadow">
-          <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2">
-            <Shield size={16} />
-            Domain Authority
-          </h3>
-          <p className="text-3xl font-bold">{authority?.domain_authority ?? 0}</p>
-          <p className="text-xs text-slate-500 mt-2">状态: {backlinkStatus?.fetch_status ?? backlinks?.fetch_status ?? "pending"}</p>
-        </div>
-        <div className="bg-white p-6 rounded shadow">
-          <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2">
-            <LinkIcon size={16} />
-            Backlinks
-          </h3>
-          <p className="text-3xl font-bold">{backlinks?.backlinks_total ?? 0}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
-          <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Ref Domains</h3>
-          <p className="text-3xl font-bold">{backlinks?.ref_domains ?? 0}</p>
-          <Link className="mt-2 inline-block text-xs text-blue-600 hover:underline" to={`/projects/${id}/backlinks/ref-domains`}>
-            查看引用域
-          </Link>
-        </div>
-        <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
-          <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Ahrefs Rank</h3>
-          <p className="text-3xl font-bold">{backlinks?.ahrefs_rank ?? authority?.ahrefs_rank ?? "—"}</p>
-          <p className="text-xs text-slate-500 mt-2">上次刷新: {backlinkStatus?.last_fetched_at ?? backlinks?.last_fetched_at ?? "未刷新"}</p>
-        </div>
-      </div>
+      <DashboardLayout
+        layout={dashboardLayout}
+        onLayoutChange={setDashboardLayout}
+        widgets={[
+          {
+            widgetId: "domain-authority",
+            title: "Domain Authority",
+            content: (
+              <div className="bg-white p-6 rounded shadow">
+                <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2">
+                  <Shield size={16} />
+                  Domain Authority
+                </h3>
+                <p className="text-3xl font-bold">{authority?.domain_authority ?? 0}</p>
+                <p className="text-xs text-slate-500 mt-2">状态: {backlinkStatus?.fetch_status ?? backlinks?.fetch_status ?? "pending"}</p>
+              </div>
+            ),
+          },
+          {
+            widgetId: "backlinks",
+            title: "Backlinks",
+            content: (
+              <div className="bg-white p-6 rounded shadow">
+                <h3 className="text-gray-500 text-sm uppercase flex items-center gap-2">
+                  <LinkIcon size={16} />
+                  Backlinks
+                </h3>
+                <p className="text-3xl font-bold">{backlinks?.backlinks_total ?? 0}</p>
+              </div>
+            ),
+          },
+          {
+            widgetId: "ref-domains",
+            title: "Ref Domains",
+            content: (
+              <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
+                <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Ref Domains</h3>
+                <p className="text-3xl font-bold">{backlinks?.ref_domains ?? 0}</p>
+                <Link className="mt-2 inline-block text-xs text-blue-600 hover:underline" to={`/projects/${id}/backlinks/ref-domains`}>
+                  查看引用域
+                </Link>
+              </div>
+            ),
+          },
+          {
+            widgetId: "ahrefs-rank",
+            title: "Ahrefs Rank",
+            content: (
+              <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700">
+                <h3 className="text-slate-600 dark:text-slate-300 text-sm uppercase">Ahrefs Rank</h3>
+                <p className="text-3xl font-bold">{backlinks?.ahrefs_rank ?? authority?.ahrefs_rank ?? "—"}</p>
+                <p className="text-xs text-slate-500 mt-2">上次刷新: {backlinkStatus?.last_fetched_at ?? backlinks?.last_fetched_at ?? "未刷新"}</p>
+              </div>
+            ),
+          },
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 h-72">
