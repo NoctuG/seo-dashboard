@@ -173,6 +173,17 @@ class Settings:
     MATOMO_SITE_ID: str = os.getenv("MATOMO_SITE_ID", "")
     MATOMO_TOKEN_AUTH: str = os.getenv("MATOMO_TOKEN_AUTH", "")
 
+    # Competitor traffic overview (optional external provider + local estimation fallback)
+    TRAFFIC_OVERVIEW_EXTERNAL_API_URL: str = os.getenv("TRAFFIC_OVERVIEW_EXTERNAL_API_URL", "")
+    TRAFFIC_OVERVIEW_EXTERNAL_API_TIMEOUT_SECONDS: int = int(
+        os.getenv("TRAFFIC_OVERVIEW_EXTERNAL_API_TIMEOUT_SECONDS", "5")
+    )
+    TRAFFIC_ESTIMATION_DEFAULT_SEARCH_VOLUME: int = int(os.getenv("TRAFFIC_ESTIMATION_DEFAULT_SEARCH_VOLUME", "100"))
+    TRAFFIC_ESTIMATION_CTR_CURVE: str = os.getenv(
+        "TRAFFIC_ESTIMATION_CTR_CURVE",
+        "0.32,0.17,0.11,0.08,0.06,0.05,0.04,0.03,0.025,0.02",
+    )
+
 settings = Settings()
 
 
