@@ -9,7 +9,7 @@ services:
       - key: ENV
         value: production
       - key: DATABASE_URL
-        value: sqlite:///./data/seo_tool.db
+        value: sqlite:///./seo_tool.db
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: JWT_EXPIRE_MINUTES
@@ -30,7 +30,5 @@ services:
         value: INFO
       - key: LOG_FORMAT
         value: json
-    disk:
-      name: seo-dashboard-data
-      mountPath: /opt/render/project/src/backend/data
-      sizeGB: 1
+      - key: ALLOWED_ORIGINS
+        sync: false
