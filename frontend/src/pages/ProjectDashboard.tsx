@@ -11,6 +11,7 @@ import {
   getProjectCompetitorTrafficOverview,
   getProjectContentPerformance,
   getProjectRoi,
+  getProjectSearchInsights,
 } from "../api";
 import type {
   DashboardStats,
@@ -23,6 +24,7 @@ import type {
   CompetitorDomainItem,
   CompetitorTrafficOverviewResponse,
   RoiBreakdownResponse,
+  SearchInsightsResponse,
 } from "../api";
 import {
   Play,
@@ -84,6 +86,10 @@ export default function ProjectDashboard() {
   const [competitorsLoading, setCompetitorsLoading] = useState(false);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [competitorError, setCompetitorError] = useState<string | null>(null);
+  const [searchInsights, setSearchInsights] = useState<SearchInsightsResponse | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsPage, setInsightsPage] = useState(1);
+  const [heatmapStep, setHeatmapStep] = useState(2);
   const { isAdmin } = useProjectRole(id);
   const { t } = useTranslation();
 
@@ -129,6 +135,28 @@ export default function ProjectDashboard() {
     };
     fetchOverview();
   }, [id, selectedCompetitorId]);
+
+  useEffect(() => {
+    if (!id) return;
+    const fetchSearchInsights = async () => {
+      setInsightsLoading(true);
+      try {
+        const data = await getProjectSearchInsights(id, {
+          days: 60,
+          page: insightsPage,
+          pageSize: 18,
+          keywordSampleStep: heatmapStep,
+        });
+        setSearchInsights(data);
+      } catch (error) {
+        console.error(error);
+        setSearchInsights(null);
+      } finally {
+        setInsightsLoading(false);
+      }
+    };
+    fetchSearchInsights();
+  }, [id, insightsPage, heatmapStep]);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -270,6 +298,32 @@ export default function ProjectDashboard() {
       return (b.date ?? '').localeCompare(a.date ?? '');
     });
   }, [backlinkQuery, backlinkSort, changes?.lost_links, changes?.new_links]);
+
+  const insightPalette = useMemo(
+    () =>
+      searchInsights?.legend.palette ?? {
+        top3: "#0f766e",
+        top10: "#0ea5a4",
+        top20: "#22d3ee",
+        top50: "#67e8f9",
+        out: "#e2e8f0",
+        missing: "#f8fafc",
+      },
+    [searchInsights?.legend.palette],
+  );
+
+  const resolveRankCellColor = (rank: number | null) => {
+    if (rank === null || rank === undefined) return insightPalette.missing;
+    if (rank <= 3) return insightPalette.top3;
+    if (rank <= 10) return insightPalette.top10;
+    if (rank <= 20) return insightPalette.top20;
+    if (rank <= 50) return insightPalette.top50;
+    return insightPalette.out;
+  };
+
+  const geoMaxSessions = Math.max(
+    ...(searchInsights?.geo_distribution.rows.map((row) => row.sessions) ?? [1]),
+  );
 
   if (loading || !stats) return <div>{t("app.loading")}</div>;
 
@@ -1007,6 +1061,120 @@ export default function ProjectDashboard() {
           "衰减页面",
           contentPerformance?.decaying_content ?? [],
         )}
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="text-xl font-bold">关键词波动热力图</h2>
+          <div className="flex items-center gap-2 text-sm">
+            <label htmlFor="heatmap-step">采样步长</label>
+            <select
+              id="heatmap-step"
+              value={heatmapStep}
+              onChange={(event) => {
+                setInsightsPage(1);
+                setHeatmapStep(Number(event.target.value));
+              }}
+              className="border rounded px-2 py-1"
+            >
+              <option value={1}>每天</option>
+              <option value={2}>每2天</option>
+              <option value={3}>每3天</option>
+              <option value={5}>每5天</option>
+            </select>
+          </div>
+        </div>
+        {insightsLoading && <p className="text-sm text-slate-500">Loading insights...</p>}
+        {!insightsLoading && (
+          <div className="overflow-auto">
+            <table className="min-w-full text-xs border-separate border-spacing-y-1">
+              <thead>
+                <tr>
+                  <th className="text-left sticky left-0 bg-white dark:bg-slate-900 pr-4">Keyword</th>
+                  {searchInsights?.keyword_heatmap.dates.map((d) => (
+                    <th key={d} className="font-medium text-slate-500 px-1 whitespace-nowrap">{d.slice(5)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {searchInsights?.keyword_heatmap.rows.map((row) => (
+                  <tr key={row.keyword}>
+                    <td className="sticky left-0 bg-white dark:bg-slate-900 pr-4 font-medium">{row.keyword}</td>
+                    {row.cells.map((cell) => (
+                      <td
+                        key={`${row.keyword}-${cell.date}`}
+                        className="w-6 h-6 rounded text-center text-[10px]"
+                        style={{ backgroundColor: resolveRankCellColor(cell.rank) }}
+                        title={`keyword=${row.keyword} | date=${cell.date} | rank=${cell.rank ?? 'N/A'}`}
+                      >
+                        {cell.rank ?? "-"}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="mt-4 flex items-center justify-between text-xs text-slate-600">
+          <span>
+            图例: Top3 / Top10 / Top20 / Top50 / Out / Missing
+          </span>
+          <div className="flex gap-2">
+            <button
+              className="border rounded px-2 py-1 disabled:opacity-40"
+              disabled={insightsPage <= 1}
+              onClick={() => setInsightsPage((prev) => Math.max(prev - 1, 1))}
+            >
+              上一页
+            </button>
+            <span>
+              Page {searchInsights?.keyword_heatmap.paging.page ?? insightsPage} /
+              {Math.max(
+                1,
+                Math.ceil(
+                  (searchInsights?.keyword_heatmap.paging.total_keywords ?? 0) /
+                    (searchInsights?.keyword_heatmap.paging.page_size ?? 1),
+                ),
+              )}
+            </span>
+            <button
+              className="border rounded px-2 py-1 disabled:opacity-40"
+              disabled={!searchInsights?.keyword_heatmap.paging.has_more}
+              onClick={() => setInsightsPage((prev) => prev + 1)}
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 p-6 rounded shadow border border-slate-200 dark:border-slate-700 mb-8">
+        <h2 className="text-xl font-bold mb-4">流量地理分布图</h2>
+        <div className="space-y-3">
+          {searchInsights?.geo_distribution.rows.map((row) => (
+            <div key={row.country}>
+              <div className="flex justify-between text-sm">
+                <span>{row.country}</span>
+                <span title={`country=${row.country} | sessions=${row.sessions} | share=${row.share}%`}>
+                  {row.sessions} sessions ({row.share}%)
+                </span>
+              </div>
+              <div className="h-2 rounded bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full rounded"
+                  style={{
+                    width: `${Math.max((row.sessions / geoMaxSessions) * 100, 4)}%`,
+                    backgroundColor: insightPalette.top10,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+          {!searchInsights?.geo_distribution.rows.length && (
+            <p className="text-sm text-slate-500">No geo data.</p>
+          )}
+        </div>
       </div>
 
       {last_crawl ? (

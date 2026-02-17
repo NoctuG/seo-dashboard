@@ -1192,6 +1192,73 @@ export async function getProjectVisibility(
   return res.data;
 }
 
+export interface SearchInsightsHeatmapCell {
+  date: string;
+  rank: number | null;
+}
+
+export interface SearchInsightsHeatmapRow {
+  keyword: string;
+  cells: SearchInsightsHeatmapCell[];
+}
+
+export interface SearchInsightsResponse {
+  project_id: number;
+  keyword_heatmap: {
+    dates: string[];
+    rows: SearchInsightsHeatmapRow[];
+    paging: {
+      page: number;
+      page_size: number;
+      total_keywords: number;
+      has_more: boolean;
+    };
+    sampling: {
+      days: number;
+      keyword_sample_step: number;
+    };
+  };
+  geo_distribution: {
+    rows: Array<{
+      country: string;
+      region: string;
+      sessions: number;
+      share: number;
+      rank: number;
+    }>;
+    total_sessions: number;
+    provider: string;
+  };
+  legend: {
+    rank_thresholds: number[];
+    palette: Record<string, string>;
+    tooltip_fields: string[];
+  };
+}
+
+export async function getProjectSearchInsights(
+  projectId: string | number,
+  params?: {
+    days?: number;
+    page?: number;
+    pageSize?: number;
+    keywordSampleStep?: number;
+  },
+): Promise<SearchInsightsResponse> {
+  const res = await api.get<SearchInsightsResponse>(
+    `/projects/${projectId}/search-insights`,
+    {
+      params: {
+        days: params?.days,
+        page: params?.page,
+        page_size: params?.pageSize,
+        keyword_sample_step: params?.keywordSampleStep,
+      },
+    },
+  );
+  return res.data;
+}
+
 export interface RoiBreakdownResponse {
   project_id: number;
   provider: string;
