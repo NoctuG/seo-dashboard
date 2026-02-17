@@ -46,6 +46,7 @@ import {
 } from 'recharts';
 import PaginationControls from '../components/PaginationControls';
 import KeywordGapVenn from '../components/KeywordGapVenn';
+import Sparkline, { EMPTY_PLACEHOLDER } from '../components/Sparkline';
 import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
 import { SERP_FEATURES, type SerpFeature } from '../constants/serpFeatures';
@@ -568,6 +569,21 @@ export default function ProjectKeywords() {
         () => filterKeywordsBySerpFeature(keywords, marketFilter, serpFeatureFilter),
         [keywords, marketFilter, serpFeatureFilter],
     );
+
+    const getKeywordTrendPoints = useCallback((kw: KeywordItem, windowDays: 7 | 30) => {
+        const raw = kw.ranking_history;
+        if (!raw || raw.length === 0) return [];
+        const now = Date.now();
+        const threshold = now - windowDays * 24 * 60 * 60 * 1000;
+        return raw
+            .map((item) => ({
+                value: typeof item.rank === 'number' ? item.rank : Number.NaN,
+                ts: new Date(item.checked_at).getTime(),
+            }))
+            .filter((item) => Number.isFinite(item.value) && Number.isFinite(item.ts) && item.ts >= threshold)
+            .sort((a, b) => a.ts - b.ts)
+            .map((item) => ({ value: item.value }));
+    }, []);
 
     const exportKeywordGap = () => {
         if (!keywordGap || keywordGap.gap.length === 0) return;
@@ -1133,6 +1149,7 @@ export default function ProjectKeywords() {
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">locale</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">market</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500 text-center">当前排名</th>
+                                <th className="px-4 py-3 text-sm font-medium text-gray-500">近 7/30 天排名趋势</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">SERP 特性</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500">最后检查时间</th>
                                 <th className="px-4 py-3 text-sm font-medium text-gray-500 text-right">操作</th>
@@ -1144,10 +1161,22 @@ export default function ProjectKeywords() {
                                 return (
                                 <tr key={kw.id} className={`hover:bg-gray-50 cursor-pointer ${selectedKeyword?.id === kw.id ? 'bg-blue-50' : ''}`} onClick={() => selectKeyword(kw)}>
                                     <td className="px-4 py-3 font-medium">{kw.term}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{kw.target_url || '-'}</td>
-                                    <td className="px-4 py-3 text-sm">{kw.locale || '-'}</td>
-                                    <td className="px-4 py-3 text-sm">{kw.market || '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{kw.target_url || EMPTY_PLACEHOLDER}</td>
+                                    <td className="px-4 py-3 text-sm">{kw.locale || EMPTY_PLACEHOLDER}</td>
+                                    <td className="px-4 py-3 text-sm">{kw.market || EMPTY_PLACEHOLDER}</td>
                                     <td className="px-4 py-3 text-center">{kw.current_rank != null ? `#${kw.current_rank}` : '未检测'}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-8 text-xs text-gray-500">7天</span>
+                                                <Sparkline data={getKeywordTrendPoints(kw, 7)} lowerIsBetter />
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-8 text-xs text-gray-500">30天</span>
+                                                <Sparkline data={getKeywordTrendPoints(kw, 30)} lowerIsBetter />
+                                            </div>
+                                        </div>
+                                    </td>
                                     <td className="px-4 py-3 text-sm text-gray-500">
                                         <div className="flex flex-wrap items-center gap-2">
                                             {serpFeatures.map((feature) => {
@@ -1165,10 +1194,10 @@ export default function ProjectKeywords() {
                                                     </span>
                                                 );
                                             })}
-                                            {serpFeatures.length === 0 && '-'}
+                                            {serpFeatures.length === 0 && EMPTY_PLACEHOLDER}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-gray-500">{kw.last_checked ? new Date(kw.last_checked).toLocaleString() : '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">{kw.last_checked ? new Date(kw.last_checked).toLocaleString() : EMPTY_PLACEHOLDER}</td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex items-center justify-end gap-2">
                                             {isAdmin && (<>

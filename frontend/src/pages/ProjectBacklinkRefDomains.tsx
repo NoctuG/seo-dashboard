@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getProjectRefDomains, type RefDomainListItem } from '../api';
 import PaginationControls from '../components/PaginationControls';
+import Sparkline, { EMPTY_PLACEHOLDER } from '../components/Sparkline';
 
 const PAGE_SIZE = 20;
 
@@ -68,6 +69,7 @@ export default function ProjectBacklinkRefDomains() {
               <th className="p-3">域名</th>
               <th className="p-3">外链数</th>
               <th className="p-3">DA</th>
+              <th className="p-3">引用域外链变化趋势</th>
               <th className="p-3">首见</th>
               <th className="p-3">最近</th>
             </tr>
@@ -75,7 +77,7 @@ export default function ProjectBacklinkRefDomains() {
           <tbody>
             {!loading && items.length === 0 && (
               <tr>
-                <td className="p-4 text-slate-500" colSpan={5}>暂无数据</td>
+                <td className="p-4 text-slate-500" colSpan={6}>暂无数据</td>
               </tr>
             )}
             {items.map((item) => (
@@ -86,9 +88,14 @@ export default function ProjectBacklinkRefDomains() {
                   </Link>
                 </td>
                 <td className="p-3">{item.backlinks_count}</td>
-                <td className="p-3">{item.da ?? '—'}</td>
-                <td className="p-3">{item.first_seen ?? '—'}</td>
-                <td className="p-3">{item.last_seen ?? '—'}</td>
+                <td className="p-3">{item.da ?? EMPTY_PLACEHOLDER}</td>
+                <td className="p-3">
+                  <Sparkline
+                    data={(item.backlinks_history ?? []).map((point) => ({ value: point.backlinks_count, label: point.date }))}
+                  />
+                </td>
+                <td className="p-3">{item.first_seen ?? EMPTY_PLACEHOLDER}</td>
+                <td className="p-3">{item.last_seen ?? EMPTY_PLACEHOLDER}</td>
               </tr>
             ))}
           </tbody>
