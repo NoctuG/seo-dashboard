@@ -151,6 +151,18 @@ class ProjectMember(SQLModel, table=True):
     role: Role = Relationship(back_populates="project_memberships")
 
 
+class UserDashboardLayout(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_user_dashboard_layout_user_project", "user_id", "project_id", unique=True),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    project_id: int = Field(foreign_key="project.id", index=True)
+    layout_json: str = "{}"
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class AiContentDraft(SQLModel, table=True):
     __table_args__ = (
         Index("ix_ai_content_draft_project_lineage_version", "project_id", "lineage_id", "version", unique=True),
