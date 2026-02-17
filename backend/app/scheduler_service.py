@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from time import perf_counter
@@ -206,6 +207,7 @@ class SchedulerService:
                     now = datetime.utcnow()
                     keyword.current_rank = result.rank
                     keyword.last_checked = now
+                    keyword.serp_features_json = json.dumps(result.serp_features, ensure_ascii=False)
                     session.add(keyword)
                     session.add(
                         RankHistory(

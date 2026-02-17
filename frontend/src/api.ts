@@ -518,6 +518,7 @@ export interface KeywordItem {
   market?: string;
   current_rank?: number;
   last_checked?: string;
+  serp_features_json?: string;
 }
 
 
