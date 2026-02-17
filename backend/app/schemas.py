@@ -346,6 +346,7 @@ class CompetitorTrafficOverviewResponse(BaseModel):
     monthly_trend: List[TrafficOverviewTrendPoint]
     top_pages: List[TrafficOverviewTopPage]
     top_keywords: List[TrafficOverviewTopKeyword]
+    notes: List[str] = Field(default_factory=list)
 
 
 class VisibilityHistoryRead(BaseModel):

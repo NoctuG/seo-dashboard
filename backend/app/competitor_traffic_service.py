@@ -4,6 +4,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 import json
+import logging
+import time
 
 import requests
 from sqlmodel import Session, select
@@ -16,6 +18,8 @@ from app.schemas import (
     TrafficOverviewTopPage,
     TrafficOverviewTrendPoint,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,8 +37,16 @@ class CompetitorTrafficService:
         project: Project,
         competitor: CompetitorDomain,
     ) -> CompetitorTrafficOverviewResponse:
-        external_payload = self._fetch_external_payload(project=project, competitor=competitor)
+        notes: list[str] = []
+
+        similarweb_payload = self._fetch_similarweb_payload(project=project, competitor=competitor, notes=notes)
+        if similarweb_payload is not None:
+            similarweb_payload.notes = notes
+            return similarweb_payload
+
+        external_payload = self._fetch_external_payload(project=project, competitor=competitor, notes=notes)
         if external_payload is not None:
+            external_payload.notes = notes
             return external_payload
 
         local_payload = self._build_local_payload(session=session, project=project, competitor=competitor)
@@ -45,13 +57,131 @@ class CompetitorTrafficService:
             monthly_trend=local_payload.monthly_trend,
             top_pages=local_payload.top_pages,
             top_keywords=local_payload.top_keywords,
+            notes=notes,
         )
+
+    def _fetch_similarweb_payload(
+        self,
+        *,
+        project: Project,
+        competitor: CompetitorDomain,
+        notes: list[str],
+    ) -> CompetitorTrafficOverviewResponse | None:
+        api_key = (settings.SIMILARWEB_API_KEY or "").strip()
+        base_url = (settings.SIMILARWEB_BASE_URL or "").rstrip("/")
+        if not api_key or not base_url:
+            return None
+
+        endpoint = f"{base_url}/v1/website/{competitor.domain}/traffic-and-engagement/overview"
+        max_retries = max(0, settings.SIMILARWEB_MAX_RETRIES)
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.get(
+                    endpoint,
+                    params={
+                        "api_key": api_key,
+                        "start_date": self._date_months_ago(11),
+                        "end_date": self._date_months_ago(0),
+                        "main_domain_only": "false",
+                        "granularity": "monthly",
+                        "format": "json",
+                    },
+                    timeout=max(1, settings.SIMILARWEB_TIMEOUT_SECONDS),
+                )
+            except requests.RequestException as exc:
+                note = f"similarweb_request_error: {exc}"
+                logger.warning("SimilarWeb request failed for %s: %s", competitor.domain, exc)
+                notes.append(note)
+                return None
+
+            if response.status_code >= 400:
+                classified_note = self._classify_http_error(
+                    provider="similarweb",
+                    status_code=response.status_code,
+                    body=response.text,
+                )
+                notes.append(classified_note)
+                if response.status_code == 429 and attempt < max_retries:
+                    time.sleep(max(0.0, settings.SIMILARWEB_RETRY_BACKOFF_SECONDS) * (2**attempt))
+                    continue
+                return None
+
+            try:
+                payload = response.json()
+            except ValueError:
+                note = "similarweb_invalid_json: unable to decode response payload"
+                logger.warning("SimilarWeb returned invalid JSON for %s", competitor.domain)
+                notes.append(note)
+                return None
+
+            trend_data = payload.get("monthly_trend")
+            if not isinstance(trend_data, list):
+                trend_data = payload.get("visits")
+
+            monthly_trend = []
+            if isinstance(trend_data, list):
+                for row in trend_data:
+                    month = str(row.get("month") or row.get("date") or "").strip()
+                    if not month:
+                        continue
+                    my_site = self._to_float(row.get("my_site") or row.get("project_visits") or 0)
+                    competitor_visits = self._to_float(
+                        row.get("competitor")
+                        or row.get("competitor_visits")
+                        or row.get("visits")
+                        or row.get("value")
+                        or 0
+                    )
+                    monthly_trend.append(
+                        TrafficOverviewTrendPoint(
+                            month=month,
+                            my_site=my_site,
+                            competitor=competitor_visits,
+                        )
+                    )
+
+            top_pages = [
+                TrafficOverviewTopPage(
+                    url=str(item.get("url") or item.get("page") or "").strip(),
+                    estimated_traffic=self._to_float(item.get("estimated_traffic") or item.get("visits") or 0),
+                    keyword_count=int(item.get("keyword_count") or item.get("keywords") or 0),
+                )
+                for item in (payload.get("top_pages") or [])
+                if str(item.get("url") or item.get("page") or "").strip()
+            ]
+
+            top_keywords = [
+                TrafficOverviewTopKeyword(
+                    keyword=str(item.get("keyword") or item.get("term") or "").strip(),
+                    rank=self._to_int(item.get("rank")),
+                    search_volume=max(0, self._to_int(item.get("search_volume")) or 0),
+                    estimated_clicks=self._to_float(item.get("estimated_clicks") or item.get("traffic") or 0),
+                )
+                for item in (payload.get("top_keywords") or [])
+                if str(item.get("keyword") or item.get("term") or "").strip()
+            ]
+
+            top_pages.sort(key=lambda item: item.estimated_traffic, reverse=True)
+            top_keywords.sort(key=lambda item: item.estimated_clicks, reverse=True)
+
+            return CompetitorTrafficOverviewResponse(
+                project_id=project.id,
+                competitor_id=competitor.id,
+                data_source="similarweb",
+                monthly_trend=monthly_trend,
+                top_pages=top_pages[:20],
+                top_keywords=top_keywords[:20],
+            )
+
+        return None
 
     def _fetch_external_payload(
         self,
         *,
         project: Project,
         competitor: CompetitorDomain,
+        notes: list[str],
     ) -> CompetitorTrafficOverviewResponse | None:
         api_url = (settings.TRAFFIC_OVERVIEW_EXTERNAL_API_URL or "").strip()
         if not api_url:
@@ -68,15 +198,26 @@ class CompetitorTrafficService:
                 },
                 timeout=max(1, settings.TRAFFIC_OVERVIEW_EXTERNAL_API_TIMEOUT_SECONDS),
             )
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            logger.warning("External traffic overview request failed for %s: %s", competitor.domain, exc)
+            notes.append(f"external_api_request_error: {exc}")
             return None
 
         if response.status_code >= 400:
+            notes.append(
+                self._classify_http_error(
+                    provider="external_api",
+                    status_code=response.status_code,
+                    body=response.text,
+                )
+            )
             return None
 
         try:
             payload = response.json()
         except ValueError:
+            logger.warning("External traffic overview returned invalid JSON for %s", competitor.domain)
+            notes.append("external_api_invalid_json: unable to decode response payload")
             return None
         monthly_trend = [TrafficOverviewTrendPoint(**item) for item in payload.get("monthly_trend", [])]
         top_pages = [TrafficOverviewTopPage(**item) for item in payload.get("top_pages", [])]
@@ -241,6 +382,47 @@ class CompetitorTrafficService:
             except ValueError:
                 continue
         return values or [0.32, 0.17, 0.11, 0.08, 0.06, 0.05, 0.04, 0.03, 0.025, 0.02]
+
+    def _date_months_ago(self, months_ago: int) -> str:
+        now = datetime.utcnow()
+        year = now.year
+        month = now.month - months_ago
+        while month <= 0:
+            month += 12
+            year -= 1
+        return f"{year:04d}-{month:02d}-01"
+
+    def _to_float(self, value: object) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _to_int(self, value: object) -> int | None:
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _classify_http_error(self, *, provider: str, status_code: int, body: str) -> str:
+        body_excerpt = (body or "").strip().replace("\n", " ")[:160]
+        if status_code == 401:
+            logger.error("%s unauthorized (401): %s", provider, body_excerpt)
+            return f"{provider}_auth_error_401: unauthorized"
+        if status_code == 403:
+            logger.error("%s forbidden (403): %s", provider, body_excerpt)
+            return f"{provider}_auth_error_403: forbidden"
+        if status_code == 429:
+            logger.warning("%s rate limited (429): %s", provider, body_excerpt)
+            return f"{provider}_rate_limited_429: too many requests"
+        if status_code >= 500:
+            logger.error("%s server error (%s): %s", provider, status_code, body_excerpt)
+            return f"{provider}_server_error_{status_code}: upstream service failure"
+
+        logger.warning("%s unexpected http status (%s): %s", provider, status_code, body_excerpt)
+        return f"{provider}_http_error_{status_code}: request failed"
 
 
 competitor_traffic_service = CompetitorTrafficService()
