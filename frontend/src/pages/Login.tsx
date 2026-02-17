@@ -34,18 +34,41 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form className="bg-white rounded shadow p-8 w-full max-w-sm" onSubmit={onSubmit}>
-        <h1 className="text-xl font-semibold mb-4">{t('login.title')}</h1>
-        {backendUnavailable && <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-3">{t('login.errors.backendUnavailable')}</p>}
-        <input className="w-full border p-2 mb-3 rounded" placeholder={t('login.email')} value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input type="password" className="w-full border p-2 mb-3 rounded" placeholder={t('login.password')} value={password} onChange={(e) => setPassword(e.target.value)} />
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-        <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded disabled:opacity-50">
+    <div className="auth-page">
+      <form className="auth-card" onSubmit={onSubmit}>
+        <h1>{t('login.title')}</h1>
+        {backendUnavailable && (
+          <p className="animate-fade-slide-down md-body-medium mb-4 rounded-[var(--shape-small)] border border-[color:color-mix(in_srgb,var(--md-sys-color-error)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--md-sys-color-error)_8%,transparent)] p-3 text-[color:var(--md-sys-color-error)]">
+            {t('login.errors.backendUnavailable')}
+          </p>
+        )}
+        <input
+          className="app-input mb-3 w-full animate-fade-slide-up animate-stagger-1"
+          placeholder={t('login.email')}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          type="password"
+          className="app-input mb-3 w-full animate-fade-slide-up animate-stagger-2"
+          placeholder={t('login.password')}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        {error && (
+          <p className="animate-fade-slide-down md-body-medium mb-3 text-[color:var(--md-sys-color-error)]">{error}</p>
+        )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="app-btn app-btn-primary w-full animate-fade-slide-up animate-stagger-3 py-2.5"
+        >
           {loading ? t('login.loading') : t('login.submit')}
         </button>
-        <p className="mt-4 text-sm text-center">
-          <Link className="text-blue-600 hover:underline" to="/forgot-password">{t('login.forgotPassword')}</Link>
+        <p className="mt-4 text-center md-body-medium animate-fade-in animate-stagger-4">
+          <Link className="text-[color:var(--md-sys-color-primary)] hover:underline" to="/forgot-password">
+            {t('login.forgotPassword')}
+          </Link>
         </p>
       </form>
     </div>

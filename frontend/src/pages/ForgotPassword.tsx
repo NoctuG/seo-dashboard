@@ -26,17 +26,32 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form className="bg-white rounded shadow p-8 w-full max-w-sm" onSubmit={onSubmit}>
-        <h1 className="text-xl font-semibold mb-4">{t('forgotPassword.title')}</h1>
-        <input className="w-full border p-2 mb-3 rounded" placeholder={t('forgotPassword.email')} value={email} onChange={(e) => setEmail(e.target.value)} />
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-        {message && <p className="text-sm text-green-600 mb-3">{message}</p>}
-        <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded disabled:opacity-50">
+    <div className="auth-page">
+      <form className="auth-card" onSubmit={onSubmit}>
+        <h1>{t('forgotPassword.title')}</h1>
+        <input
+          className="app-input mb-3 w-full animate-fade-slide-up animate-stagger-1"
+          placeholder={t('forgotPassword.email')}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        {error && (
+          <p className="animate-fade-slide-down md-body-medium mb-3 text-[color:var(--md-sys-color-error)]">{error}</p>
+        )}
+        {message && (
+          <p className="animate-fade-slide-down md-body-medium mb-3 text-[color:#16a34a]">{message}</p>
+        )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="app-btn app-btn-primary w-full animate-fade-slide-up animate-stagger-2 py-2.5"
+        >
           {loading ? t('forgotPassword.loading') : t('forgotPassword.submit')}
         </button>
-        <p className="mt-4 text-sm text-center">
-          <Link className="text-blue-600 hover:underline" to="/login">{t('forgotPassword.backToLogin')}</Link>
+        <p className="mt-4 text-center md-body-medium animate-fade-in animate-stagger-3">
+          <Link className="text-[color:var(--md-sys-color-primary)] hover:underline" to="/login">
+            {t('forgotPassword.backToLogin')}
+          </Link>
         </p>
       </form>
     </div>
