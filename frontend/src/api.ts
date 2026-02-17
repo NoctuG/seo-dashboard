@@ -652,11 +652,19 @@ export interface AiGenerateArticleRequest {
   outline?: string;
 }
 
+export interface AiContentBlock {
+  type: "heading" | "paragraph" | "list" | "cta" | "hashtag" | string;
+  text: string;
+  level?: number | null;
+  meta?: Record<string, unknown>;
+}
+
 export interface AiGenerateArticleResponse {
   title: string;
   content: string;
   meta_description: string;
   keywords_used: string[];
+  blocks?: AiContentBlock[];
 }
 
 export async function generateSeoArticle(
@@ -679,6 +687,7 @@ export interface AiSocialPost {
   content: string;
   hashtags: string[];
   platform: string;
+  blocks?: AiContentBlock[];
 }
 
 export interface AiGenerateSocialResponse {

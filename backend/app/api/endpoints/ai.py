@@ -2,11 +2,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import httpx
+import json
+import logging
 
 from app.core.error_codes import ErrorCode
 from app.runtime_settings import get_runtime_settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class AiAnalyzeRequest(BaseModel):
@@ -26,11 +29,19 @@ class AiGenerateArticleRequest(BaseModel):
     outline: Optional[str] = Field(default=None, description="Custom article outline")
 
 
+class AiContentBlock(BaseModel):
+    type: str = Field(description="Block type, e.g. heading|paragraph|list|cta")
+    text: str = Field(default="", description="Main text content")
+    level: Optional[int] = Field(default=None, ge=1, le=6, description="Heading/list level")
+    meta: dict = Field(default_factory=dict, description="Extra metadata for the block")
+
+
 class AiGenerateArticleResponse(BaseModel):
     title: str
     content: str
     meta_description: str
     keywords_used: List[str]
+    blocks: List[AiContentBlock] = Field(default_factory=list)
 
 
 class AiGenerateSocialRequest(BaseModel):
@@ -46,6 +57,7 @@ class AiSocialPost(BaseModel):
     content: str
     hashtags: List[str]
     platform: str
+    blocks: List[AiContentBlock] = Field(default_factory=list)
 
 
 class AiGenerateSocialResponse(BaseModel):
@@ -101,6 +113,63 @@ async def _call_ai(system_prompt: str, user_prompt: str) -> str:
 
     message = choices[0].get("message") or {}
     return message.get("content", "")
+
+
+def _extract_json(raw: str) -> Optional[dict]:
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 3 and lines[-1].strip() == "```":
+            text = "\n".join(lines[1:-1]).strip()
+            if text.lower().startswith("json"):
+                text = text[4:].strip()
+
+    try:
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else None
+    except json.JSONDecodeError:
+        pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end <= start:
+        return None
+
+    try:
+        parsed = json.loads(text[start:end + 1])
+        return parsed if isinstance(parsed, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
+def _normalize_blocks(blocks: object) -> List[AiContentBlock]:
+    if not isinstance(blocks, list):
+        return []
+
+    normalized: List[AiContentBlock] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+
+        raw_text = block.get("text", "")
+        text = str(raw_text).strip() if raw_text is not None else ""
+
+        raw_level = block.get("level")
+        level: Optional[int] = None
+        if isinstance(raw_level, int) and 1 <= raw_level <= 6:
+            level = raw_level
+
+        raw_meta = block.get("meta")
+        meta = raw_meta if isinstance(raw_meta, dict) else {}
+
+        normalized.append(AiContentBlock(
+            type=str(block.get("type", "paragraph")).strip() or "paragraph",
+            text=text,
+            level=level,
+            meta=meta,
+        ))
+
+    return normalized
 
 
 @router.post("/analyze", response_model=AiAnalyzeResponse)
@@ -177,7 +246,15 @@ async def generate_seo_article(payload: AiGenerateArticleRequest):
         f"[TITLE]\n文章标题\n"
         f"[META_DESCRIPTION]\n一句话SEO描述（120-160字符）\n"
         f"[KEYWORDS_USED]\n实际使用的关键词，逗号分隔\n"
-        f"[CONTENT]\n正文（使用Markdown格式，包含H2/H3标题、段落、列表等）"
+        f"[CONTENT]\n正文（使用Markdown格式，包含H2/H3标题、段落、列表等）\n\n"
+        f"另外，请在末尾附加严格JSON对象（无Markdown代码块、无额外解释），字段必须匹配：\n"
+        f"{{\n"
+        f"  \"title\": string,\n"
+        f"  \"meta_description\": string,\n"
+        f"  \"keywords_used\": string[],\n"
+        f"  \"content\": string,\n"
+        f"  \"blocks\": [{{\"type\": \"heading\"|\"paragraph\"|\"list\"|\"cta\", \"text\": string, \"level\": number|null, \"meta\": object}}]\n"
+        f"}}"
     )
 
     raw = await _call_ai(system_prompt, user_prompt)
@@ -208,11 +285,33 @@ async def generate_seo_article(payload: AiGenerateArticleRequest):
         lines = content.split("\n")
         title = lines[0].lstrip("# ").strip() if lines else payload.topic
 
+    parsed = _extract_json(raw)
+    blocks: List[AiContentBlock] = []
+    if parsed is not None:
+        parsed_title = str(parsed.get("title", "")).strip()
+        parsed_meta = str(parsed.get("meta_description", "")).strip()
+        parsed_content = str(parsed.get("content", "")).strip()
+        parsed_keywords = parsed.get("keywords_used")
+
+        if parsed_title:
+            title = parsed_title
+        if parsed_meta:
+            meta_description = parsed_meta
+        if parsed_content:
+            content = parsed_content
+        if isinstance(parsed_keywords, list):
+            keywords_used = [str(k).strip() for k in parsed_keywords if str(k).strip()]
+
+        blocks = _normalize_blocks(parsed.get("blocks"))
+    else:
+        logger.warning("ai.generate_article.structured_parse_failed", extra={"topic": payload.topic})
+
     return AiGenerateArticleResponse(
         title=title,
         content=content,
         meta_description=meta_description or title,
         keywords_used=keywords_used or payload.keywords,
+        blocks=blocks,
     )
 
 
@@ -246,6 +345,17 @@ async def generate_social_content(payload: AiGenerateSocialRequest):
         f"请严格按以下格式输出每条内容（用 --- 分隔不同条目）：\n"
         f"[POST]\n内容文本\n"
         f"[HASHTAGS]\n标签1, 标签2, 标签3\n---"
+        f"\n\n另外在末尾附加严格JSON对象（无Markdown代码块、无额外解释），字段必须匹配：\n"
+        f"{{\n"
+        f"  \"posts\": [\n"
+        f"    {{\n"
+        f"      \"content\": string,\n"
+        f"      \"platform\": string,\n"
+        f"      \"hashtags\": string[],\n"
+        f"      \"blocks\": [{{\"type\": \"heading\"|\"paragraph\"|\"list\"|\"cta\"|\"hashtag\", \"text\": string, \"level\": number|null, \"meta\": object}}]\n"
+        f"    }}\n"
+        f"  ]\n"
+        f"}}"
     )
 
     raw = await _call_ai(system_prompt, user_prompt)
@@ -279,8 +389,30 @@ async def generate_social_content(payload: AiGenerateSocialRequest):
                 platform=payload.platform,
             ))
 
+    parsed = _extract_json(raw)
+    if parsed is not None and isinstance(parsed.get("posts"), list):
+        parsed_posts: List[AiSocialPost] = []
+        for item in parsed.get("posts", []):
+            if not isinstance(item, dict):
+                continue
+            post_content = str(item.get("content", "")).strip()
+            if not post_content:
+                continue
+            parsed_posts.append(AiSocialPost(
+                content=post_content,
+                hashtags=[str(t).strip().lstrip("#") for t in item.get("hashtags", []) if str(t).strip()],
+                platform=str(item.get("platform") or payload.platform),
+                blocks=_normalize_blocks(item.get("blocks")),
+            ))
+        if parsed_posts:
+            posts = parsed_posts
+        else:
+            logger.warning("ai.generate_social.structured_posts_empty", extra={"topic": payload.topic, "platform": payload.platform})
+    else:
+        logger.warning("ai.generate_social.structured_parse_failed", extra={"topic": payload.topic, "platform": payload.platform})
+
     if not posts:
-        posts.append(AiSocialPost(content=raw, hashtags=[], platform=payload.platform))
+        posts.append(AiSocialPost(content=raw, hashtags=[], platform=payload.platform, blocks=[]))
 
     return AiGenerateSocialResponse(posts=posts)
 

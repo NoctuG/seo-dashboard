@@ -11,7 +11,14 @@ import {
 import { runWithUiState } from '../utils/asyncAction';
 import { getErrorMessage } from '../utils/error';
 import CanvasContentEditor from '../components/ai/CanvasContentEditor';
-import { articleMarkdownToCanvas, canvasToText, exportCanvas, socialToCanvas } from '../components/ai/canvasConverters';
+import {
+  articleBlocksToCanvas,
+  articleMarkdownToCanvas,
+  canvasToText,
+  exportCanvas,
+  socialBlocksToCanvas,
+  socialToCanvas,
+} from '../components/ai/canvasConverters';
 import type { CanvasDocument } from '../components/ai/canvasTypes';
 
 type TabKey = 'article' | 'social' | 'analyze';
@@ -114,7 +121,12 @@ function ArticleGenerator() {
         outline: outline || undefined,
       });
       setResult(data);
-      setEditableDocument(articleMarkdownToCanvas(data.content, data.title));
+      const structuredBlocks = data.blocks ?? [];
+      setEditableDocument(
+        structuredBlocks.length > 0
+          ? articleBlocksToCanvas(structuredBlocks, data.title)
+          : articleMarkdownToCanvas(data.content, data.title),
+      );
     }, {
       setLoading,
       setError,
@@ -363,7 +375,14 @@ function SocialGenerator() {
         count,
       });
       setPosts(data.posts);
-      setPostDocuments(data.posts.map((post) => socialToCanvas(post.content, post.hashtags)));
+      setPostDocuments(
+        data.posts.map((post) => {
+          const structuredBlocks = post.blocks ?? [];
+          return structuredBlocks.length > 0
+            ? socialBlocksToCanvas(structuredBlocks, post.hashtags)
+            : socialToCanvas(post.content, post.hashtags);
+        }),
+      );
     }, {
       setLoading,
       setError,

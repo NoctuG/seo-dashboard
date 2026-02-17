@@ -1,4 +1,5 @@
 import type { CanvasDocument, CanvasNode, CanvasNodeType, ExportFormat } from './canvasTypes';
+import type { AiContentBlock } from '../../api';
 
 const DEFAULT_WIDTH = 760;
 const DEFAULT_HEIGHT = 900;
@@ -27,6 +28,76 @@ function makeNode(type: CanvasNodeType, text: string, y: number, zIndex: number)
     zIndex,
     style: { ...baseStyleByType[type] },
   };
+}
+
+
+function blockTypeToNodeType(type: string): CanvasNodeType {
+  if (type === 'heading') return 'heading';
+  if (type === 'cta') return 'cta';
+  if (type === 'hashtag') return 'hashtag';
+  return 'paragraph';
+}
+
+function blockTextFromMeta(block: AiContentBlock): string {
+  const text = block.text?.trim();
+  if (text) return text;
+  if (Array.isArray(block.meta?.items)) {
+    return (block.meta.items as unknown[])
+      .map((item) => String(item).trim())
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
+}
+
+export function articleBlocksToCanvas(blocks: AiContentBlock[], title?: string): CanvasDocument {
+  const nodes: CanvasNode[] = [];
+  let y = 24;
+  let zIndex = 1;
+
+  if (title?.trim()) {
+    nodes.push(makeNode('heading', title.trim(), y, zIndex++));
+    y += 84;
+  }
+
+  blocks.forEach((block) => {
+    const nodeType = blockTypeToNodeType(block.type);
+    const text = blockTextFromMeta(block);
+    if (!text) return;
+
+    const node = makeNode(nodeType, text, y, zIndex++);
+    if (nodeType === 'heading') {
+      const level = Math.min(Math.max(block.level ?? 2, 1), 6);
+      node.style.fontSize = Math.max(20, 34 - level * 2);
+      node.height = 68;
+    } else if (nodeType === 'hashtag') {
+      node.height = 44;
+    } else {
+      node.height = Math.max(80, Math.ceil(text.length / 48) * 30 + 32);
+    }
+    nodes.push(node);
+    y += node.height + 16;
+  });
+
+  return {
+    id: uid(),
+    width: DEFAULT_WIDTH,
+    height: Math.max(DEFAULT_HEIGHT, y + 40),
+    nodes,
+    edges: nodes.slice(1).map((node, i) => ({ id: uid(), from: nodes[i].id, to: node.id, kind: 'flow' })),
+    metadata: { sourceType: 'article' },
+  };
+}
+
+export function socialBlocksToCanvas(blocks: AiContentBlock[], hashtags: string[]): CanvasDocument {
+  const doc = articleBlocksToCanvas(blocks);
+  doc.metadata = { sourceType: 'social' };
+  const hasHashtagNode = doc.nodes.some((node) => node.type === 'hashtag');
+  if (!hasHashtagNode && hashtags.length > 0) {
+    const bottomY = doc.nodes.reduce((max, n) => Math.max(max, n.y + n.height), 24) + 14;
+    doc.nodes.push(makeNode('hashtag', hashtags.map((h) => `#${h}`).join(' '), bottomY, doc.nodes.length + 1));
+  }
+  return doc;
 }
 
 export function articleMarkdownToCanvas(markdown: string, title?: string): CanvasDocument {
