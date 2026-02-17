@@ -1,16 +1,29 @@
 from __future__ import annotations
 
+import csv
+import io
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.api.deps import require_project_role
+from app.backlink_gap_service import BacklinkGapDomainRow, backlink_gap_service
+from app.config import settings
 from app.core.error_codes import ErrorCode
 from app.db import get_session
 from app.models import CompetitorDomain, Keyword, Project, ProjectRoleType, RankHistory, User, VisibilityHistory
-from app.schemas import KeywordGapResponse, KeywordGapRow, KeywordGapStats
+from app.schemas import (
+    BacklinkGapResponse,
+    BacklinkGapRow,
+    BacklinkGapStats,
+    KeywordGapResponse,
+    KeywordGapRow,
+    KeywordGapStats,
+)
 
 router = APIRouter()
 
@@ -187,4 +200,144 @@ def get_keyword_gap(
         common=computed.common,
         gap=computed.gap,
         unique=computed.unique,
+    )
+
+
+def _sort_backlink_rows(
+    rows: list[BacklinkGapDomainRow],
+    sort_by: Literal["da", "first_seen_at"],
+    sort_order: Literal["asc", "desc"],
+) -> list[BacklinkGapDomainRow]:
+    populated: list[BacklinkGapDomainRow]
+    missing: list[BacklinkGapDomainRow]
+
+    if sort_by == "da":
+        populated = [row for row in rows if row.da is not None]
+        missing = [row for row in rows if row.da is None]
+        populated = sorted(populated, key=lambda row: row.da or 0, reverse=sort_order == "desc")
+        return [*populated, *missing]
+
+    populated = [row for row in rows if row.first_seen_at is not None]
+    missing = [row for row in rows if row.first_seen_at is None]
+    populated = sorted(
+        populated,
+        key=lambda row: row.first_seen_at or datetime.min,
+        reverse=sort_order == "desc",
+    )
+    return [*populated, *missing]
+
+
+def _to_response_rows(rows: list[BacklinkGapDomainRow]) -> list[BacklinkGapRow]:
+    return [
+        BacklinkGapRow(
+            referring_domain=row.referring_domain,
+            da=row.da,
+            link_type=row.link_type,
+            anchor_text=row.anchor_text,
+            target_url=row.target_url,
+            first_seen_at=row.first_seen_at,
+        )
+        for row in rows
+    ]
+
+
+def _render_backlink_gap_csv(rows: list[BacklinkGapDomainRow]) -> str:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["referring_domain", "da", "link_type", "anchor_text", "target_url", "first_seen_at"])
+    for row in rows:
+        writer.writerow(
+            [
+                row.referring_domain,
+                row.da if row.da is not None else "",
+                row.link_type or "",
+                row.anchor_text or "",
+                row.target_url or "",
+                row.first_seen_at.isoformat() if row.first_seen_at else "",
+            ]
+        )
+    return buffer.getvalue()
+
+
+@router.get("/{project_id}/competitors/{competitor_id}/backlink-gap", response_model=BacklinkGapResponse)
+def get_backlink_gap(
+    project_id: int,
+    competitor_id: int,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    sort_by: Literal["da", "first_seen_at"] = Query(default="da"),
+    sort_order: Literal["asc", "desc"] = Query(default="desc"),
+    export: Optional[Literal["csv"]] = Query(default=None),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_project_role(ProjectRoleType.VIEWER)),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+    competitor = session.get(CompetitorDomain, competitor_id)
+    if not competitor or competitor.project_id != project_id:
+        raise HTTPException(status_code=404, detail=ErrorCode.COMPETITOR_NOT_FOUND)
+
+    configured_provider = (settings.BACKLINK_PROVIDER or "ahrefs").lower()
+
+    project_rows, provider, source = backlink_gap_service.fetch_domain_rows(
+        session,
+        project_id=project_id,
+        domain=project.domain,
+        provider=configured_provider,
+        is_primary_project_domain=True,
+    )
+    competitor_rows, competitor_provider, competitor_source = backlink_gap_service.fetch_domain_rows(
+        session,
+        project_id=project_id,
+        domain=competitor.domain,
+        provider=configured_provider,
+        is_primary_project_domain=False,
+    )
+
+    if not project_rows and competitor_rows:
+        provider = competitor_provider
+        source = competitor_source
+
+    project_domains = {row.referring_domain for row in project_rows}
+    competitor_domains = {row.referring_domain for row in competitor_rows}
+
+    shared_domains = project_domains & competitor_domains
+    gap_domains = competitor_domains - project_domains
+    unique_domains = project_domains - competitor_domains
+
+    selected_rows = [row for row in competitor_rows if row.referring_domain in gap_domains]
+    sorted_rows = _sort_backlink_rows(selected_rows, sort_by=sort_by, sort_order=sort_order)
+
+    if export == "csv":
+        csv_payload = _render_backlink_gap_csv(sorted_rows)
+        filename = f"backlink_gap_{project_id}_{competitor_id}.csv"
+        return StreamingResponse(
+            iter([csv_payload]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    total = len(sorted_rows)
+    offset = (page - 1) * page_size
+    paged_rows = sorted_rows[offset : offset + page_size]
+
+    return BacklinkGapResponse(
+        project_id=project_id,
+        competitor_id=competitor_id,
+        competitor_domain=competitor.domain,
+        provider=provider,
+        source=source,
+        stats=BacklinkGapStats(
+            shared_ref_domains=len(shared_domains),
+            gap_ref_domains=len(gap_domains),
+            unique_ref_domains=len(unique_domains),
+        ),
+        rows=_to_response_rows(paged_rows),
+        total=total,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )

@@ -227,6 +227,36 @@ class KeywordGapResponse(BaseModel):
     unique: List[KeywordGapRow]
 
 
+class BacklinkGapRow(BaseModel):
+    referring_domain: str
+    da: Optional[float] = None
+    link_type: Optional[str] = None
+    anchor_text: Optional[str] = None
+    target_url: Optional[str] = None
+    first_seen_at: Optional[datetime] = None
+
+
+class BacklinkGapStats(BaseModel):
+    shared_ref_domains: int = 0
+    gap_ref_domains: int = 0
+    unique_ref_domains: int = 0
+
+
+class BacklinkGapResponse(BaseModel):
+    project_id: int
+    competitor_id: int
+    competitor_domain: str
+    provider: str
+    source: str
+    stats: BacklinkGapStats
+    rows: List[BacklinkGapRow]
+    total: int
+    page: int
+    page_size: int
+    sort_by: str
+    sort_order: str
+
+
 class VisibilityHistoryRead(BaseModel):
     keyword_id: Optional[int]
     keyword_term: str
