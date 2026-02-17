@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
     addProjectCompetitor,
@@ -262,7 +262,8 @@ export default function ProjectKeywords() {
         }
     };
 
-    const fetchHistory = async (keywordId: number, days: 7 | 30 | 90 = historyWindow) => {
+    const fetchHistory = useCallback(async (keywordId: number, days: 7 | 30 | 90) => {
+        if (!id) return;
         setHistoryLoading(true);
         try {
             const res = await api.get<RankHistoryItem[]>(`/projects/${id}/keywords/${keywordId}/history`, {
@@ -274,7 +275,7 @@ export default function ProjectKeywords() {
         } finally {
             setHistoryLoading(false);
         }
-    };
+    }, [id]);
 
     const selectKeyword = (kw: KeywordItem) => {
         setSelectedKeyword(kw);
@@ -282,11 +283,9 @@ export default function ProjectKeywords() {
     };
 
     useEffect(() => {
-        if (selectedKeyword) {
-            fetchHistory(selectedKeyword.id, historyWindow);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [historyWindow]);
+        if (!selectedKeyword) return;
+        fetchHistory(selectedKeyword.id, historyWindow);
+    }, [selectedKeyword, historyWindow, fetchHistory]);
 
     const saveSchedule = async () => {
         if (!id) return;
