@@ -954,6 +954,17 @@ export async function deleteProjectCompetitor(
   await api.delete(`/projects/${projectId}/competitors/${competitorId}`);
 }
 
+export async function updateProjectCompetitor(
+  projectId: string | number,
+  competitorId: number,
+  domain: string,
+): Promise<CompetitorDomainItem> {
+  const res = await api.put<CompetitorDomainItem>(
+    `/projects/${projectId}/competitors/${competitorId}`,
+    { domain },
+  );
+  return res.data;
+}
 
 
 export async function getKeywordRankSchedule(

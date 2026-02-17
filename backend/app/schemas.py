@@ -224,6 +224,10 @@ class CompetitorDomainCreate(BaseModel):
     domain: str
 
 
+class CompetitorDomainUpdate(BaseModel):
+    domain: str
+
+
 class CompetitorDomainRead(BaseModel):
     id: int
     project_id: int

@@ -8,6 +8,7 @@ import {
     getProjectVisibility,
     getProjectRankingsDistribution,
     runProjectKeywordCompare,
+    updateProjectCompetitor,
     updateProjectSettings,
     getKeywordRankSchedule,
     upsertKeywordRankSchedule,
@@ -25,7 +26,7 @@ import type {
     KeywordScheduleFrequency,
     RankingDistributionResponse,
 } from '../api';
-import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield, Download, X } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, TrendingUp, Search, BarChart3, Shield, Download, X, Pencil, Check, Sparkles, Images, MapPin, MessageCircleQuestion } from 'lucide-react';
 import { useProjectRole } from '../useProjectRole';
 import {
     LineChart,
@@ -81,6 +82,8 @@ export default function ProjectKeywords() {
     const [competitorTotal, setCompetitorTotal] = useState(0);
     const [competitorPage, setCompetitorPage] = useState(1);
     const [competitorInput, setCompetitorInput] = useState('');
+    const [editingCompetitorId, setEditingCompetitorId] = useState<number | null>(null);
+    const [editingCompetitorDomain, setEditingCompetitorDomain] = useState('');
     const [compareHistory, setCompareHistory] = useState<VisibilityHistoryItem[]>([]);
     const [visibility, setVisibility] = useState<VisibilityResponse | null>(null);
     const [projectSettings, setProjectSettings] = useState<Project | null>(null);
@@ -254,6 +257,29 @@ export default function ProjectKeywords() {
         }, {
             setError,
             formatError: (err: unknown) => getErrorMessage(err, '删除竞争对手失败，请稍后再试。'),
+            onError: (err: unknown) => console.error(err),
+        });
+    };
+
+    const startEditingCompetitor = (competitor: CompetitorDomainItem) => {
+        setEditingCompetitorId(competitor.id);
+        setEditingCompetitorDomain(competitor.domain);
+    };
+
+    const cancelEditingCompetitor = () => {
+        setEditingCompetitorId(null);
+        setEditingCompetitorDomain('');
+    };
+
+    const saveCompetitor = async (competitorId: number) => {
+        if (!id || !editingCompetitorDomain.trim()) return;
+        await runWithUiState(async () => {
+            await updateProjectCompetitor(id, competitorId, editingCompetitorDomain.trim());
+            cancelEditingCompetitor();
+            await fetchCompetitors(competitorPage);
+        }, {
+            setError,
+            formatError: (err: unknown) => getErrorMessage(err, '更新竞争对手失败，请稍后再试。'),
             onError: (err: unknown) => console.error(err),
         });
     };
@@ -665,16 +691,55 @@ export default function ProjectKeywords() {
                     {competitors.length === 0 ? (
                         <span className="text-sm text-gray-500">暂无竞争对手配置。</span>
                     ) : (
-                        competitors.map((item) => (
-                            <span key={item.id} className="inline-flex items-center gap-2 bg-slate-100 rounded-full px-3 py-1 text-sm">
-                                {item.domain}
-                                {isAdmin && (
-                                <button onClick={() => removeCompetitor(item.id)} className="text-red-500 hover:text-red-700">
-                                    <Trash2 size={14} />
-                                </button>
-                                )}
-                            </span>
-                        ))
+                        competitors.map((item) => {
+                            const isEditing = editingCompetitorId === item.id;
+                            return (
+                                <span key={item.id} className="inline-flex items-center gap-2 bg-slate-100 rounded-full px-3 py-1 text-sm">
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            value={editingCompetitorDomain}
+                                            onChange={(e) => setEditingCompetitorDomain(e.target.value)}
+                                            className="border rounded px-2 py-1 text-sm"
+                                            onKeyDown={(e) => e.key === 'Enter' && saveCompetitor(item.id)}
+                                        />
+                                    ) : (
+                                        item.domain
+                                    )}
+                                    {isAdmin && (
+                                        <>
+                                            {isEditing ? (
+                                                <>
+                                                    <button
+                                                        onClick={() => saveCompetitor(item.id)}
+                                                        disabled={!editingCompetitorDomain.trim()}
+                                                        className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
+                                                    >
+                                                        <><Check size={14} /> 保存</>
+                                                    </button>
+                                                    <button
+                                                        onClick={cancelEditingCompetitor}
+                                                        className="text-gray-500 hover:text-gray-700"
+                                                    >
+                                                        <><X size={14} /> 取消</>
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button
+                                                    onClick={() => startEditingCompetitor(item)}
+                                                    className="text-sky-600 hover:text-sky-700"
+                                                >
+                                                    <><Pencil size={14} /> 编辑</>
+                                                </button>
+                                            )}
+                                            <button onClick={() => removeCompetitor(item.id)} className="text-red-500 hover:text-red-700">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </>
+                                    )}
+                                </span>
+                            );
+                        })
                     )}
                 </div>
                 <PaginationControls page={competitorPage} pageSize={20} total={competitorTotal} onPageChange={setCompetitorPage} />
