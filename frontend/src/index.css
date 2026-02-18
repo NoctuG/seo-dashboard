@@ -160,7 +160,16 @@
   }
 
   .dashboard-card {
-    @apply p-6;
+    padding: var(--space-3);
+    border-radius: var(--shape-large);
+  }
+
+  .dashboard-section {
+    margin-bottom: var(--space-4);
+  }
+
+  .dashboard-grid {
+    gap: var(--space-3);
   }
 
   .dashboard-card-compact {

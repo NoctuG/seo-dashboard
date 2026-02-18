@@ -83,7 +83,7 @@ export default function DashboardLayout({ widgets, layout, onLayoutChange }: Pro
   };
 
   return (
-    <div className="mb-8">
+    <div className="dashboard-section">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {widgets.map((widget) => (
           <button
@@ -111,7 +111,7 @@ export default function DashboardLayout({ widgets, layout, onLayoutChange }: Pro
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={visibleIds} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 dashboard-grid">
             {visibleIds.map((id, index) => {
               const widget = widgetMap.get(id);
               if (!widget) return null;
