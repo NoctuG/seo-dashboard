@@ -9,7 +9,7 @@ from sqlmodel import Session
 from app.auth_service import create_initial_admin
 from app.config import settings, validate_settings
 from app.api.api import api_router
-from app.db import init_db, engine
+from app.db import engine
 from app.rate_limit import limiter, rate_limit_exceeded_handler
 from app.logging_config import REQUEST_PATH_CONTEXT, TRACE_ID_CONTEXT, generate_trace_id
 from app.metrics import finish_timed_request, observe_http_request, timed_request
@@ -34,7 +34,6 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     validate_settings()
-    init_db()
     with Session(engine) as session:
         create_initial_admin(session)
     scheduler_service.start()
