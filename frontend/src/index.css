@@ -152,15 +152,15 @@
 
 @layer components {
   .app-card {
-    background: var(--md-sys-color-surface-container);
+    background: var(--md-sys-color-surface-container-low);
     color: var(--md-sys-color-on-surface);
     border: 1px solid var(--md-sys-color-outline);
     border-radius: var(--shape-large);
-    @apply shadow-sm;
+
   }
 
   .dashboard-card {
-    @apply p-6 rounded shadow;
+    @apply p-6;
   }
 
   .dashboard-card-compact {

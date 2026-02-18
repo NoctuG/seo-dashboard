@@ -458,7 +458,7 @@ export default function ProjectDashboard() {
     title: string,
     items: ContentPerformanceItem[],
   ) => (
-    <div className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow">
+    <div className="app-card dashboard-card">
       {" "}
       <h3 className="font-semibold mb-3">{title}</h3>{" "}
       <ul className="space-y-3 text-sm">
@@ -672,7 +672,7 @@ export default function ProjectDashboard() {
           </h3>{" "}
           <p className="text-3xl font-bold">{stats.total_pages}</p>{" "}
         </div>{" "}
-        <div className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow border-l-4 border-red-500">
+        <div className="app-card dashboard-card border-l-4 border-red-500">
           {" "}
           <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
             {" "}
@@ -683,7 +683,7 @@ export default function ProjectDashboard() {
             {issues_breakdown.critical}{" "}
           </p>{" "}
         </div>{" "}
-        <div className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow border-l-4 border-yellow-500">
+        <div className="app-card dashboard-card border-l-4 border-yellow-500">
           {" "}
           <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
             {" "}
@@ -694,7 +694,7 @@ export default function ProjectDashboard() {
             {issues_breakdown.warning}{" "}
           </p>{" "}
         </div>{" "}
-        <div className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow border-l-4 border-blue-500">
+        <div className="app-card dashboard-card border-l-4 border-blue-500">
           {" "}
           <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
             {" "}
@@ -827,7 +827,7 @@ export default function ProjectDashboard() {
             widgetId: "domain-authority",
             title: "Domain Authority",
             content: (
-              <div className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow">
+              <div className="app-card dashboard-card">
                 {" "}
                 <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
                   {" "}
@@ -849,7 +849,7 @@ export default function ProjectDashboard() {
             widgetId: "backlinks",
             title: "Backlinks",
             content: (
-              <div className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow">
+              <div className="app-card dashboard-card">
                 {" "}
                 <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
                   {" "}
@@ -1227,7 +1227,7 @@ export default function ProjectDashboard() {
       </div>{" "}
       <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-6">
         {" "}
-        <div className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow">
+        <div className="app-card dashboard-card">
           {" "}
           <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
             {" "}
@@ -1246,7 +1246,7 @@ export default function ProjectDashboard() {
             {analytics.period.monthly_total}
           </p>{" "}
         </div>{" "}
-        <div className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow">
+        <div className="app-card dashboard-card">
           {" "}
           <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase">
             Growth
@@ -1263,7 +1263,7 @@ export default function ProjectDashboard() {
             {analytics.period.growth_pct}%{" "}
           </p>{" "}
         </div>{" "}
-        <div className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow">
+        <div className="app-card dashboard-card">
           {" "}
           <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
             {" "}
@@ -1279,7 +1279,7 @@ export default function ProjectDashboard() {
         {qualityCards.map((card) => (
           <div
             key={card.label}
-            className="bg-[var(--md-sys-color-surface-container)] p-6 rounded shadow"
+            className="app-card dashboard-card"
           >
             {" "}
             <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase">
