@@ -44,6 +44,9 @@ import {
 } from "lucide-react";
 import RoiAttributionNote from "../components/RoiAttributionNote";
 import DashboardLayout from "../components/DashboardLayout";
+import { DashboardSkeleton } from "../components/SkeletonCard";
+import { EmptyState } from "../components/EmptyState";
+import { InlineAlert } from "../components/InlineAlert";
 import { useAuth } from "../auth";
 import { useProjectRole } from "../useProjectRole";
 import {
@@ -61,6 +64,10 @@ import {
   Area,
 } from "recharts";
 
+// ---------------------------------------------------------------------------
+// Shared chart style tokens — derived from CSS custom properties so they
+// automatically follow the active light / dark theme.
+// ---------------------------------------------------------------------------
 const chartSeriesColors = {
   primary: "var(--md-sys-color-primary)",
   secondary: "var(--md-sys-color-secondary)",
@@ -125,18 +132,45 @@ const DEFAULT_WIDGET_ORDER = [
   "ref-domains",
   "ahrefs-rank",
 ];
+
+// ---------------------------------------------------------------------------
+// Heatmap loading skeleton — 5 placeholder rows
+// ---------------------------------------------------------------------------
+function HeatmapSkeleton() {
+  return (
+    <div className="animate-pulse space-y-2 py-2">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          className="h-6 w-full rounded bg-[var(--md-sys-color-surface-variant)]"
+        />
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export default function ProjectDashboard() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
+
+  // Core dashboard
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [maxPages, setMaxPages] = useState(50);
   const [sitemapUrl, setSitemapUrl] = useState("");
+
+  // Content performance
   const [contentPerformance, setContentPerformance] =
     useState<ContentPerformanceResponse | null>(null);
   const [window, setWindow] = useState<"7d" | "30d" | "90d">("30d");
   const [sort, setSort] = useState<"traffic" | "conversion_rate" | "decay">(
     "traffic",
   );
+
+  // Authority & backlinks
   const [authority, setAuthority] = useState<AuthorityResponse | null>(null);
   const [backlinks, setBacklinks] = useState<BacklinkResponse | null>(null);
   const [changes, setChanges] = useState<BacklinkChangesResponse | null>(null);
@@ -148,16 +182,20 @@ export default function ProjectDashboard() {
   const [backlinkTrendInterval, setBacklinkTrendInterval] = useState<
     "day" | "week"
   >("day");
+  const [backlinkQuery, setBacklinkQuery] = useState("");
+  const [backlinkSort, setBacklinkSort] = useState<
+    "status" | "source" | "date"
+  >("date");
+
+  // Brand / ROI
   const [brandWindow, setBrandWindow] = useState<"7d" | "30d" | "90d">("30d");
   const [roiRange, setRoiRange] = useState<"30d" | "90d" | "12m">("30d");
   const [attributionModel, setAttributionModel] = useState<
     "linear" | "first_click" | "last_click"
   >("linear");
   const [roi, setRoi] = useState<RoiBreakdownResponse | null>(null);
-  const [backlinkQuery, setBacklinkQuery] = useState("");
-  const [backlinkSort, setBacklinkSort] = useState<
-    "status" | "source" | "date"
-  >("date");
+
+  // Competitor
   const [competitors, setCompetitors] = useState<CompetitorDomainItem[]>([]);
   const [selectedCompetitorId, setSelectedCompetitorId] = useState<
     number | null
@@ -166,112 +204,74 @@ export default function ProjectDashboard() {
     useState<CompetitorTrafficOverviewResponse | null>(null);
   const [competitorsLoading, setCompetitorsLoading] = useState(false);
   const [overviewLoading, setOverviewLoading] = useState(false);
-  const [competitorError, setCompetitorError] = useState<string | null>(null);
+  /**
+   * "list" → failed to load the competitor list
+   * "overview" → failed to load the traffic overview for selected competitor
+   */
+  const [competitorError, setCompetitorError] = useState<
+    "list" | "overview" | null
+  >(null);
+
+  // Search insights / heatmap
   const [searchInsights, setSearchInsights] =
     useState<SearchInsightsResponse | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsPage, setInsightsPage] = useState(1);
   const [heatmapStep, setHeatmapStep] = useState(2);
+
+  // Auth / layout
   const { isAdmin } = useProjectRole(id);
   const { isAuthenticated } = useAuth();
-  const { t } = useTranslation();
   const [dashboardLayout, setDashboardLayout] = useState<{
     order: string[];
     hidden: string[];
   }>({ order: DEFAULT_WIDGET_ORDER, hidden: [] });
-  useEffect(() => {
+
+  // ---------------------------------------------------------------------------
+  // Data-fetch callbacks (extracted so retry buttons can call them directly)
+  // ---------------------------------------------------------------------------
+  const fetchCompetitorsList = useCallback(async () => {
     if (!id) return;
-    const fetchCompetitors = async () => {
-      setCompetitorsLoading(true);
-      setCompetitorError(null);
-      try {
-        const listData = await getProjectCompetitorList(id);
-        setCompetitors(listData.items);
-        setSelectedCompetitorId(
-          (prev) => prev ?? listData.items[0]?.id ?? null,
-        );
-      } catch (error) {
-        console.error(error);
-        setCompetitorError("Failed to load competitors.");
-        setCompetitors([]);
-        setSelectedCompetitorId(null);
-      } finally {
-        setCompetitorsLoading(false);
-      }
-    };
-    fetchCompetitors();
+    setCompetitorsLoading(true);
+    setCompetitorError(null);
+    try {
+      const listData = await getProjectCompetitorList(id);
+      setCompetitors(listData.items);
+      setSelectedCompetitorId(
+        (prev) => prev ?? listData.items[0]?.id ?? null,
+      );
+    } catch (error) {
+      console.error(error);
+      setCompetitorError("list");
+      setCompetitors([]);
+      setSelectedCompetitorId(null);
+    } finally {
+      setCompetitorsLoading(false);
+    }
   }, [id]);
-  useEffect(() => {
+
+  const fetchCompetitorOverview = useCallback(async () => {
     if (!id || !selectedCompetitorId) {
       setCompetitorOverview(null);
       return;
     }
-    const fetchOverview = async () => {
-      setOverviewLoading(true);
-      setCompetitorError(null);
-      try {
-        const overview = await getProjectCompetitorTrafficOverview(
-          id,
-          selectedCompetitorId,
-        );
-        setCompetitorOverview(overview);
-      } catch (error) {
-        console.error(error);
-        setCompetitorError("Failed to load competitor overview.");
-        setCompetitorOverview(null);
-      } finally {
-        setOverviewLoading(false);
-      }
-    };
-    fetchOverview();
-  }, [id, selectedCompetitorId]);
-  useEffect(() => {
-    if (!id) return;
-    const fetchSearchInsights = async () => {
-      setInsightsLoading(true);
-      try {
-        const data = await getProjectSearchInsights(id, {
-          days: 60,
-          page: insightsPage,
-          pageSize: 18,
-          keywordSampleStep: heatmapStep,
-        });
-        setSearchInsights(data);
-      } catch (error) {
-        console.error(error);
-        setSearchInsights(null);
-      } finally {
-        setInsightsLoading(false);
-      }
-    };
-    fetchSearchInsights();
-  }, [id, insightsPage, heatmapStep]);
-  useEffect(() => {
-    if (!id) return;
-    if (!isAuthenticated || !isAdmin) {
-      setDashboardLayout({ order: DEFAULT_WIDGET_ORDER, hidden: [] });
-      return;
+    setOverviewLoading(true);
+    setCompetitorError(null);
+    try {
+      const overview = await getProjectCompetitorTrafficOverview(
+        id,
+        selectedCompetitorId,
+      );
+      setCompetitorOverview(overview);
+    } catch (error) {
+      console.error(error);
+      setCompetitorError("overview");
+      setCompetitorOverview(null);
+    } finally {
+      setOverviewLoading(false);
     }
-    getProjectDashboardLayout(id)
-      .then((layout) =>
-        setDashboardLayout({
-          order: layout.order?.length ? layout.order : DEFAULT_WIDGET_ORDER,
-          hidden: layout.hidden ?? [],
-        }),
-      )
-      .catch(() =>
-        setDashboardLayout({ order: DEFAULT_WIDGET_ORDER, hidden: [] }),
-      );
-  }, [id, isAuthenticated, isAdmin]);
-  useEffect(() => {
-    if (!id || !isAuthenticated || !isAdmin) return;
-    const timer = globalThis.setTimeout(() => {
-      saveProjectDashboardLayout(id, dashboardLayout).catch((error) =>
-        console.error(error),
-      );
-    }, 800);
-    return () => globalThis.clearTimeout(timer);
-  }, [id, isAuthenticated, isAdmin, dashboardLayout]);
+  }, [id, selectedCompetitorId]);
+
   const fetchDashboard = useCallback(async () => {
     try {
       const res = await api.get<DashboardStats>(`/projects/${id}/dashboard`);
@@ -282,6 +282,7 @@ export default function ProjectDashboard() {
       setLoading(false);
     }
   }, [id]);
+
   const fetchBacklinkData = useCallback(async () => {
     if (!id) return;
     try {
@@ -303,6 +304,7 @@ export default function ProjectDashboard() {
       console.error(error);
     }
   }, [id, backlinkTrendInterval, backlinkTrendWindow]);
+
   const fetchBacklinkStatus = useCallback(async () => {
     if (!id) return;
     try {
@@ -312,6 +314,7 @@ export default function ProjectDashboard() {
       console.error(error);
     }
   }, [id]);
+
   const fetchRoiData = useCallback(async () => {
     if (!id) return;
     try {
@@ -321,6 +324,7 @@ export default function ProjectDashboard() {
       console.error(error);
     }
   }, [id, roiRange, attributionModel]);
+
   const fetchContentPerformance = useCallback(async () => {
     if (!id) return;
     try {
@@ -330,6 +334,68 @@ export default function ProjectDashboard() {
       console.error(error);
     }
   }, [id, window, sort]);
+
+  // ---------------------------------------------------------------------------
+  // Effects
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    fetchCompetitorsList();
+  }, [fetchCompetitorsList]);
+
+  useEffect(() => {
+    fetchCompetitorOverview();
+  }, [fetchCompetitorOverview]);
+
+  useEffect(() => {
+    if (!id) return;
+    const fetchSearchInsights = async () => {
+      setInsightsLoading(true);
+      try {
+        const data = await getProjectSearchInsights(id, {
+          days: 60,
+          page: insightsPage,
+          pageSize: 18,
+          keywordSampleStep: heatmapStep,
+        });
+        setSearchInsights(data);
+      } catch (error) {
+        console.error(error);
+        setSearchInsights(null);
+      } finally {
+        setInsightsLoading(false);
+      }
+    };
+    fetchSearchInsights();
+  }, [id, insightsPage, heatmapStep]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (!isAuthenticated || !isAdmin) {
+      setDashboardLayout({ order: DEFAULT_WIDGET_ORDER, hidden: [] });
+      return;
+    }
+    getProjectDashboardLayout(id)
+      .then((layout) =>
+        setDashboardLayout({
+          order: layout.order?.length ? layout.order : DEFAULT_WIDGET_ORDER,
+          hidden: layout.hidden ?? [],
+        }),
+      )
+      .catch(() =>
+        setDashboardLayout({ order: DEFAULT_WIDGET_ORDER, hidden: [] }),
+      );
+  }, [id, isAuthenticated, isAdmin]);
+
+  useEffect(() => {
+    if (!id || !isAuthenticated || !isAdmin) return;
+    const timer = globalThis.setTimeout(() => {
+      saveProjectDashboardLayout(id, dashboardLayout).catch((error) =>
+        console.error(error),
+      );
+    }, 800);
+    return () => globalThis.clearTimeout(timer);
+  }, [id, isAuthenticated, isAdmin, dashboardLayout]);
+
   useEffect(() => {
     if (id) {
       fetchDashboard();
@@ -344,21 +410,29 @@ export default function ProjectDashboard() {
     fetchBacklinkData,
     fetchRoiData,
   ]);
+
   useEffect(() => {
     if (id) fetchContentPerformance();
   }, [id, window, sort, fetchContentPerformance]);
+
   useEffect(() => {
     if (id) fetchBacklinkData();
   }, [id, backlinkTrendWindow, backlinkTrendInterval, fetchBacklinkData]);
+
   useEffect(() => {
     if (id) fetchRoiData();
   }, [id, roiRange, attributionModel, fetchRoiData]);
+
   useEffect(() => {
     if (!id) return;
     fetchBacklinkStatus();
     const timer = globalThis.setInterval(fetchBacklinkStatus, 10000);
     return () => globalThis.clearInterval(timer);
   }, [id, fetchBacklinkStatus]);
+
+  // ---------------------------------------------------------------------------
+  // Derived / memoised values
+  // ---------------------------------------------------------------------------
   const startCrawl = async () => {
     try {
       await api.post(`/projects/${id}/crawl`, null, {
@@ -370,12 +444,15 @@ export default function ProjectDashboard() {
       console.error(error);
     }
   };
+
   const brandWindowDays =
     brandWindow === "7d" ? 7 : brandWindow === "30d" ? 30 : 90;
+
   const brandSeries = useMemo(() => {
     const rows = [...(stats?.analytics.daily_brand_segments || [])];
     return rows.slice(Math.max(rows.length - brandWindowDays, 0));
   }, [stats?.analytics.daily_brand_segments, brandWindowDays]);
+
   const brandSummary = useMemo(() => {
     return brandSeries.reduce(
       (acc, row) => ({
@@ -393,15 +470,23 @@ export default function ProjectDashboard() {
       },
     );
   }, [brandSeries]);
+
+  // Store raw status keys; translate at render time to stay i18n-correct.
   const backlinkRows = useMemo(() => {
     const rows = [
-      ...(changes?.new_links ?? []).map((l) => ({ ...l, status: "新增" })),
-      ...(changes?.lost_links ?? []).map((l) => ({ ...l, status: "失效" })),
+      ...(changes?.new_links ?? []).map((l) => ({
+        ...l,
+        status: "new" as const,
+      })),
+      ...(changes?.lost_links ?? []).map((l) => ({
+        ...l,
+        status: "lost" as const,
+      })),
     ];
     const filtered = rows.filter((row) => {
       if (!backlinkQuery.trim()) return true;
       const q = backlinkQuery.toLowerCase();
-      return `${row.status} ${row.source ?? ""} ${row.url} ${row.anchor ?? ""} ${row.date ?? ""}`
+      return `${row.source ?? ""} ${row.url} ${row.anchor ?? ""} ${row.date ?? ""}`
         .toLowerCase()
         .includes(q);
     });
@@ -412,6 +497,7 @@ export default function ProjectDashboard() {
       return (b.date ?? "").localeCompare(a.date ?? "");
     });
   }, [backlinkQuery, backlinkSort, changes?.lost_links, changes?.new_links]);
+
   const insightPalette = useMemo(
     () =>
       searchInsights?.legend.palette ?? {
@@ -424,6 +510,7 @@ export default function ProjectDashboard() {
       },
     [searchInsights?.legend.palette],
   );
+
   const resolveRankCellColor = (rank: number | null) => {
     if (rank === null || rank === undefined) return insightPalette.missing;
     if (rank <= 3) return insightPalette.top3;
@@ -432,11 +519,13 @@ export default function ProjectDashboard() {
     if (rank <= 50) return insightPalette.top50;
     return insightPalette.out;
   };
+
   const geoMaxSessions = Math.max(
     ...(searchInsights?.geo_distribution.rows.map((row) => row.sessions) ?? [
       1,
     ]),
   );
+
   const backlinkTrendSeries: BacklinkTrendPoint[] =
     backlinks?.trend_series && backlinks.trend_series.length > 0
       ? backlinks.trend_series
@@ -458,12 +547,18 @@ export default function ProjectDashboard() {
     backlinkTrendSummary?.net_growth ??
     (backlinkTrendLatest?.backlinks_total ?? 0) -
       (backlinkTrendFirst?.backlinks_total ?? 0);
+
   const formatPct = (value?: number | null) => {
     if (value === null || value === undefined || Number.isNaN(value))
       return "—";
     return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
   };
-  if (loading || !stats) return <div>{t("app.loading")}</div>;
+
+  // ---------------------------------------------------------------------------
+  // Skeleton guard — show animated placeholder until core stats arrive
+  // ---------------------------------------------------------------------------
+  if (loading || !stats) return <DashboardSkeleton />;
+
   const { last_crawl, issues_breakdown, analytics } = stats;
   const hasGrowth = analytics.period.growth_pct >= 0;
   const siteHealthStroke = getSiteHealthStroke(stats.site_health_band);
@@ -472,21 +567,26 @@ export default function ProjectDashboard() {
   const healthDashOffset =
     healthCircumference - (stats.site_health_score / 100) * healthCircumference;
   const categoryScores = stats.category_scores ?? [];
+
   const qualityCards = [
     {
-      label: "Engaged Sessions",
+      label: t("dashboard.qualityEngagedSessions"),
       value: analytics.quality_metrics.engaged_sessions,
     },
     {
-      label: "Avg Engagement Time (s)",
+      label: t("dashboard.qualityAvgEngagementTime"),
       value: analytics.quality_metrics.avg_engagement_time,
     },
     {
-      label: "Pages / Session",
+      label: t("dashboard.qualityPagesPerSession"),
       value: analytics.quality_metrics.pages_per_session,
     },
-    { label: "Key Events", value: analytics.quality_metrics.key_events },
+    {
+      label: t("dashboard.qualityKeyEvents"),
+      value: analytics.quality_metrics.key_events,
+    },
   ];
+
   const competitorCurrentMonthTraffic =
     competitorOverview?.monthly_trend.at(-1)?.competitor ?? null;
   const competitorPrevMonthTraffic =
@@ -502,144 +602,142 @@ export default function ProjectDashboard() {
         100
       : null;
   const topKeyword = competitorOverview?.top_keywords[0] ?? null;
+
+  // ---------------------------------------------------------------------------
+  // Content list renderer (shared across top / conversion / decay lists)
+  // ---------------------------------------------------------------------------
   const renderContentList = (
     title: string,
     items: ContentPerformanceItem[],
   ) => (
     <div className="app-card dashboard-card">
-      {" "}
-      <h3 className="md-title-medium mb-3">{title}</h3>{" "}
+      <h3 className="md-title-medium mb-3">{title}</h3>
       <ul className="space-y-3 md-body-medium">
-        {" "}
         {items.length === 0 && (
-          <li className="text-[var(--md-sys-color-on-surface-variant)]">
-            No data
+          <li>
+            <EmptyState message={t("dashboard.noData")} />
           </li>
-        )}{" "}
+        )}
         {items.map((item) => (
           <li key={`${title}-${item.url}`} className="border-b pb-2">
-            {" "}
             <a
               href={item.url}
               target="_blank"
               rel="noreferrer"
               className="app-action-link break-all"
             >
-              {" "}
-              {item.url}{" "}
-            </a>{" "}
+              {item.url}
+            </a>
             <div className="md-label-medium text-[var(--md-sys-color-on-surface-variant)] mt-1 flex flex-wrap gap-3">
-              {" "}
-              <span>Sessions: {item.sessions}</span>{" "}
-              <span>CVR: {item.conversion_rate}%</span>{" "}
-              <span>7d: {item.change_7d}%</span>{" "}
+              <span>
+                {t("dashboard.sessions")}: {item.sessions}
+              </span>
+              <span>
+                {t("dashboard.cvr")}: {item.conversion_rate}%
+              </span>
+              <span>
+                {t("dashboard.change7d")}: {item.change_7d}%
+              </span>
               {item.decay_flag && (
-                <span className="text-red-600">Decay</span>
-              )}{" "}
-            </div>{" "}
+                <span className="text-[var(--md-sys-color-error)]">
+                  {t("dashboard.decayFlag")}
+                </span>
+              )}
+            </div>
             {item.suggested_action && (
               <p className="md-label-medium text-orange-700 mt-1">
-                {" "}
-                {item.suggested_action}{" "}
+                {item.suggested_action}
               </p>
-            )}{" "}
+            )}
           </li>
-        ))}{" "}
-      </ul>{" "}
+        ))}
+      </ul>
     </div>
   );
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
     <div className="dashboard-page text-[var(--md-sys-color-on-surface)]">
-      {" "}
+      {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="flex justify-between items-center mb-6">
-        {" "}
         <div className="flex items-center gap-3">
-          {" "}
-          <h1 className="md-headline-large">Dashboard</h1>{" "}
+          <h1 className="md-headline-large">{t("dashboard.title")}</h1>
           <Link
             to={`/projects/${id}/reports`}
             className="md-body-medium app-action-link"
           >
-            {" "}
-            Reports{" "}
-          </Link>{" "}
+            {t("dashboard.reports")}
+          </Link>
           <Link
             to={`/projects/${id}/site-audit`}
             className="md-body-medium app-action-link"
           >
-            {" "}
-            Site Audit Overview{" "}
-          </Link>{" "}
-        </div>{" "}
+            {t("dashboard.siteAudit")}
+          </Link>
+        </div>
         {isAdmin && (
-          <button
-            onClick={startCrawl}
-            className="app-btn app-btn-primary"
-          >
-            {" "}
-            <Play size={18} /> Start New Crawl{" "}
+          <button onClick={startCrawl} className="app-btn app-btn-primary">
+            <Play size={18} /> {t("dashboard.startCrawl")}
           </button>
-        )}{" "}
-      </div>{" "}
+        )}
+      </div>
+
+      {/* ── Crawl configuration ──────────────────────────────────────────── */}
       <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-        {" "}
         <label className="flex flex-col gap-2 text-sm">
-          {" "}
           <span className="text-[var(--md-sys-color-on-surface-variant)]">
-            Max pages
-          </span>{" "}
+            {t("dashboard.maxPages")}
+          </span>
           <input
             type="number"
             min={1}
             value={maxPages}
             onChange={(e) => setMaxPages(Number(e.target.value) || 1)}
             className="app-input"
-          />{" "}
-        </label>{" "}
+          />
+        </label>
         <label className="flex flex-col gap-2 text-sm">
-          {" "}
           <span className="text-[var(--md-sys-color-on-surface-variant)]">
-            Sitemap URL (optional)
-          </span>{" "}
+            {t("dashboard.sitemapUrl")}
+          </span>
           <input
             type="url"
             placeholder="https://example.com/sitemap.xml"
             value={sitemapUrl}
             onChange={(e) => setSitemapUrl(e.target.value)}
             className="app-input"
-          />{" "}
-        </label>{" "}
-      </div>{" "}
+          />
+        </label>
+      </div>
+
+      {/* ── Site Health card ─────────────────────────────────────────────── */}
       <Link
         to={`/projects/${id}/issues`}
         className="mb-6 block app-card dashboard-card hover:border-[var(--md-sys-color-primary)] transition"
       >
-        {" "}
         <div className="flex items-center justify-between gap-4">
-          {" "}
           <div>
-            {" "}
             <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
-              Site Health
-            </p>{" "}
-            <p className="md-display-large"
-              style={{ color: siteHealthStroke }}>
-              {" "}
-              {stats.site_health_score}{" "}
-            </p>{" "}
+              {t("dashboard.siteHealth")}
+            </p>
+            <p className="md-display-large" style={{ color: siteHealthStroke }}>
+              {stats.site_health_score}
+            </p>
             <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
-              {" "}
-              Band: {stats.site_health_band.toUpperCase()} ·
-              点击查看审计详情{" "}
-            </p>{" "}
-          </div>{" "}
+              {t("dashboard.band", {
+                value: stats.site_health_band.toUpperCase(),
+              })}{" "}
+              {t("dashboard.viewAuditDetail")}
+            </p>
+          </div>
           <svg
             width="110"
             height="110"
             viewBox="0 0 110 110"
             aria-label="Site health score chart"
           >
-            {" "}
             <circle
               cx="55"
               cy="55"
@@ -647,7 +745,7 @@ export default function ProjectDashboard() {
               stroke="var(--md-sys-color-outline-variant)"
               strokeWidth="10"
               fill="none"
-            />{" "}
+            />
             <circle
               cx="55"
               cy="55"
@@ -659,7 +757,7 @@ export default function ProjectDashboard() {
               strokeDasharray={healthCircumference}
               strokeDashoffset={healthDashOffset}
               transform="rotate(-90 55 55)"
-            />{" "}
+            />
             <text
               x="55"
               y="60"
@@ -668,332 +766,310 @@ export default function ProjectDashboard() {
               fontSize="18"
               fontWeight="700"
             >
-              {" "}
-              {stats.site_health_score}{" "}
-            </text>{" "}
-          </svg>{" "}
-        </div>{" "}
-      </Link>{" "}
+              {stats.site_health_score}
+            </text>
+          </svg>
+        </div>
+      </Link>
+
+      {/* ── Category scores ──────────────────────────────────────────────── */}
       {categoryScores.length > 0 && (
         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
-          {" "}
           {categoryScores.map((item) => (
             <div
               key={item.key ?? item.name}
               className="app-card dashboard-card dashboard-card-compact"
             >
-              {" "}
               <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
                 {item.name}
-              </p>{" "}
+              </p>
               <p className="mt-1 md-headline-large text-[var(--md-sys-color-on-surface)]">
                 {item.score}
-              </p>{" "}
+              </p>
               <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
                 Issues: {item.issue_count}
-              </p>{" "}
+              </p>
             </div>
-          ))}{" "}
+          ))}
         </div>
-      )}{" "}
+      )}
+
+      {/* ── Data notes banner ────────────────────────────────────────────── */}
       {(authority?.notes?.length ||
         backlinks?.notes?.length ||
         analytics.notes.length > 0) && (
         <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded p-4 text-sm text-yellow-900 space-y-1">
-          {" "}
           {analytics.notes.map((note) => (
             <p key={`analytics-${note}`}>{note}</p>
-          ))}{" "}
+          ))}
           {authority?.notes?.map((note) => (
             <p key={`authority-${note}`}>{note}</p>
-          ))}{" "}
+          ))}
           {backlinks?.notes?.map((note) => (
             <p key={`backlinks-${note}`}>{note}</p>
-          ))}{" "}
+          ))}
         </div>
-      )}{" "}
+      )}
+
+      {/* ── Issue breakdown cards ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-4 dashboard-grid dashboard-section">
-        {" "}
         <div className="app-card dashboard-card">
-          {" "}
           <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
-            Total Pages
-          </h3>{" "}
-          <p className="md-display-large">{stats.total_pages}</p>{" "}
-        </div>{" "}
+            {t("dashboard.totalPages")}
+          </h3>
+          <p className="md-display-large">{stats.total_pages}</p>
+        </div>
         <div className="app-card dashboard-card border-l-4 border-red-500">
-          {" "}
           <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
-            {" "}
-            <AlertOctagon size={16} /> Critical{" "}
-          </h3>{" "}
+            <AlertOctagon size={16} /> {t("dashboard.critical")}
+          </h3>
           <p className="md-display-large text-red-600">
-            {" "}
-            {issues_breakdown.critical}{" "}
-          </p>{" "}
-        </div>{" "}
+            {issues_breakdown.critical}
+          </p>
+        </div>
         <div className="app-card dashboard-card border-l-4 border-yellow-500">
-          {" "}
           <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
-            {" "}
-            <AlertTriangle size={16} /> Warning{" "}
-          </h3>{" "}
+            <AlertTriangle size={16} /> {t("dashboard.warning")}
+          </h3>
           <p className="md-display-large text-yellow-600">
-            {" "}
-            {issues_breakdown.warning}{" "}
-          </p>{" "}
-        </div>{" "}
+            {issues_breakdown.warning}
+          </p>
+        </div>
         <div className="app-card dashboard-card border-l-4 border-blue-500">
-          {" "}
           <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
-            {" "}
-            <Info size={16} /> Info{" "}
-          </h3>{" "}
+            <Info size={16} /> {t("dashboard.info")}
+          </h3>
           <p className="md-display-large text-[var(--md-sys-color-primary)]">
-            {" "}
-            {issues_breakdown.info}{" "}
-          </p>{" "}
-        </div>{" "}
-      </div>{" "}
+            {issues_breakdown.info}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Technical Health ─────────────────────────────────────────────── */}
       <div className="app-card dashboard-card dashboard-section">
-        {" "}
         <div className="flex items-center justify-between mb-4">
-          {" "}
-          <h2 className="md-headline-large">Technical Health</h2>{" "}
+          <h2 className="md-headline-large">{t("dashboard.technicalHealth")}</h2>
           <span className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
-            {" "}
-            Pass Rate: {stats.technical_health.pass_rate}%{" "}
-          </span>{" "}
-        </div>{" "}
+            {t("dashboard.passRate", {
+              rate: stats.technical_health.pass_rate,
+            })}
+          </span>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          {" "}
           <div className="dashboard-subcard">
-            {" "}
             <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
-              CWV Good
-            </p>{" "}
+              {t("dashboard.cwvGood")}
+            </p>
             <p className="md-headline-large text-green-600">
-              {" "}
-              {stats.technical_health.cwv_scorecard.good}{" "}
-            </p>{" "}
-          </div>{" "}
+              {stats.technical_health.cwv_scorecard.good}
+            </p>
+          </div>
           <div className="dashboard-subcard">
-            {" "}
             <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
-              Needs Improvement
-            </p>{" "}
+              {t("dashboard.needsImprovement")}
+            </p>
             <p className="md-headline-large text-yellow-600">
-              {" "}
-              {stats.technical_health.cwv_scorecard.needs_improvement}{" "}
-            </p>{" "}
-          </div>{" "}
+              {stats.technical_health.cwv_scorecard.needs_improvement}
+            </p>
+          </div>
           <div className="dashboard-subcard">
-            {" "}
             <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
-              CWV Poor
-            </p>{" "}
+              {t("dashboard.cwvPoor")}
+            </p>
             <p className="md-headline-large text-red-600">
-              {" "}
-              {stats.technical_health.cwv_scorecard.poor}{" "}
-            </p>{" "}
-          </div>{" "}
+              {stats.technical_health.cwv_scorecard.poor}
+            </p>
+          </div>
           <div className="dashboard-subcard">
-            {" "}
             <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
-              Failed Items
-            </p>{" "}
+              {t("dashboard.failedItems")}
+            </p>
             <p className="md-headline-large">
-              {" "}
-              {stats.technical_health.failed_items}{" "}
-            </p>{" "}
-          </div>{" "}
-        </div>{" "}
+              {stats.technical_health.failed_items}
+            </p>
+          </div>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-          {" "}
           <div className="border border-[var(--md-sys-color-outline)] rounded p-4">
-            {" "}
-            <h3 className="md-title-medium mb-2">Index Coverage Anomalies</h3>{" "}
+            <h3 className="md-title-medium mb-2">
+              {t("dashboard.indexAnomalies")}
+            </h3>
             <ul className="text-sm space-y-1">
-              {" "}
               {stats.technical_health.indexability_anomalies.length === 0 && (
                 <li className="text-[var(--md-sys-color-on-surface-variant)]">
-                  No anomalies
+                  {t("dashboard.noAnomalies")}
                 </li>
-              )}{" "}
+              )}
               {stats.technical_health.indexability_anomalies.map((item) => (
                 <li key={item.issue_type} className="flex justify-between">
-                  {" "}
-                  <span>{item.issue_type}</span>{" "}
-                  <span className="md-title-medium">{item.count}</span>{" "}
+                  <span>{item.issue_type}</span>
+                  <span className="md-title-medium">{item.count}</span>
                 </li>
-              ))}{" "}
-            </ul>{" "}
-          </div>{" "}
+              ))}
+            </ul>
+          </div>
           <div className="border border-[var(--md-sys-color-outline)] rounded p-4">
-            {" "}
-            <h3 className="md-title-medium mb-2">Structured Data Errors</h3>{" "}
+            <h3 className="md-title-medium mb-2">
+              {t("dashboard.structuredDataErrors")}
+            </h3>
             <ul className="text-sm space-y-1">
-              {" "}
               {stats.technical_health.structured_data_errors.length === 0 && (
                 <li className="text-[var(--md-sys-color-on-surface-variant)]">
-                  No errors
+                  {t("dashboard.noStructuredErrors")}
                 </li>
-              )}{" "}
+              )}
               {stats.technical_health.structured_data_errors.map((item) => (
                 <li key={item.issue_type} className="flex justify-between">
-                  {" "}
-                  <span>{item.issue_type}</span>{" "}
-                  <span className="md-title-medium">{item.count}</span>{" "}
+                  <span>{item.issue_type}</span>
+                  <span className="md-title-medium">{item.count}</span>
                 </li>
-              ))}{" "}
-            </ul>{" "}
-          </div>{" "}
-          <div className="border border-[var(--md-sys-color-outline)] rounded p-4 h-48">
-            {" "}
-            <h3 className="md-title-medium mb-2">Pass Rate Trend</h3>{" "}
+              ))}
+            </ul>
+          </div>
+          {/* Pass Rate Trend – dynamic height via aspect-ratio on xl screens */}
+          <div className="border border-[var(--md-sys-color-outline)] rounded p-4 h-48 xl:h-56">
+            <h3 className="md-title-medium mb-2">
+              {t("dashboard.passRateTrend")}
+            </h3>
             <ResponsiveContainer width="100%" height="85%">
-              {" "}
               <LineChart data={stats.technical_health.trend}>
-                {" "}
-                <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
-                <XAxis dataKey="date" tick={{ fill: chartAxisText }} />{" "}
-                <YAxis domain={[0, 100]} tick={{ fill: chartAxisText }} />{" "}
+                <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fill: chartAxisText }} />
+                <YAxis domain={[0, 100]} tick={{ fill: chartAxisText }} />
                 <Tooltip
                   contentStyle={chartTooltipStyle}
                   labelStyle={chartTooltipLabelStyle}
                   cursor={chartTooltipCursor}
-                />{" "}
+                />
                 <Line
                   type="monotone"
                   dataKey="pass_rate"
                   stroke={chartSeriesColors.primary}
                   strokeWidth={2}
-                />{" "}
-              </LineChart>{" "}
-            </ResponsiveContainer>{" "}
-          </div>{" "}
-        </div>{" "}
-      </div>{" "}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Authority metric widgets (drag-and-drop) ─────────────────────── */}
       <DashboardLayout
         layout={dashboardLayout}
         onLayoutChange={setDashboardLayout}
         widgets={[
           {
             widgetId: "domain-authority",
-            title: "Domain Authority",
+            title: t("dashboard.domainAuthority"),
             content: (
               <div className="app-card dashboard-card">
-                {" "}
                 <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
-                  {" "}
-                  <Shield size={16} /> Domain Authority{" "}
-                </h3>{" "}
+                  <Shield size={16} /> {t("dashboard.domainAuthority")}
+                </h3>
                 <p className="md-display-large">
                   {authority?.domain_authority ?? 0}
-                </p>{" "}
+                </p>
                 <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)] mt-2">
-                  状态:{" "}
+                  {t("dashboard.statusLabel")}:{" "}
                   {backlinkStatus?.fetch_status ??
                     backlinks?.fetch_status ??
                     "pending"}
-                </p>{" "}
+                </p>
               </div>
             ),
           },
           {
             widgetId: "backlinks",
-            title: "Backlinks",
+            title: t("dashboard.backlinkCount"),
             content: (
               <div className="app-card dashboard-card">
-                {" "}
                 <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
-                  {" "}
-                  <LinkIcon size={16} /> Backlinks{" "}
-                </h3>{" "}
+                  <LinkIcon size={16} /> {t("dashboard.backlinkCount")}
+                </h3>
                 <p className="md-display-large">
                   {backlinks?.backlinks_total ?? 0}
-                </p>{" "}
+                </p>
               </div>
             ),
           },
           {
             widgetId: "ref-domains",
-            title: "Ref Domains",
+            title: t("dashboard.refDomainsMetric"),
             content: (
               <div className="app-card dashboard-card">
-                {" "}
                 <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
-                  Ref Domains
-                </h3>{" "}
+                  {t("dashboard.refDomainsMetric")}
+                </h3>
                 <p className="md-display-large">
                   {backlinks?.ref_domains ?? 0}
-                </p>{" "}
+                </p>
                 <Link
                   className="mt-2 inline-block md-label-medium app-action-link"
                   to={`/projects/${id}/backlinks/ref-domains`}
                 >
-                  {" "}
-                  查看引用域{" "}
-                </Link>{" "}
+                  {t("dashboard.viewRefDomains")}
+                </Link>
               </div>
             ),
           },
           {
             widgetId: "ahrefs-rank",
-            title: "Ahrefs Rank",
+            title: t("dashboard.ahrefsRank"),
             content: (
               <div className="app-card dashboard-card">
-                {" "}
                 <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
-                  Ahrefs Rank
-                </h3>{" "}
+                  {t("dashboard.ahrefsRank")}
+                </h3>
                 <p className="md-display-large">
                   {backlinks?.ahrefs_rank ?? authority?.ahrefs_rank ?? "—"}
-                </p>{" "}
+                </p>
                 <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)] mt-2">
-                  上次刷新:{" "}
-                  {backlinkStatus?.last_fetched_at ??
-                    backlinks?.last_fetched_at ??
-                    "未刷新"}
-                </p>{" "}
+                  {backlinkStatus?.last_fetched_at ?? backlinks?.last_fetched_at
+                    ? t("dashboard.lastRefreshed", {
+                        time:
+                          backlinkStatus?.last_fetched_at ??
+                          backlinks?.last_fetched_at,
+                      })
+                    : t("dashboard.neverRefreshed")}
+                </p>
               </div>
             ),
           },
         ]}
-      />{" "}
+      />
+
+      {/* ── Authority Trend + Backlink Trend charts ───────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 dashboard-grid dashboard-section">
-        {" "}
-        <div className="app-card dashboard-card h-72">
-          {" "}
-          <h3 className="md-title-medium mb-3">Authority Trend</h3>{" "}
+        {/* Authority trend */}
+        <div className="app-card dashboard-card h-72 xl:h-80">
+          <h3 className="md-title-medium mb-3">
+            {t("dashboard.authorityTrend")}
+          </h3>
           <ResponsiveContainer width="100%" height="90%">
-            {" "}
             <LineChart data={authority?.history ?? []}>
-              {" "}
-              <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
-              <XAxis dataKey="date" tick={{ fill: chartAxisText }} />{" "}
-              <YAxis tick={{ fill: chartAxisText }} />{" "}
+              <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ fill: chartAxisText }} />
+              <YAxis tick={{ fill: chartAxisText }} />
               <Tooltip
                 contentStyle={chartTooltipStyle}
                 labelStyle={chartTooltipLabelStyle}
                 cursor={chartTooltipCursor}
-              />{" "}
+              />
               <Line
                 type="monotone"
                 dataKey="domain_authority"
                 stroke={chartSeriesColors.primary}
                 strokeWidth={2}
-              />{" "}
-            </LineChart>{" "}
-          </ResponsiveContainer>{" "}
-        </div>{" "}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Backlink trend */}
         <div className="app-card dashboard-card min-h-72">
-          {" "}
           <div className="mb-[var(--space-2)] flex flex-wrap items-center justify-between gap-[var(--space-1)]">
-            {" "}
-            <h3 className="md-title-medium">Backlink Trend</h3>{" "}
+            <h3 className="md-title-medium">{t("dashboard.backlinkTrend")}</h3>
             <div className="flex items-center gap-2">
-              {" "}
               <select
                 value={backlinkTrendWindow}
                 onChange={(e) =>
@@ -1001,11 +1077,10 @@ export default function ProjectDashboard() {
                 }
                 className="rounded border px-2 py-1 text-xs"
               >
-                {" "}
-                <option value={7}>7 天</option>{" "}
-                <option value={30}>30 天</option>{" "}
-                <option value={90}>90 天</option>{" "}
-              </select>{" "}
+                <option value={7}>{t("dashboard.range7d")}</option>
+                <option value={30}>{t("dashboard.range30d")}</option>
+                <option value={90}>{t("dashboard.range90d")}</option>
+              </select>
               <select
                 value={backlinkTrendInterval}
                 onChange={(e) =>
@@ -1013,181 +1088,200 @@ export default function ProjectDashboard() {
                 }
                 className="rounded border px-2 py-1 text-xs"
               >
-                {" "}
-                <option value="day">按日</option>{" "}
-                <option value="week">按周</option>{" "}
-              </select>{" "}
+                <option value="day">{t("dashboard.byDay")}</option>
+                <option value="week">{t("dashboard.byWeek")}</option>
+              </select>
               <Link
                 className="md-label-medium app-action-link"
                 to={`/projects/${id}/backlinks/ref-domains`}
               >
-                {" "}
-                前往引用域分析{" "}
-              </Link>{" "}
-            </div>{" "}
-          </div>{" "}
+                {t("dashboard.goToRefDomainAnalysis")}
+              </Link>
+            </div>
+          </div>
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {" "}
             <div className="rounded border p-3">
-              {" "}
               <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
-                总外链
-              </p>{" "}
-              <p className="md-headline-large">
-                {totalBacklinksMetric}
-              </p>{" "}
-            </div>{" "}
+                {t("dashboard.totalBacklinksMetric")}
+              </p>
+              <p className="md-headline-large">{totalBacklinksMetric}</p>
+            </div>
             <div className="rounded border p-3">
-              {" "}
               <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
-                引用域
-              </p>{" "}
-              <p className="md-headline-large">
-                {totalRefDomainsMetric}
-              </p>{" "}
-            </div>{" "}
+                {t("dashboard.refDomainsMetric")}
+              </p>
+              <p className="md-headline-large">{totalRefDomainsMetric}</p>
+            </div>
             <div className="rounded border p-3">
-              {" "}
               <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
-                净增长
-              </p>{" "}
+                {t("dashboard.netGrowth")}
+              </p>
               <p
                 className={`md-headline-large ${netGrowthMetric >= 0 ? "text-green-600" : "text-red-600"}`}
               >
                 {netGrowthMetric >= 0 ? "+" : ""}
                 {netGrowthMetric}
-              </p>{" "}
+              </p>
               <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-                环比 {formatPct(backlinkTrendSummary?.mom_growth_pct)} · 同比{" "}
-                {formatPct(backlinkTrendSummary?.yoy_growth_pct)}
-              </p>{" "}
-            </div>{" "}
-          </div>{" "}
-          {backlinkTrendSeries.length === 0 ? (
-            <div className="flex h-40 items-center justify-center rounded border border-dashed md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
-              {" "}
-              历史外链为空，暂无法绘图{" "}
+                {t("dashboard.momYoy", {
+                  mom: formatPct(backlinkTrendSummary?.mom_growth_pct),
+                  yoy: formatPct(backlinkTrendSummary?.yoy_growth_pct),
+                })}
+              </p>
             </div>
+          </div>
+          {backlinkTrendSeries.length === 0 ? (
+            <EmptyState
+              message={t("dashboard.noBacklinkHistory")}
+              className="h-40 rounded border border-dashed"
+            />
           ) : (
-            <div className="h-56">
-              {" "}
+            <div className="h-56 xl:h-64">
               <ResponsiveContainer width="100%" height="100%">
-                {" "}
                 <LineChart data={backlinkTrendSeries}>
-                  {" "}
-                  <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
-                  <XAxis dataKey="date" tick={{ fill: chartAxisText }} />{" "}
-                  <YAxis tick={{ fill: chartAxisText }} />{" "}
+                  <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fill: chartAxisText }} />
+                  <YAxis tick={{ fill: chartAxisText }} />
                   <Tooltip
                     contentStyle={chartTooltipStyle}
                     labelStyle={chartTooltipLabelStyle}
                     cursor={chartTooltipCursor}
-                  />{" "}
+                  />
                   <Line
                     type="monotone"
                     dataKey="backlinks_total"
                     stroke={chartSeriesColors.primary}
                     strokeWidth={2}
-                  />{" "}
+                  />
                   <Line
                     type="monotone"
                     dataKey="ref_domains"
                     stroke={chartSeriesColors.secondary}
                     strokeWidth={2}
-                  />{" "}
-                </LineChart>{" "}
-              </ResponsiveContainer>{" "}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-          )}{" "}
-        </div>{" "}
-      </div>{" "}
+          )}
+        </div>
+      </div>
+
+      {/* ── Top backlinks list ───────────────────────────────────────────── */}
       <div className="app-card dashboard-card dashboard-section">
-        {" "}
-        <h3 className="md-title-medium mb-3">重要外链 Top N</h3>{" "}
+        <h3 className="md-title-medium mb-3">{t("dashboard.topBacklinks")}</h3>
         <ul className="space-y-2 text-sm">
-          {" "}
-          {(backlinks?.top_backlinks ?? []).length === 0 && (
-            <li className="text-[var(--md-sys-color-on-surface-variant)]">
-              暂无缓存数据
+          {(backlinks?.top_backlinks ?? []).length === 0 ? (
+            <li>
+              <EmptyState message={t("dashboard.noBacklinkCache")} />
             </li>
-          )}{" "}
-          {(backlinks?.top_backlinks ?? []).map((item, idx) => (
-            <li key={`top-link-${idx}-${item.url}`} className="border-b pb-2">
-              {" "}
-              <p className="md-body-medium break-all">{item.url}</p>{" "}
-              <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-                {item.source ?? "—"} · {item.anchor ?? "—"} · {item.date ?? "—"}
-              </p>{" "}
-            </li>
-          ))}{" "}
-        </ul>{" "}
-      </div>{" "}
+          ) : (
+            (backlinks?.top_backlinks ?? []).map((item, idx) => (
+              <li
+                key={`top-link-${idx}-${item.url}`}
+                className="border-b pb-2"
+              >
+                <p className="md-body-medium break-all">{item.url}</p>
+                <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
+                  {item.source ?? "—"} · {item.anchor ?? "—"} ·{" "}
+                  {item.date ?? "—"}
+                </p>
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
+
+      {/* ── Recent backlink changes table ────────────────────────────────── */}
       <div className="app-card dashboard-card dashboard-section overflow-x-auto">
-        {" "}
         <div className="mb-[var(--space-2)] flex flex-wrap items-center justify-between gap-[var(--space-1)]">
-          {" "}
-          <h3 className="md-title-medium">最近新增 / 失效外链</h3>{" "}
+          <h3 className="md-title-medium">
+            {t("dashboard.recentBacklinkChanges")}
+          </h3>
           <div className="flex gap-[var(--space-1)]">
-            {" "}
             <input
               value={backlinkQuery}
               onChange={(e) => setBacklinkQuery(e.target.value)}
-              placeholder="筛选 source / url / anchor"
+              placeholder={t("dashboard.filterPlaceholder")}
               className="rounded border px-3 py-1 text-sm"
-            />{" "}
+            />
             <select
               value={backlinkSort}
               onChange={(e) =>
-                setBacklinkSort(e.target.value as "status" | "source" | "date")
+                setBacklinkSort(
+                  e.target.value as "status" | "source" | "date",
+                )
               }
               className="rounded border px-3 py-1 text-sm"
             >
-              {" "}
-              <option value="date">按日期</option>{" "}
-              <option value="status">按状态</option>{" "}
-              <option value="source">按来源</option>{" "}
-            </select>{" "}
-          </div>{" "}
-        </div>{" "}
-        <table className="w-full text-sm">
-          {" "}
-          <thead>
-            {" "}
-            <tr className="text-left border-b">
-              {" "}
-              <th className="pb-2">状态</th> <th className="pb-2">Source</th>{" "}
-              <th className="pb-2">URL</th> <th className="pb-2">Anchor</th>{" "}
-              <th className="pb-2">Date</th>{" "}
-            </tr>{" "}
-          </thead>{" "}
-          <tbody>
-            {" "}
-            {backlinkRows.map((item, idx) => (
-              <tr
-                key={`${item.status}-${item.url}-${idx}`}
-                className="border-b"
-              >
-                {" "}
-                <td className="py-2">{item.status}</td>{" "}
-                <td className="py-2">{item.source ?? "—"}</td>{" "}
-                <td className="py-2 break-all">{item.url}</td>{" "}
-                <td className="py-2">{item.anchor ?? "—"}</td>{" "}
-                <td className="py-2">{item.date ?? "—"}</td>{" "}
+              <option value="date">{t("dashboard.sortByDate")}</option>
+              <option value="status">{t("dashboard.sortByStatus")}</option>
+              <option value="source">{t("dashboard.sortBySource")}</option>
+            </select>
+          </div>
+        </div>
+        {/* Max height + sticky header so long tables are easier to browse */}
+        <div className="max-h-80 overflow-y-auto overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-[var(--md-sys-color-surface-container)] shadow-[0_1px_0_var(--md-sys-color-outline-variant)]">
+              <tr className="text-left">
+                <th className="pb-2 pt-1 pr-3">
+                  {t("dashboard.colStatus")}
+                </th>
+                <th className="pb-2 pt-1 pr-3">
+                  {t("dashboard.colSource")}
+                </th>
+                <th className="pb-2 pt-1 pr-3">{t("dashboard.colUrl")}</th>
+                <th className="pb-2 pt-1 pr-3">
+                  {t("dashboard.colAnchor")}
+                </th>
+                <th className="pb-2 pt-1">{t("dashboard.colDate")}</th>
               </tr>
-            ))}{" "}
-          </tbody>{" "}
-        </table>{" "}
-      </div>{" "}
+            </thead>
+            <tbody>
+              {backlinkRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>
+                    <EmptyState message={t("dashboard.noData")} />
+                  </td>
+                </tr>
+              ) : (
+                backlinkRows.map((item, idx) => (
+                  <tr
+                    key={`${item.status}-${item.url}-${idx}`}
+                    className="border-b"
+                  >
+                    <td className="py-2 pr-3">
+                      <span
+                        className={
+                          item.status === "new"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }
+                      >
+                        {item.status === "new"
+                          ? t("dashboard.newLink")
+                          : t("dashboard.lostLink")}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-3">{item.source ?? "—"}</td>
+                    <td className="py-2 pr-3 break-all">{item.url}</td>
+                    <td className="py-2 pr-3">{item.anchor ?? "—"}</td>
+                    <td className="py-2">{item.date ?? "—"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── SEO ROI ──────────────────────────────────────────────────────── */}
       <div className="app-card dashboard-card dashboard-section">
-        {" "}
         <div className="flex flex-wrap items-center justify-between gap-[var(--space-2)] mb-[var(--space-2)]">
-          {" "}
           <h3 className="md-title-medium flex items-center gap-2">
-            {" "}
-            <BadgePercent size={18} /> SEO ROI{" "}
-          </h3>{" "}
+            <BadgePercent size={18} /> {t("dashboard.roiTitle")}
+          </h3>
           <div className="flex gap-[var(--space-1)]">
-            {" "}
             <select
               value={roiRange}
               onChange={(e) =>
@@ -1195,11 +1289,10 @@ export default function ProjectDashboard() {
               }
               className="border rounded px-3 py-1 text-sm"
             >
-              {" "}
-              <option value="30d">30天</option>{" "}
-              <option value="90d">90天</option>{" "}
-              <option value="12m">12个月</option>{" "}
-            </select>{" "}
+              <option value="30d">{t("dashboard.range30d")}</option>
+              <option value="90d">{t("dashboard.range90d")}</option>
+              <option value="12m">{t("dashboard.range12m")}</option>
+            </select>
             <select
               value={attributionModel}
               onChange={(e) =>
@@ -1209,59 +1302,48 @@ export default function ProjectDashboard() {
               }
               className="border rounded px-3 py-1 text-sm"
             >
-              {" "}
-              <option value="linear">Linear</option>{" "}
-              <option value="first_click">First Click</option>{" "}
-              <option value="last_click">Last Click</option>{" "}
-            </select>{" "}
-          </div>{" "}
-        </div>{" "}
+              <option value="linear">Linear</option>
+              <option value="first_click">First Click</option>
+              <option value="last_click">Last Click</option>
+            </select>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-[var(--space-2)] mb-[var(--space-2)]">
-          {" "}
           <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
-            {" "}
             <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-              收益 (Gain)
-            </p>{" "}
-            <p className="md-headline-large">{roi?.gain ?? 0}</p>{" "}
-          </div>{" "}
+              {t("dashboard.gain")}
+            </p>
+            <p className="md-headline-large">{roi?.gain ?? 0}</p>
+          </div>
           <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
-            {" "}
             <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-              成本 (Cost)
-            </p>{" "}
+              {t("dashboard.cost")}
+            </p>
             <p className="md-headline-large">
-              {" "}
-              {roi ? roi.cost.monthly_total_cost : 0}{" "}
-            </p>{" "}
-          </div>{" "}
+              {roi ? roi.cost.monthly_total_cost : 0}
+            </p>
+          </div>
           <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
-            {" "}
             <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-              辅助转化
-            </p>{" "}
+              {t("dashboard.assistedConversions")}
+            </p>
             <p className="md-headline-large">
-              {" "}
-              {roi?.assisted_conversions ?? 0}{" "}
-            </p>{" "}
-          </div>{" "}
+              {roi?.assisted_conversions ?? 0}
+            </p>
+          </div>
           <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
-            {" "}
             <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-              ROI %
-            </p>{" "}
+              {t("dashboard.roiPct")}
+            </p>
             <p
               className={`md-headline-large ${(roi?.roi_pct ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
             >
-              {" "}
-              {roi?.roi_pct ?? 0}%{" "}
-            </p>{" "}
-          </div>{" "}
-        </div>{" "}
-        <div className="h-64 mb-4">
-          {" "}
+              {roi?.roi_pct ?? 0}%
+            </p>
+          </div>
+        </div>
+        <div className="h-64 xl:h-72 mb-4">
           <ResponsiveContainer width="100%" height="100%">
-            {" "}
             <AreaChart
               data={[
                 {
@@ -1270,103 +1352,90 @@ export default function ProjectDashboard() {
                 },
                 {
                   name: "Pipeline",
-                  value: roi?.pipeline_value ?? analytics.totals.pipeline_value,
+                  value:
+                    roi?.pipeline_value ?? analytics.totals.pipeline_value,
                 },
                 { name: "Cost", value: roi?.cost.monthly_total_cost ?? 0 },
               ]}
             >
-              {" "}
-              <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
-              <XAxis dataKey="name" tick={{ fill: chartAxisText }} />{" "}
-              <YAxis tick={{ fill: chartAxisText }} />{" "}
+              <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fill: chartAxisText }} />
+              <YAxis tick={{ fill: chartAxisText }} />
               <Tooltip
                 contentStyle={chartTooltipStyle}
                 labelStyle={chartTooltipLabelStyle}
                 cursor={chartTooltipCursor}
-              />{" "}
+              />
               <Area
                 type="monotone"
                 dataKey="value"
                 stroke={chartSeriesColors.primary}
                 fill="color-mix(in srgb, var(--md-sys-color-primary) 28%, transparent)"
-              />{" "}
-            </AreaChart>{" "}
-          </ResponsiveContainer>{" "}
-        </div>{" "}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
         <RoiAttributionNote
           attributionModel={attributionModel}
           provider={roi?.provider ?? analytics.provider}
-        />{" "}
-      </div>{" "}
+        />
+      </div>
+
+      {/* ── Analytics metric cards ───────────────────────────────────────── */}
       <div className="dashboard-section grid grid-cols-1 md:grid-cols-4 dashboard-grid">
-        {" "}
         <div className="app-card dashboard-card">
-          {" "}
           <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
-            {" "}
-            <Activity size={16} /> Daily Avg{" "}
-          </h3>{" "}
-          <p className="md-display-large">
-            {analytics.period.daily_average}
-          </p>{" "}
-        </div>{" "}
+            <Activity size={16} /> {t("dashboard.dailyAvg")}
+          </h3>
+          <p className="md-display-large">{analytics.period.daily_average}</p>
+        </div>
         <div className="app-card dashboard-card">
-          {" "}
           <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
-            Monthly Sessions
-          </h3>{" "}
-          <p className="md-display-large">
-            {analytics.period.monthly_total}
-          </p>{" "}
-        </div>{" "}
+            {t("dashboard.monthlySessions")}
+          </h3>
+          <p className="md-display-large">{analytics.period.monthly_total}</p>
+        </div>
         <div className="app-card dashboard-card">
-          {" "}
           <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
-            Growth
-          </h3>{" "}
+            {t("dashboard.growth")}
+          </h3>
           <p
             className={`md-display-large flex items-center gap-2 ${hasGrowth ? "text-green-600" : "text-red-600"}`}
           >
-            {" "}
             {hasGrowth ? (
               <TrendingUp size={20} />
             ) : (
               <TrendingDown size={20} />
-            )}{" "}
-            {analytics.period.growth_pct}%{" "}
-          </p>{" "}
-        </div>{" "}
+            )}
+            {analytics.period.growth_pct}%
+          </p>
+        </div>
         <div className="app-card dashboard-card">
-          {" "}
           <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
-            {" "}
-            <MousePointerClick size={16} /> Conversions{" "}
-          </h3>{" "}
-          <p className="md-display-large">
-            {analytics.totals.conversions}
-          </p>{" "}
-        </div>{" "}
-      </div>{" "}
+            <MousePointerClick size={16} /> {t("dashboard.conversions")}
+          </h3>
+          <p className="md-display-large">{analytics.totals.conversions}</p>
+        </div>
+      </div>
+
+      {/* ── Quality metric cards ─────────────────────────────────────────── */}
       <div className="dashboard-section grid grid-cols-1 md:grid-cols-4 dashboard-grid">
-        {" "}
         {qualityCards.map((card) => (
-          <div
-            key={card.label}
-            className="app-card dashboard-card"
-          >
-            {" "}
+          <div key={card.label} className="app-card dashboard-card">
             <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
               {card.label}
-            </h3>{" "}
-            <p className="md-display-large">{card.value ?? "—"}</p>{" "}
+            </h3>
+            <p className="md-display-large">{card.value ?? "—"}</p>
           </div>
-        ))}{" "}
-      </div>{" "}
+        ))}
+      </div>
+
+      {/* ── Competitor Overview ──────────────────────────────────────────── */}
       <div className="app-card dashboard-card dashboard-section">
-        {" "}
         <div className="flex flex-wrap items-center justify-between gap-[var(--space-2)] mb-[var(--space-2)]">
-          {" "}
-          <h3 className="md-headline-large">Competitor Overview</h3>{" "}
+          <h3 className="md-headline-large">
+            {t("dashboard.competitorOverview")}
+          </h3>
           <select
             value={selectedCompetitorId ?? ""}
             onChange={(e) =>
@@ -1375,97 +1444,111 @@ export default function ProjectDashboard() {
             className="border rounded px-3 py-1 text-sm min-w-48"
             disabled={competitorsLoading || competitors.length === 0}
           >
-            {" "}
             {competitors.length === 0 ? (
-              <option value="">No competitors</option>
+              <option value="">{t("dashboard.noCompetitors")}</option>
             ) : (
               competitors.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {" "}
-                  {item.domain}{" "}
+                  {item.domain}
                 </option>
               ))
-            )}{" "}
-          </select>{" "}
-        </div>{" "}
+            )}
+          </select>
+        </div>
+
+        {/* Loading state */}
         {(competitorsLoading || overviewLoading) && (
           <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
-            Loading competitor overview...
+            {t("dashboard.loadingCompetitor")}
           </p>
-        )}{" "}
+        )}
+
+        {/* Error state with retry */}
         {!competitorsLoading && !overviewLoading && competitorError && (
-          <p className="md-body-medium text-red-600">{competitorError}</p>
-        )}{" "}
+          <InlineAlert
+            message={t(
+              competitorError === "list"
+                ? "dashboard.competitorFailedLoad"
+                : "dashboard.competitorOverviewFailed",
+            )}
+            onRetry={
+              competitorError === "list"
+                ? fetchCompetitorsList
+                : fetchCompetitorOverview
+            }
+            retryLabel={t("dashboard.retryButton")}
+          />
+        )}
+
+        {/* Empty: no competitors configured */}
         {!competitorsLoading &&
           !overviewLoading &&
           !competitorError &&
           competitors.length === 0 && (
-            <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
-              Add competitors to view traffic benchmarks.
-            </p>
-          )}{" "}
+            <EmptyState message={t("dashboard.addCompetitors")} />
+          )}
+
+        {/* Overview data */}
         {!competitorsLoading &&
           !overviewLoading &&
           !competitorError &&
           competitorOverview && (
             <>
-              {" "}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {" "}
                 <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
-                  {" "}
                   <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-                    本月流量
-                  </p>{" "}
+                    {t("dashboard.currentMonthTraffic")}
+                  </p>
                   <p className="md-headline-large">
                     {Math.round(
                       competitorCurrentMonthTraffic ?? 0,
                     ).toLocaleString()}
-                  </p>{" "}
-                </div>{" "}
+                  </p>
+                </div>
                 <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
-                  {" "}
                   <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-                    环比
-                  </p>{" "}
+                    {t("dashboard.momChange")}
+                  </p>
                   <p
                     className={`md-headline-large ${(competitorMoM ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
                   >
-                    {" "}
                     {competitorMoM === null
                       ? "—"
-                      : `${competitorMoM.toFixed(1)}%`}{" "}
-                  </p>{" "}
-                </div>{" "}
+                      : `${competitorMoM.toFixed(1)}%`}
+                  </p>
+                </div>
                 <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
-                  {" "}
                   <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-                    Top 关键词
-                  </p>{" "}
+                    {t("dashboard.topKeyword")}
+                  </p>
                   <p className="md-title-medium break-all">
                     {topKeyword?.keyword ?? "—"}
-                  </p>{" "}
+                  </p>
                   <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)] mt-1">
-                    {" "}
                     {topKeyword
-                      ? `Rank ${topKeyword.rank ?? "—"} · SV ${topKeyword.search_volume}`
-                      : "暂无关键词数据"}{" "}
-                  </p>{" "}
-                </div>{" "}
-              </div>{" "}
+                      ? t("dashboard.rankAndVolume", {
+                          rank: topKeyword.rank ?? "—",
+                          volume: topKeyword.search_volume,
+                        })
+                      : t("dashboard.noKeywordData")}
+                  </p>
+                </div>
+              </div>
               {competitorOverview.data_source === "local_estimation" && (
                 <p className="mt-3 inline-flex rounded-full bg-amber-100 text-amber-800 text-xs px-2 py-1">
-                  估算数据
+                  {t("dashboard.estimatedData")}
                 </p>
-              )}{" "}
+              )}
             </>
-          )}{" "}
-      </div>{" "}
+          )}
+      </div>
+
+      {/* ── Brand vs Non-Brand ───────────────────────────────────────────── */}
       <div className="app-card dashboard-card dashboard-section">
-        {" "}
         <div className="flex items-center justify-between mb-3">
-          {" "}
-          <h3 className="md-headline-large">Brand vs Non-brand</h3>{" "}
+          <h3 className="md-headline-large">
+            {t("dashboard.brandVsNonBrand")}
+          </h3>
           <select
             value={brandWindow}
             onChange={(e) =>
@@ -1473,123 +1556,119 @@ export default function ProjectDashboard() {
             }
             className="border rounded px-3 py-1 text-sm"
           >
-            {" "}
-            <option value="7d">7 days</option>{" "}
-            <option value="30d">30 days</option>{" "}
-            <option value="90d">90 days</option>{" "}
-          </select>{" "}
-        </div>{" "}
+            <option value="7d">{t("dashboard.range7d")}</option>
+            <option value="30d">{t("dashboard.range30d")}</option>
+            <option value="90d">{t("dashboard.range90d")}</option>
+          </select>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3 text-sm">
-          {" "}
           <div>
-            {" "}
-            Brand Sessions:{""}{" "}
+            {t("dashboard.brandSessions")}:{" "}
             <span className="md-title-medium">{brandSummary.brandSessions}</span>
-            {""} · Conversions:{""}{" "}
+            {" · "}{t("dashboard.conversions")}:{" "}
             <span className="md-title-medium">
-              {" "}
-              {brandSummary.brandConversions}{" "}
-            </span>{" "}
-          </div>{" "}
-          <div>
-            {" "}
-            Non-brand Sessions:{""}{" "}
-            <span className="md-title-medium">
-              {" "}
-              {brandSummary.nonBrandSessions}{" "}
+              {brandSummary.brandConversions}
             </span>
-            {""} · Conversions:{""}{" "}
+          </div>
+          <div>
+            {t("dashboard.nonBrandSessions")}:{" "}
             <span className="md-title-medium">
-              {" "}
-              {brandSummary.nonBrandConversions}{" "}
-            </span>{" "}
-          </div>{" "}
-        </div>{" "}
-        <div className="h-72">
-          {" "}
+              {brandSummary.nonBrandSessions}
+            </span>
+            {" · "}{t("dashboard.conversions")}:{" "}
+            <span className="md-title-medium">
+              {brandSummary.nonBrandConversions}
+            </span>
+          </div>
+        </div>
+        <div className="h-72 xl:h-80">
           <ResponsiveContainer width="100%" height="100%">
-            {" "}
             <BarChart data={brandSeries}>
-              {" "}
-              <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
-              <XAxis dataKey="date" tick={{ fill: chartAxisText }} />{" "}
-              <YAxis tick={{ fill: chartAxisText }} />{" "}
+              <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ fill: chartAxisText }} />
+              <YAxis tick={{ fill: chartAxisText }} />
               <Tooltip
                 contentStyle={chartTooltipStyle}
                 labelStyle={chartTooltipLabelStyle}
                 cursor={chartTooltipCursor}
-              />{" "}
-              <Legend wrapperStyle={{ color: "var(--md-sys-color-on-surface-variant)" }} />{" "}
+              />
+              <Legend
+                wrapperStyle={{
+                  color: "var(--md-sys-color-on-surface-variant)",
+                }}
+              />
               <Bar
                 dataKey="brand_sessions"
                 fill={chartSeriesColors.primary}
-                name="Brand Sessions"
-              />{" "}
+                name={t("dashboard.brandSessions")}
+              />
               <Bar
                 dataKey="non_brand_sessions"
                 fill={chartSeriesColors.secondary}
-                name="Non-brand Sessions"
-              />{" "}
-            </BarChart>{" "}
-          </ResponsiveContainer>{" "}
-        </div>{" "}
-      </div>{" "}
+                name={t("dashboard.nonBrandSessions")}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── Content Performance ──────────────────────────────────────────── */}
       <div className="mb-4 flex flex-wrap gap-[var(--space-2)] items-center">
-        {" "}
-        <h2 className="md-headline-large mr-3">Content Performance</h2>{" "}
+        <h2 className="md-headline-large mr-3">
+          {t("dashboard.contentPerformance")}
+        </h2>
         <select
           value={window}
           onChange={(e) => setWindow(e.target.value as "7d" | "30d" | "90d")}
           className="app-select"
         >
-          {" "}
-          <option value="7d">7 days</option>{" "}
-          <option value="30d">30 days</option>{" "}
-          <option value="90d">90 days</option>{" "}
-        </select>{" "}
+          <option value="7d">{t("dashboard.range7d")}</option>
+          <option value="30d">{t("dashboard.range30d")}</option>
+          <option value="90d">{t("dashboard.range90d")}</option>
+        </select>
         <select
           value={sort}
           onChange={(e) =>
-            setSort(e.target.value as "traffic" | "conversion_rate" | "decay")
+            setSort(
+              e.target.value as "traffic" | "conversion_rate" | "decay",
+            )
           }
           className="app-select"
         >
-          {" "}
-          <option value="traffic">Sort: Traffic</option>{" "}
-          <option value="conversion_rate">Sort: Conversion Rate</option>{" "}
-          <option value="decay">Sort: Decay</option>{" "}
-        </select>{" "}
+          <option value="traffic">{t("dashboard.sortTraffic")}</option>
+          <option value="conversion_rate">
+            {t("dashboard.sortConversionRate")}
+          </option>
+          <option value="decay">{t("dashboard.sortDecay")}</option>
+        </select>
         <Link
           to={`/projects/${id}/pages`}
           className="md-body-medium app-action-link"
         >
-          {" "}
-          View page details{" "}
-        </Link>{" "}
-      </div>{" "}
+          {t("dashboard.viewPageDetails")}
+        </Link>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 dashboard-grid dashboard-section">
-        {" "}
         {renderContentList(
-          "热门内容",
+          t("dashboard.topContent"),
           contentPerformance?.top_content ?? [],
-        )}{" "}
+        )}
         {renderContentList(
-          "高转化页面",
+          t("dashboard.topConversion"),
           contentPerformance?.top_conversion ?? [],
-        )}{" "}
+        )}
         {renderContentList(
-          "衰减页面",
+          t("dashboard.decayingContent"),
           contentPerformance?.decaying_content ?? [],
-        )}{" "}
-      </div>{" "}
+        )}
+      </div>
+
+      {/* ── Keyword Ranking Heatmap ──────────────────────────────────────── */}
       <div className="app-card dashboard-card dashboard-section">
-        {" "}
         <div className="flex flex-wrap items-center justify-between gap-[var(--space-2)] mb-[var(--space-2)]">
-          {" "}
-          <h2 className="md-headline-large">关键词波动热力图</h2>{" "}
+          <h2 className="md-headline-large">{t("dashboard.keywordHeatmap")}</h2>
           <div className="flex items-center gap-2 text-sm">
-            {" "}
-            <label htmlFor="heatmap-step">采样步长</label>{" "}
+            <label htmlFor="heatmap-step">{t("dashboard.sampleStep")}</label>
             <select
               id="heatmap-step"
               value={heatmapStep}
@@ -1599,30 +1678,25 @@ export default function ProjectDashboard() {
               }}
               className="app-select app-select-sm"
             >
-              {" "}
-              <option value={1}>每天</option> <option value={2}>每2天</option>{" "}
-              <option value={3}>每3天</option>{" "}
-              <option value={5}>每5天</option>{" "}
-            </select>{" "}
-          </div>{" "}
-        </div>{" "}
-        {insightsLoading && (
-          <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
-            Loading insights...
-          </p>
-        )}{" "}
-        {!insightsLoading && (
+              <option value={1}>{t("dashboard.daily")}</option>
+              <option value={2}>{t("dashboard.every2Days")}</option>
+              <option value={3}>{t("dashboard.every3Days")}</option>
+              <option value={5}>{t("dashboard.every5Days")}</option>
+            </select>
+          </div>
+        </div>
+
+        {insightsLoading ? (
+          <HeatmapSkeleton />
+        ) : (
           <div className="overflow-auto">
-            {" "}
             <table className="min-w-full text-xs border-separate border-spacing-y-1">
-              {" "}
               <thead>
-                {" "}
                 <tr>
-                  {" "}
-                  <th className="text-left sticky left-0 bg-[var(--md-sys-color-surface-container)] pr-4">
-                    Keyword
-                  </th>{" "}
+                  {/* Sticky keyword column header */}
+                  <th className="text-left sticky left-0 bg-[var(--md-sys-color-surface-container)] pr-4 shadow-[1px_0_0_var(--md-sys-color-outline-variant)]">
+                    {t("dashboard.colKeyword")}
+                  </th>
                   {searchInsights?.keyword_heatmap.dates.map((d) => (
                     <th
                       key={d}
@@ -1630,17 +1704,16 @@ export default function ProjectDashboard() {
                     >
                       {d.slice(5)}
                     </th>
-                  ))}{" "}
-                </tr>{" "}
-              </thead>{" "}
+                  ))}
+                </tr>
+              </thead>
               <tbody>
-                {" "}
                 {searchInsights?.keyword_heatmap.rows.map((row) => (
                   <tr key={row.keyword}>
-                    {" "}
-                    <td className="sticky left-0 bg-[var(--md-sys-color-surface-container)] pr-4 md-body-medium">
+                    {/* Sticky keyword column with right shadow for depth */}
+                    <td className="sticky left-0 bg-[var(--md-sys-color-surface-container)] pr-4 md-body-medium shadow-[1px_0_0_var(--md-sys-color-outline-variant)]">
                       {row.keyword}
-                    </td>{" "}
+                    </td>
                     {row.cells.map((cell) => (
                       <td
                         key={`${row.keyword}-${cell.date}`}
@@ -1650,172 +1723,149 @@ export default function ProjectDashboard() {
                         }}
                         title={`keyword=${row.keyword} | date=${cell.date} | rank=${cell.rank ?? "N/A"}`}
                       >
-                        {" "}
-                        {cell.rank ?? "-"}{" "}
+                        {cell.rank ?? "-"}
                       </td>
-                    ))}{" "}
+                    ))}
                   </tr>
-                ))}{" "}
-              </tbody>{" "}
-            </table>{" "}
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}{" "}
+        )}
+
         <div className="mt-[var(--space-2)] flex items-center justify-between md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
-          {" "}
-          <span> 图例: Top3 / Top10 / Top20 / Top50 / Out / Missing </span>{" "}
+          <span>{t("dashboard.heatmapLegend")}</span>
           <div className="flex gap-[var(--space-1)]">
-            {" "}
             <button
               className="app-btn app-btn-outline app-btn-sm disabled:opacity-40"
               disabled={insightsPage <= 1}
-              onClick={() => setInsightsPage((prev) => Math.max(prev - 1, 1))}
+              onClick={() =>
+                setInsightsPage((prev) => Math.max(prev - 1, 1))
+              }
             >
-              {" "}
-              上一页{" "}
-            </button>{" "}
+              {t("dashboard.prevPage")}
+            </button>
             <span>
-              {" "}
-              Page {searchInsights?.keyword_heatmap.paging.page ??
-                insightsPage}{" "}
-              /{" "}
-              {Math.max(
-                1,
-                Math.ceil(
-                  (searchInsights?.keyword_heatmap.paging.total_keywords ?? 0) /
-                    (searchInsights?.keyword_heatmap.paging.page_size ?? 1),
+              {t("dashboard.pageOf", {
+                current:
+                  searchInsights?.keyword_heatmap.paging.page ?? insightsPage,
+                total: Math.max(
+                  1,
+                  Math.ceil(
+                    (searchInsights?.keyword_heatmap.paging.total_keywords ??
+                      0) /
+                      (searchInsights?.keyword_heatmap.paging.page_size ?? 1),
+                  ),
                 ),
-              )}{" "}
-            </span>{" "}
+              })}
+            </span>
             <button
               className="app-btn app-btn-outline app-btn-sm disabled:opacity-40"
               disabled={!searchInsights?.keyword_heatmap.paging.has_more}
               onClick={() => setInsightsPage((prev) => prev + 1)}
             >
-              {" "}
-              下一页{" "}
-            </button>{" "}
-          </div>{" "}
-        </div>{" "}
-      </div>{" "}
+              {t("dashboard.nextPage")}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Geo Distribution ─────────────────────────────────────────────── */}
       <div className="app-card dashboard-card dashboard-section">
-        {" "}
-        <h2 className="md-headline-large mb-4">流量地理分布图</h2>{" "}
+        <h2 className="md-headline-large mb-4">
+          {t("dashboard.geoDistribution")}
+        </h2>
         <div className="space-y-[var(--space-2)]">
-          {" "}
           {searchInsights?.geo_distribution.rows.map((row) => (
             <div key={row.country}>
-              {" "}
               <div className="flex justify-between text-sm">
-                {" "}
-                <span>{row.country}</span>{" "}
+                <span>{row.country}</span>
                 <span
                   title={`country=${row.country} | sessions=${row.sessions} | share=${row.share}%`}
                 >
-                  {" "}
-                  {row.sessions} sessions ({row.share}%){" "}
-                </span>{" "}
-              </div>{" "}
+                  {row.sessions} sessions ({row.share}%)
+                </span>
+              </div>
               <div className="h-2 rounded bg-[var(--md-sys-color-surface-container-low)] overflow-hidden">
-                {" "}
                 <div
                   className="h-full rounded"
                   style={{
                     width: `${Math.max((row.sessions / geoMaxSessions) * 100, 4)}%`,
                     backgroundColor: insightPalette.top10,
                   }}
-                />{" "}
-              </div>{" "}
+                />
+              </div>
             </div>
-          ))}{" "}
+          ))}
           {!searchInsights?.geo_distribution.rows.length && (
-            <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
-              No geo data.
-            </p>
-          )}{" "}
-        </div>{" "}
-      </div>{" "}
+            <EmptyState message={t("dashboard.noGeoData")} />
+          )}
+        </div>
+      </div>
+
+      {/* ── Last Crawl Status ─────────────────────────────────────────────── */}
       {last_crawl ? (
         <div className="app-card dashboard-card">
-          {" "}
-          <h2 className="md-headline-large mb-4">Last Crawl Status</h2>{" "}
+          <h2 className="md-headline-large mb-4">
+            {t("dashboard.lastCrawlStatus")}
+          </h2>
           <div className="grid grid-cols-2 gap-4">
-            {" "}
             <div>
-              {" "}
               <span className="text-[var(--md-sys-color-on-surface-variant)]">
-                Status:
-              </span>{" "}
+                {t("dashboard.colStatus")}:
+              </span>
               <span
                 className="ml-2 px-2 py-1 rounded text-sm"
                 style={getCrawlStatusStyle(last_crawl.status)}
               >
-                {" "}
-                {last_crawl.status}{" "}
-              </span>{" "}
-            </div>{" "}
+                {last_crawl.status}
+              </span>
+            </div>
             <div>
-              {" "}
               <span className="text-[var(--md-sys-color-on-surface-variant)]">
-                Date:
-              </span>{" "}
+                {t("dashboard.colDate")}:
+              </span>
               <span className="ml-2">
-                {" "}
-                {new Date(last_crawl.start_time).toLocaleString()}{" "}
-              </span>{" "}
-            </div>{" "}
-          </div>{" "}
-          <div className="mt-4 flex gap-4">
-            {" "}
-            <Link
-              to={`/projects/${id}/pages`}
-              className="app-action-link"
-            >
-              {" "}
-              View Pages{" "}
-            </Link>{" "}
-            <Link
-              to={`/projects/${id}/issues`}
-              className="app-action-link"
-            >
-              {" "}
-              View Issues{" "}
-            </Link>{" "}
-            <Link
-              to={`/projects/${id}/keywords`}
-              className="app-action-link"
-            >
-              {" "}
-              Keyword Rankings{" "}
-            </Link>{" "}
+                {new Date(last_crawl.start_time).toLocaleString()}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-4">
+            <Link to={`/projects/${id}/pages`} className="app-action-link">
+              {t("dashboard.viewPages")}
+            </Link>
+            <Link to={`/projects/${id}/issues`} className="app-action-link">
+              {t("dashboard.viewIssues")}
+            </Link>
+            <Link to={`/projects/${id}/keywords`} className="app-action-link">
+              {t("dashboard.keywordRankings")}
+            </Link>
             <Link
               to={`/projects/${id}/keyword-research`}
               className="app-action-link"
             >
-              {" "}
-              Keyword Research{" "}
-            </Link>{" "}
+              {t("dashboard.keywordResearch")}
+            </Link>
             {isAdmin && (
               <Link
                 to={`/projects/${id}/api-keys`}
                 className="app-action-link"
               >
-                {" "}
-                API Keys{" "}
+                {t("dashboard.apiKeys")}
               </Link>
-            )}{" "}
-          </div>{" "}
+            )}
+          </div>
         </div>
       ) : (
         <div className="app-card dashboard-card">
-          {" "}
-          <h2 className="md-headline-large mb-4">Last Crawl Status</h2>{" "}
+          <h2 className="md-headline-large mb-4">
+            {t("dashboard.lastCrawlStatus")}
+          </h2>
           <p className="text-[var(--md-sys-color-on-surface-variant)]">
-            {" "}
-            No crawl data yet. Start a crawl to populate technical SEO
-            metrics.{" "}
-          </p>{" "}
+            {t("dashboard.noCrawlData")}
+          </p>
         </div>
-      )}{" "}
+      )}
     </div>
   );
 }
