@@ -33,7 +33,15 @@ type Props = {
   onLayoutChange: (layout: LayoutState) => void;
 };
 
-function SortableCard({ id, children }: { id: string; children: React.ReactNode }) {
+function SortableCard({
+  id,
+  children,
+  className,
+}: {
+  id: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -41,7 +49,7 @@ function SortableCard({ id, children }: { id: string; children: React.ReactNode 
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} className={className} {...attributes} {...listeners}>
       {children}
     </div>
   );
@@ -82,14 +90,14 @@ export default function DashboardLayout({ widgets, layout, onLayoutChange }: Pro
             key={widget.widgetId}
             type="button"
             onClick={() => toggleWidget(widget.widgetId)}
-            className="rounded border px-2 py-1 text-xs"
+            className="app-btn app-btn-outline app-btn-sm"
           >
             {layout.hidden.includes(widget.widgetId) ? `显示 ${widget.title}` : `隐藏 ${widget.title}`}
           </button>
         ))}
         <button
           type="button"
-          className="rounded border px-2 py-1 text-xs"
+          className="app-btn app-btn-outline app-btn-sm"
           onClick={() =>
             onLayoutChange({
               order: widgets.map((w) => w.widgetId),
@@ -104,10 +112,19 @@ export default function DashboardLayout({ widgets, layout, onLayoutChange }: Pro
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={visibleIds} strategy={rectSortingStrategy}>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-            {visibleIds.map((id) => {
+            {visibleIds.map((id, index) => {
               const widget = widgetMap.get(id);
               if (!widget) return null;
-              return <SortableCard key={id} id={id}>{widget.content}</SortableCard>;
+              const staggerClass = `animate-stagger-${(index % 5) + 1}`;
+              return (
+                <SortableCard
+                  key={id}
+                  id={id}
+                  className={`animate-fade-slide-up ${staggerClass}`}
+                >
+                  {widget.content}
+                </SortableCard>
+              );
             })}
           </div>
         </SortableContext>

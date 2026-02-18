@@ -523,7 +523,7 @@ export default function ProjectDashboard() {
               href={item.url}
               target="_blank"
               rel="noreferrer"
-              className="text-[var(--md-sys-color-primary)] hover:underline break-all"
+              className="app-action-link break-all"
             >
               {" "}
               {item.url}{" "}
@@ -558,14 +558,14 @@ export default function ProjectDashboard() {
           <h1 className="md-headline-large">Dashboard</h1>{" "}
           <Link
             to={`/projects/${id}/reports`}
-            className="md-body-medium text-[var(--md-sys-color-primary)] underline"
+            className="md-body-medium app-action-link"
           >
             {" "}
             Reports{" "}
           </Link>{" "}
           <Link
             to={`/projects/${id}/site-audit`}
-            className="md-body-medium text-[var(--md-sys-color-primary)] underline"
+            className="md-body-medium app-action-link"
           >
             {" "}
             Site Audit Overview{" "}
@@ -574,7 +574,7 @@ export default function ProjectDashboard() {
         {isAdmin && (
           <button
             onClick={startCrawl}
-            className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700"
+            className="app-btn app-btn-primary"
           >
             {" "}
             <Play size={18} /> Start New Crawl{" "}
@@ -929,7 +929,7 @@ export default function ProjectDashboard() {
                   {backlinks?.ref_domains ?? 0}
                 </p>{" "}
                 <Link
-                  className="mt-2 inline-block md-label-medium text-[var(--md-sys-color-primary)] hover:underline"
+                  className="mt-2 inline-block md-label-medium app-action-link"
                   to={`/projects/${id}/backlinks/ref-domains`}
                 >
                   {" "}
@@ -1018,7 +1018,7 @@ export default function ProjectDashboard() {
                 <option value="week">按周</option>{" "}
               </select>{" "}
               <Link
-                className="md-label-medium text-[var(--md-sys-color-primary)] hover:underline"
+                className="md-label-medium app-action-link"
                 to={`/projects/${id}/backlinks/ref-domains`}
               >
                 {" "}
@@ -1561,7 +1561,7 @@ export default function ProjectDashboard() {
         </select>{" "}
         <Link
           to={`/projects/${id}/pages`}
-          className="md-body-medium text-[var(--md-sys-color-primary)] hover:underline"
+          className="md-body-medium app-action-link"
         >
           {" "}
           View page details{" "}
@@ -1768,28 +1768,28 @@ export default function ProjectDashboard() {
             {" "}
             <Link
               to={`/projects/${id}/pages`}
-              className="text-[var(--md-sys-color-primary)] hover:underline"
+              className="app-action-link"
             >
               {" "}
               View Pages{" "}
             </Link>{" "}
             <Link
               to={`/projects/${id}/issues`}
-              className="text-[var(--md-sys-color-primary)] hover:underline"
+              className="app-action-link"
             >
               {" "}
               View Issues{" "}
             </Link>{" "}
             <Link
               to={`/projects/${id}/keywords`}
-              className="text-[var(--md-sys-color-primary)] hover:underline"
+              className="app-action-link"
             >
               {" "}
               Keyword Rankings{" "}
             </Link>{" "}
             <Link
               to={`/projects/${id}/keyword-research`}
-              className="text-[var(--md-sys-color-primary)] hover:underline"
+              className="app-action-link"
             >
               {" "}
               Keyword Research{" "}
@@ -1797,7 +1797,7 @@ export default function ProjectDashboard() {
             {isAdmin && (
               <Link
                 to={`/projects/${id}/api-keys`}
-                className="text-[var(--md-sys-color-primary)] hover:underline"
+                className="app-action-link"
               >
                 {" "}
                 API Keys{" "}

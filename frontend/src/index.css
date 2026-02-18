@@ -210,10 +210,43 @@
   .app-btn {
     border-radius: var(--shape-small);
     padding: var(--space-1) var(--space-2);
-    @apply inline-flex items-center justify-center gap-2 transition;
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden isolate transition;
     font-size: var(--md-sys-typescale-label-large-size);
     line-height: var(--md-sys-typescale-label-large-line-height);
     font-weight: var(--md-sys-typescale-label-large-weight);
+  }
+
+  .app-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--md-sys-state-hover);
+    opacity: 0;
+    transform: scale(0.96);
+    transition: opacity 0.18s ease, transform 0.2s ease;
+    pointer-events: none;
+  }
+
+  .app-btn > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .app-btn:hover::after {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+
+  .app-btn:active::after,
+  .app-btn[data-pressed="true"]::after {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .app-btn:active,
+  .app-btn[data-pressed="true"] {
+    transform: translateY(1px);
   }
 
   .md-display-large {
@@ -269,10 +302,6 @@
     color: var(--md-sys-color-on-primary);
   }
 
-  .app-btn-primary:hover {
-    background: color-mix(in srgb, var(--md-sys-color-primary) 88%, black);
-  }
-
   .app-btn-tonal {
     background: var(--md-sys-color-primary-container);
     color: var(--md-sys-color-on-primary-container);
@@ -284,13 +313,26 @@
     background: transparent;
   }
 
-  .app-btn-outline:hover {
-    background: var(--md-sys-state-hover);
-  }
-
   .app-btn-danger {
     background: var(--md-sys-color-error);
     color: var(--md-sys-color-on-error);
+  }
+
+  .app-action-link {
+    color: var(--md-sys-color-primary);
+    border-radius: var(--shape-small);
+    transition: background-color 0.18s ease, color 0.18s ease;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .app-action-link:hover {
+    background: var(--md-sys-state-hover);
+  }
+
+  .app-action-link:active,
+  .app-action-link[data-pressed="true"] {
+    background: color-mix(in srgb, var(--md-sys-state-hover) 82%, black 18%);
   }
 
   .app-btn:focus-visible,
