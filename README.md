@@ -37,7 +37,7 @@ cd backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env  # 按需修改
-alembic upgrade heads
+alembic upgrade head  # 必须先执行数据库迁移
 uvicorn app.main:app --reload --host 0.0.0.0 --port 28000
 ```
 
