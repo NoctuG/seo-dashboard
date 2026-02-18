@@ -4,8 +4,18 @@ from sqlmodel import SQLModel, Session, create_engine
 from app.metrics import record_db_pool_event
 from .config import settings
 
-connect_args = {"check_same_thread": False}
-engine = create_engine(settings.DATABASE_URL, echo=True, connect_args=connect_args)
+
+def _build_engine():
+    database_url = settings.DATABASE_URL
+    is_sqlite = database_url.startswith("sqlite:///") or database_url.startswith("sqlite+")
+
+    if is_sqlite:
+        return create_engine(database_url, echo=True, connect_args={"check_same_thread": False})
+
+    return create_engine(database_url, echo=True)
+
+
+engine = _build_engine()
 
 
 @event.listens_for(engine, "connect")
