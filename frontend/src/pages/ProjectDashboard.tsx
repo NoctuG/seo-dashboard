@@ -460,8 +460,8 @@ export default function ProjectDashboard() {
   ) => (
     <div className="app-card dashboard-card">
       {" "}
-      <h3 className="font-semibold mb-3">{title}</h3>{" "}
-      <ul className="space-y-3 text-sm">
+      <h3 className="md-title-medium mb-3">{title}</h3>{" "}
+      <ul className="space-y-3 md-body-medium">
         {" "}
         {items.length === 0 && (
           <li className="text-[var(--md-sys-color-on-surface-variant)]">
@@ -480,7 +480,7 @@ export default function ProjectDashboard() {
               {" "}
               {item.url}{" "}
             </a>{" "}
-            <div className="text-xs text-[var(--md-sys-color-on-surface-variant)] mt-1 flex flex-wrap gap-3">
+            <div className="md-label-medium text-[var(--md-sys-color-on-surface-variant)] mt-1 flex flex-wrap gap-3">
               {" "}
               <span>Sessions: {item.sessions}</span>{" "}
               <span>CVR: {item.conversion_rate}%</span>{" "}
@@ -490,7 +490,7 @@ export default function ProjectDashboard() {
               )}{" "}
             </div>{" "}
             {item.suggested_action && (
-              <p className="text-xs text-orange-700 mt-1">
+              <p className="md-label-medium text-orange-700 mt-1">
                 {" "}
                 {item.suggested_action}{" "}
               </p>
@@ -507,17 +507,17 @@ export default function ProjectDashboard() {
         {" "}
         <div className="flex items-center gap-3">
           {" "}
-          <h1 className="text-2xl font-bold">Dashboard</h1>{" "}
+          <h1 className="md-headline-large">Dashboard</h1>{" "}
           <Link
             to={`/projects/${id}/reports`}
-            className="text-sm text-[var(--md-sys-color-primary)] underline"
+            className="md-body-medium text-[var(--md-sys-color-primary)] underline"
           >
             {" "}
             Reports{" "}
           </Link>{" "}
           <Link
             to={`/projects/${id}/site-audit`}
-            className="text-sm text-[var(--md-sys-color-primary)] underline"
+            className="md-body-medium text-[var(--md-sys-color-primary)] underline"
           >
             {" "}
             Site Audit Overview{" "}
@@ -571,14 +571,14 @@ export default function ProjectDashboard() {
           {" "}
           <div>
             {" "}
-            <p className="text-sm uppercase text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
               Site Health
             </p>{" "}
-            <p className={`text-3xl font-bold ${siteHealthColorClass}`}>
+            <p className={`md-display-large ${siteHealthColorClass}`}>
               {" "}
               {stats.site_health_score}{" "}
             </p>{" "}
-            <p className="text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
               {" "}
               Band: {stats.site_health_band.toUpperCase()} ·
               点击查看审计详情{" "}
@@ -634,13 +634,13 @@ export default function ProjectDashboard() {
               className="app-card dashboard-card dashboard-card-compact"
             >
               {" "}
-              <p className="text-xs uppercase text-[var(--md-sys-color-on-surface-variant)]">
+              <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
                 {item.name}
               </p>{" "}
-              <p className="mt-1 text-2xl font-bold text-[var(--md-sys-color-on-surface)]">
+              <p className="mt-1 md-headline-large text-[var(--md-sys-color-on-surface)]">
                 {item.score}
               </p>{" "}
-              <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+              <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
                 Issues: {item.issue_count}
               </p>{" "}
             </div>
@@ -667,40 +667,40 @@ export default function ProjectDashboard() {
         {" "}
         <div className="app-card dashboard-card">
           {" "}
-          <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase">
+          <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
             Total Pages
           </h3>{" "}
-          <p className="text-3xl font-bold">{stats.total_pages}</p>{" "}
+          <p className="md-display-large">{stats.total_pages}</p>{" "}
         </div>{" "}
         <div className="app-card dashboard-card border-l-4 border-red-500">
           {" "}
-          <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
+          <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
             {" "}
             <AlertOctagon size={16} /> Critical{" "}
           </h3>{" "}
-          <p className="text-3xl font-bold text-red-600">
+          <p className="md-display-large text-red-600">
             {" "}
             {issues_breakdown.critical}{" "}
           </p>{" "}
         </div>{" "}
         <div className="app-card dashboard-card border-l-4 border-yellow-500">
           {" "}
-          <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
+          <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
             {" "}
             <AlertTriangle size={16} /> Warning{" "}
           </h3>{" "}
-          <p className="text-3xl font-bold text-yellow-600">
+          <p className="md-display-large text-yellow-600">
             {" "}
             {issues_breakdown.warning}{" "}
           </p>{" "}
         </div>{" "}
         <div className="app-card dashboard-card border-l-4 border-blue-500">
           {" "}
-          <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
+          <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
             {" "}
             <Info size={16} /> Info{" "}
           </h3>{" "}
-          <p className="text-3xl font-bold text-[var(--md-sys-color-primary)]">
+          <p className="md-display-large text-[var(--md-sys-color-primary)]">
             {" "}
             {issues_breakdown.info}{" "}
           </p>{" "}
@@ -710,8 +710,8 @@ export default function ProjectDashboard() {
         {" "}
         <div className="flex items-center justify-between mb-4">
           {" "}
-          <h2 className="text-xl font-semibold">Technical Health</h2>{" "}
-          <span className="text-sm text-[var(--md-sys-color-on-surface-variant)]">
+          <h2 className="md-headline-large">Technical Health</h2>{" "}
+          <span className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
             {" "}
             Pass Rate: {stats.technical_health.pass_rate}%{" "}
           </span>{" "}
@@ -720,40 +720,40 @@ export default function ProjectDashboard() {
           {" "}
           <div className="dashboard-subcard">
             {" "}
-            <p className="text-xs uppercase text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
               CWV Good
             </p>{" "}
-            <p className="text-2xl font-bold text-green-600">
+            <p className="md-headline-large text-green-600">
               {" "}
               {stats.technical_health.cwv_scorecard.good}{" "}
             </p>{" "}
           </div>{" "}
           <div className="dashboard-subcard">
             {" "}
-            <p className="text-xs uppercase text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
               Needs Improvement
             </p>{" "}
-            <p className="text-2xl font-bold text-yellow-600">
+            <p className="md-headline-large text-yellow-600">
               {" "}
               {stats.technical_health.cwv_scorecard.needs_improvement}{" "}
             </p>{" "}
           </div>{" "}
           <div className="dashboard-subcard">
             {" "}
-            <p className="text-xs uppercase text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
               CWV Poor
             </p>{" "}
-            <p className="text-2xl font-bold text-red-600">
+            <p className="md-headline-large text-red-600">
               {" "}
               {stats.technical_health.cwv_scorecard.poor}{" "}
             </p>{" "}
           </div>{" "}
           <div className="dashboard-subcard">
             {" "}
-            <p className="text-xs uppercase text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
               Failed Items
             </p>{" "}
-            <p className="text-2xl font-bold">
+            <p className="md-headline-large">
               {" "}
               {stats.technical_health.failed_items}{" "}
             </p>{" "}
@@ -763,7 +763,7 @@ export default function ProjectDashboard() {
           {" "}
           <div className="border border-[var(--md-sys-color-outline)] rounded p-4">
             {" "}
-            <h3 className="font-medium mb-2">Index Coverage Anomalies</h3>{" "}
+            <h3 className="md-title-medium mb-2">Index Coverage Anomalies</h3>{" "}
             <ul className="text-sm space-y-1">
               {" "}
               {stats.technical_health.indexability_anomalies.length === 0 && (
@@ -775,14 +775,14 @@ export default function ProjectDashboard() {
                 <li key={item.issue_type} className="flex justify-between">
                   {" "}
                   <span>{item.issue_type}</span>{" "}
-                  <span className="font-semibold">{item.count}</span>{" "}
+                  <span className="md-title-medium">{item.count}</span>{" "}
                 </li>
               ))}{" "}
             </ul>{" "}
           </div>{" "}
           <div className="border border-[var(--md-sys-color-outline)] rounded p-4">
             {" "}
-            <h3 className="font-medium mb-2">Structured Data Errors</h3>{" "}
+            <h3 className="md-title-medium mb-2">Structured Data Errors</h3>{" "}
             <ul className="text-sm space-y-1">
               {" "}
               {stats.technical_health.structured_data_errors.length === 0 && (
@@ -794,14 +794,14 @@ export default function ProjectDashboard() {
                 <li key={item.issue_type} className="flex justify-between">
                   {" "}
                   <span>{item.issue_type}</span>{" "}
-                  <span className="font-semibold">{item.count}</span>{" "}
+                  <span className="md-title-medium">{item.count}</span>{" "}
                 </li>
               ))}{" "}
             </ul>{" "}
           </div>{" "}
           <div className="border border-[var(--md-sys-color-outline)] rounded p-4 h-48">
             {" "}
-            <h3 className="font-medium mb-2">Pass Rate Trend</h3>{" "}
+            <h3 className="md-title-medium mb-2">Pass Rate Trend</h3>{" "}
             <ResponsiveContainer width="100%" height="85%">
               {" "}
               <LineChart data={stats.technical_health.trend}>
@@ -829,14 +829,14 @@ export default function ProjectDashboard() {
             content: (
               <div className="app-card dashboard-card">
                 {" "}
-                <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
+                <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
                   {" "}
                   <Shield size={16} /> Domain Authority{" "}
                 </h3>{" "}
-                <p className="text-3xl font-bold">
+                <p className="md-display-large">
                   {authority?.domain_authority ?? 0}
                 </p>{" "}
-                <p className="text-xs text-[var(--md-sys-color-on-surface-variant)] mt-2">
+                <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)] mt-2">
                   状态:{" "}
                   {backlinkStatus?.fetch_status ??
                     backlinks?.fetch_status ??
@@ -851,11 +851,11 @@ export default function ProjectDashboard() {
             content: (
               <div className="app-card dashboard-card">
                 {" "}
-                <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
+                <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
                   {" "}
                   <LinkIcon size={16} /> Backlinks{" "}
                 </h3>{" "}
-                <p className="text-3xl font-bold">
+                <p className="md-display-large">
                   {backlinks?.backlinks_total ?? 0}
                 </p>{" "}
               </div>
@@ -867,14 +867,14 @@ export default function ProjectDashboard() {
             content: (
               <div className="app-card dashboard-card">
                 {" "}
-                <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase">
+                <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
                   Ref Domains
                 </h3>{" "}
-                <p className="text-3xl font-bold">
+                <p className="md-display-large">
                   {backlinks?.ref_domains ?? 0}
                 </p>{" "}
                 <Link
-                  className="mt-2 inline-block text-xs text-[var(--md-sys-color-primary)] hover:underline"
+                  className="mt-2 inline-block md-label-medium text-[var(--md-sys-color-primary)] hover:underline"
                   to={`/projects/${id}/backlinks/ref-domains`}
                 >
                   {" "}
@@ -889,13 +889,13 @@ export default function ProjectDashboard() {
             content: (
               <div className="app-card dashboard-card">
                 {" "}
-                <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase">
+                <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
                   Ahrefs Rank
                 </h3>{" "}
-                <p className="text-3xl font-bold">
+                <p className="md-display-large">
                   {backlinks?.ahrefs_rank ?? authority?.ahrefs_rank ?? "—"}
                 </p>{" "}
-                <p className="text-xs text-[var(--md-sys-color-on-surface-variant)] mt-2">
+                <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)] mt-2">
                   上次刷新:{" "}
                   {backlinkStatus?.last_fetched_at ??
                     backlinks?.last_fetched_at ??
@@ -910,7 +910,7 @@ export default function ProjectDashboard() {
         {" "}
         <div className="app-card dashboard-card h-72">
           {" "}
-          <h3 className="font-semibold mb-3">Authority Trend</h3>{" "}
+          <h3 className="md-title-medium mb-3">Authority Trend</h3>{" "}
           <ResponsiveContainer width="100%" height="90%">
             {" "}
             <LineChart data={authority?.history ?? []}>
@@ -930,7 +930,7 @@ export default function ProjectDashboard() {
           {" "}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             {" "}
-            <h3 className="font-semibold">Backlink Trend</h3>{" "}
+            <h3 className="md-title-medium">Backlink Trend</h3>{" "}
             <div className="flex items-center gap-2">
               {" "}
               <select
@@ -957,7 +957,7 @@ export default function ProjectDashboard() {
                 <option value="week">按周</option>{" "}
               </select>{" "}
               <Link
-                className="text-xs text-[var(--md-sys-color-primary)] hover:underline"
+                className="md-label-medium text-[var(--md-sys-color-primary)] hover:underline"
                 to={`/projects/${id}/backlinks/ref-domains`}
               >
                 {" "}
@@ -969,41 +969,41 @@ export default function ProjectDashboard() {
             {" "}
             <div className="rounded border p-3">
               {" "}
-              <p className="text-xs uppercase text-[var(--md-sys-color-on-surface-variant)]">
+              <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
                 总外链
               </p>{" "}
-              <p className="text-xl font-semibold">
+              <p className="md-headline-large">
                 {totalBacklinksMetric}
               </p>{" "}
             </div>{" "}
             <div className="rounded border p-3">
               {" "}
-              <p className="text-xs uppercase text-[var(--md-sys-color-on-surface-variant)]">
+              <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
                 引用域
               </p>{" "}
-              <p className="text-xl font-semibold">
+              <p className="md-headline-large">
                 {totalRefDomainsMetric}
               </p>{" "}
             </div>{" "}
             <div className="rounded border p-3">
               {" "}
-              <p className="text-xs uppercase text-[var(--md-sys-color-on-surface-variant)]">
+              <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
                 净增长
               </p>{" "}
               <p
-                className={`text-xl font-semibold ${netGrowthMetric >= 0 ? "text-green-600" : "text-red-600"}`}
+                className={`md-headline-large ${netGrowthMetric >= 0 ? "text-green-600" : "text-red-600"}`}
               >
                 {netGrowthMetric >= 0 ? "+" : ""}
                 {netGrowthMetric}
               </p>{" "}
-              <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+              <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
                 环比 {formatPct(backlinkTrendSummary?.mom_growth_pct)} · 同比{" "}
                 {formatPct(backlinkTrendSummary?.yoy_growth_pct)}
               </p>{" "}
             </div>{" "}
           </div>{" "}
           {backlinkTrendSeries.length === 0 ? (
-            <div className="flex h-40 items-center justify-center rounded border border-dashed text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            <div className="flex h-40 items-center justify-center rounded border border-dashed md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
               {" "}
               历史外链为空，暂无法绘图{" "}
             </div>
@@ -1036,7 +1036,7 @@ export default function ProjectDashboard() {
       </div>{" "}
       <div className="app-card dashboard-card mb-8">
         {" "}
-        <h3 className="font-semibold mb-3">重要外链 Top N</h3>{" "}
+        <h3 className="md-title-medium mb-3">重要外链 Top N</h3>{" "}
         <ul className="space-y-2 text-sm">
           {" "}
           {(backlinks?.top_backlinks ?? []).length === 0 && (
@@ -1047,8 +1047,8 @@ export default function ProjectDashboard() {
           {(backlinks?.top_backlinks ?? []).map((item, idx) => (
             <li key={`top-link-${idx}-${item.url}`} className="border-b pb-2">
               {" "}
-              <p className="font-medium break-all">{item.url}</p>{" "}
-              <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+              <p className="md-body-medium break-all">{item.url}</p>{" "}
+              <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
                 {item.source ?? "—"} · {item.anchor ?? "—"} · {item.date ?? "—"}
               </p>{" "}
             </li>
@@ -1059,7 +1059,7 @@ export default function ProjectDashboard() {
         {" "}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           {" "}
-          <h3 className="font-semibold">最近新增 / 失效外链</h3>{" "}
+          <h3 className="md-title-medium">最近新增 / 失效外链</h3>{" "}
           <div className="flex gap-2">
             {" "}
             <input
@@ -1115,7 +1115,7 @@ export default function ProjectDashboard() {
         {" "}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           {" "}
-          <h3 className="font-semibold flex items-center gap-2">
+          <h3 className="md-title-medium flex items-center gap-2">
             {" "}
             <BadgePercent size={18} /> SEO ROI{" "}
           </h3>{" "}
@@ -1153,38 +1153,38 @@ export default function ProjectDashboard() {
           {" "}
           <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
             {" "}
-            <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
               收益 (Gain)
             </p>{" "}
-            <p className="text-2xl font-bold">{roi?.gain ?? 0}</p>{" "}
+            <p className="md-headline-large">{roi?.gain ?? 0}</p>{" "}
           </div>{" "}
           <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
             {" "}
-            <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
               成本 (Cost)
             </p>{" "}
-            <p className="text-2xl font-bold">
+            <p className="md-headline-large">
               {" "}
               {roi ? roi.cost.monthly_total_cost : 0}{" "}
             </p>{" "}
           </div>{" "}
           <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
             {" "}
-            <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
               辅助转化
             </p>{" "}
-            <p className="text-2xl font-bold">
+            <p className="md-headline-large">
               {" "}
               {roi?.assisted_conversions ?? 0}{" "}
             </p>{" "}
           </div>{" "}
           <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
             {" "}
-            <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
               ROI %
             </p>{" "}
             <p
-              className={`text-2xl font-bold ${(roi?.roi_pct ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
+              className={`md-headline-large ${(roi?.roi_pct ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
             >
               {" "}
               {roi?.roi_pct ?? 0}%{" "}
@@ -1229,30 +1229,30 @@ export default function ProjectDashboard() {
         {" "}
         <div className="app-card dashboard-card">
           {" "}
-          <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
+          <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
             {" "}
             <Activity size={16} /> Daily Avg{" "}
           </h3>{" "}
-          <p className="text-3xl font-bold">
+          <p className="md-display-large">
             {analytics.period.daily_average}
           </p>{" "}
         </div>{" "}
         <div className="app-card dashboard-card">
           {" "}
-          <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase">
+          <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
             Monthly Sessions
           </h3>{" "}
-          <p className="text-3xl font-bold">
+          <p className="md-display-large">
             {analytics.period.monthly_total}
           </p>{" "}
         </div>{" "}
         <div className="app-card dashboard-card">
           {" "}
-          <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase">
+          <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
             Growth
           </h3>{" "}
           <p
-            className={`text-3xl font-bold flex items-center gap-2 ${hasGrowth ? "text-green-600" : "text-red-600"}`}
+            className={`md-display-large flex items-center gap-2 ${hasGrowth ? "text-green-600" : "text-red-600"}`}
           >
             {" "}
             {hasGrowth ? (
@@ -1265,11 +1265,11 @@ export default function ProjectDashboard() {
         </div>{" "}
         <div className="app-card dashboard-card">
           {" "}
-          <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase flex items-center gap-2">
+          <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase flex items-center gap-2">
             {" "}
             <MousePointerClick size={16} /> Conversions{" "}
           </h3>{" "}
-          <p className="text-3xl font-bold">
+          <p className="md-display-large">
             {analytics.totals.conversions}
           </p>{" "}
         </div>{" "}
@@ -1282,10 +1282,10 @@ export default function ProjectDashboard() {
             className="app-card dashboard-card"
           >
             {" "}
-            <h3 className="text-[var(--md-sys-color-on-surface-variant)] text-sm uppercase">
+            <h3 className="md-title-medium text-[var(--md-sys-color-on-surface-variant)] uppercase">
               {card.label}
             </h3>{" "}
-            <p className="text-3xl font-bold">{card.value ?? "—"}</p>{" "}
+            <p className="md-display-large">{card.value ?? "—"}</p>{" "}
           </div>
         ))}{" "}
       </div>{" "}
@@ -1293,7 +1293,7 @@ export default function ProjectDashboard() {
         {" "}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           {" "}
-          <h3 className="font-semibold">Competitor Overview</h3>{" "}
+          <h3 className="md-headline-large">Competitor Overview</h3>{" "}
           <select
             value={selectedCompetitorId ?? ""}
             onChange={(e) =>
@@ -1316,18 +1316,18 @@ export default function ProjectDashboard() {
           </select>{" "}
         </div>{" "}
         {(competitorsLoading || overviewLoading) && (
-          <p className="text-sm text-[var(--md-sys-color-on-surface-variant)]">
+          <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
             Loading competitor overview...
           </p>
         )}{" "}
         {!competitorsLoading && !overviewLoading && competitorError && (
-          <p className="text-sm text-red-600">{competitorError}</p>
+          <p className="md-body-medium text-red-600">{competitorError}</p>
         )}{" "}
         {!competitorsLoading &&
           !overviewLoading &&
           !competitorError &&
           competitors.length === 0 && (
-            <p className="text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
               Add competitors to view traffic benchmarks.
             </p>
           )}{" "}
@@ -1341,10 +1341,10 @@ export default function ProjectDashboard() {
                 {" "}
                 <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
                   {" "}
-                  <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+                  <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
                     本月流量
                   </p>{" "}
-                  <p className="text-2xl font-bold">
+                  <p className="md-headline-large">
                     {Math.round(
                       competitorCurrentMonthTraffic ?? 0,
                     ).toLocaleString()}
@@ -1352,11 +1352,11 @@ export default function ProjectDashboard() {
                 </div>{" "}
                 <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
                   {" "}
-                  <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+                  <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
                     环比
                   </p>{" "}
                   <p
-                    className={`text-2xl font-bold ${(competitorMoM ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
+                    className={`md-headline-large ${(competitorMoM ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
                   >
                     {" "}
                     {competitorMoM === null
@@ -1366,13 +1366,13 @@ export default function ProjectDashboard() {
                 </div>{" "}
                 <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
                   {" "}
-                  <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+                  <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
                     Top 关键词
                   </p>{" "}
-                  <p className="text-lg font-semibold break-all">
+                  <p className="md-title-medium break-all">
                     {topKeyword?.keyword ?? "—"}
                   </p>{" "}
-                  <p className="text-xs text-[var(--md-sys-color-on-surface-variant)] mt-1">
+                  <p className="md-label-medium text-[var(--md-sys-color-on-surface-variant)] mt-1">
                     {" "}
                     {topKeyword
                       ? `Rank ${topKeyword.rank ?? "—"} · SV ${topKeyword.search_volume}`
@@ -1392,7 +1392,7 @@ export default function ProjectDashboard() {
         {" "}
         <div className="flex items-center justify-between mb-3">
           {" "}
-          <h3 className="font-semibold">Brand vs Non-brand</h3>{" "}
+          <h3 className="md-headline-large">Brand vs Non-brand</h3>{" "}
           <select
             value={brandWindow}
             onChange={(e) =>
@@ -1411,9 +1411,9 @@ export default function ProjectDashboard() {
           <div>
             {" "}
             Brand Sessions:{""}{" "}
-            <span className="font-semibold">{brandSummary.brandSessions}</span>
+            <span className="md-title-medium">{brandSummary.brandSessions}</span>
             {""} · Conversions:{""}{" "}
-            <span className="font-semibold">
+            <span className="md-title-medium">
               {" "}
               {brandSummary.brandConversions}{" "}
             </span>{" "}
@@ -1421,12 +1421,12 @@ export default function ProjectDashboard() {
           <div>
             {" "}
             Non-brand Sessions:{""}{" "}
-            <span className="font-semibold">
+            <span className="md-title-medium">
               {" "}
               {brandSummary.nonBrandSessions}{" "}
             </span>
             {""} · Conversions:{""}{" "}
-            <span className="font-semibold">
+            <span className="md-title-medium">
               {" "}
               {brandSummary.nonBrandConversions}{" "}
             </span>{" "}
@@ -1456,7 +1456,7 @@ export default function ProjectDashboard() {
       </div>{" "}
       <div className="mb-4 flex flex-wrap gap-3 items-center">
         {" "}
-        <h2 className="text-xl font-bold mr-3">Content Performance</h2>{" "}
+        <h2 className="md-headline-large mr-3">Content Performance</h2>{" "}
         <select
           value={window}
           onChange={(e) => setWindow(e.target.value as "7d" | "30d" | "90d")}
@@ -1481,7 +1481,7 @@ export default function ProjectDashboard() {
         </select>{" "}
         <Link
           to={`/projects/${id}/pages`}
-          className="text-sm text-[var(--md-sys-color-primary)] hover:underline"
+          className="md-body-medium text-[var(--md-sys-color-primary)] hover:underline"
         >
           {" "}
           View page details{" "}
@@ -1506,7 +1506,7 @@ export default function ProjectDashboard() {
         {" "}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           {" "}
-          <h2 className="text-xl font-bold">关键词波动热力图</h2>{" "}
+          <h2 className="md-headline-large">关键词波动热力图</h2>{" "}
           <div className="flex items-center gap-2 text-sm">
             {" "}
             <label htmlFor="heatmap-step">采样步长</label>{" "}
@@ -1527,7 +1527,7 @@ export default function ProjectDashboard() {
           </div>{" "}
         </div>{" "}
         {insightsLoading && (
-          <p className="text-sm text-[var(--md-sys-color-on-surface-variant)]">
+          <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
             Loading insights...
           </p>
         )}{" "}
@@ -1546,7 +1546,7 @@ export default function ProjectDashboard() {
                   {searchInsights?.keyword_heatmap.dates.map((d) => (
                     <th
                       key={d}
-                      className="font-medium text-[var(--md-sys-color-on-surface-variant)] px-1 whitespace-nowrap"
+                      className="md-label-medium text-[var(--md-sys-color-on-surface-variant)] px-1 whitespace-nowrap"
                     >
                       {d.slice(5)}
                     </th>
@@ -1558,7 +1558,7 @@ export default function ProjectDashboard() {
                 {searchInsights?.keyword_heatmap.rows.map((row) => (
                   <tr key={row.keyword}>
                     {" "}
-                    <td className="sticky left-0 bg-[var(--md-sys-color-surface-container)] pr-4 font-medium">
+                    <td className="sticky left-0 bg-[var(--md-sys-color-surface-container)] pr-4 md-body-medium">
                       {row.keyword}
                     </td>{" "}
                     {row.cells.map((cell) => (
@@ -1580,7 +1580,7 @@ export default function ProjectDashboard() {
             </table>{" "}
           </div>
         )}{" "}
-        <div className="mt-4 flex items-center justify-between text-xs text-[var(--md-sys-color-on-surface-variant)]">
+        <div className="mt-4 flex items-center justify-between md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
           {" "}
           <span> 图例: Top3 / Top10 / Top20 / Top50 / Out / Missing </span>{" "}
           <div className="flex gap-2">
@@ -1619,7 +1619,7 @@ export default function ProjectDashboard() {
       </div>{" "}
       <div className="app-card dashboard-card mb-8">
         {" "}
-        <h2 className="text-xl font-bold mb-4">流量地理分布图</h2>{" "}
+        <h2 className="md-headline-large mb-4">流量地理分布图</h2>{" "}
         <div className="space-y-3">
           {" "}
           {searchInsights?.geo_distribution.rows.map((row) => (
@@ -1648,7 +1648,7 @@ export default function ProjectDashboard() {
             </div>
           ))}{" "}
           {!searchInsights?.geo_distribution.rows.length && (
-            <p className="text-sm text-[var(--md-sys-color-on-surface-variant)]">
+            <p className="md-body-medium text-[var(--md-sys-color-on-surface-variant)]">
               No geo data.
             </p>
           )}{" "}
@@ -1657,7 +1657,7 @@ export default function ProjectDashboard() {
       {last_crawl ? (
         <div className="app-card dashboard-card">
           {" "}
-          <h2 className="text-xl font-bold mb-4">Last Crawl Status</h2>{" "}
+          <h2 className="md-headline-large mb-4">Last Crawl Status</h2>{" "}
           <div className="grid grid-cols-2 gap-4">
             {" "}
             <div>
@@ -1727,7 +1727,7 @@ export default function ProjectDashboard() {
       ) : (
         <div className="app-card dashboard-card">
           {" "}
-          <h2 className="text-xl font-bold mb-4">Last Crawl Status</h2>{" "}
+          <h2 className="md-headline-large mb-4">Last Crawl Status</h2>{" "}
           <p className="text-[var(--md-sys-color-on-surface-variant)]">
             {" "}
             No crawl data yet. Start a crawl to populate technical SEO
