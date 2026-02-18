@@ -60,6 +60,65 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+
+const chartSeriesColors = {
+  primary: "var(--md-sys-color-primary)",
+  secondary: "var(--md-sys-color-secondary)",
+  tertiary: "var(--md-sys-color-tertiary)",
+};
+
+const chartGridStroke = "var(--md-sys-color-outline-variant)";
+const chartAxisText = "var(--md-sys-color-on-surface-variant)";
+const chartTooltipStyle = {
+  backgroundColor:
+    "color-mix(in srgb, var(--md-sys-color-surface-container) 92%, transparent)",
+  border: "1px solid var(--md-sys-color-outline-variant)",
+  borderRadius: "12px",
+  color: "var(--md-sys-color-on-surface)",
+};
+const chartTooltipLabelStyle = {
+  color: "var(--md-sys-color-on-surface-variant)",
+};
+const chartTooltipCursor = {
+  stroke: "var(--md-sys-color-outline)",
+};
+
+const siteHealthStrokeByBand: Record<
+  "green" | "yellow" | "red",
+  (typeof chartSeriesColors)[keyof typeof chartSeriesColors]
+> = {
+  green: chartSeriesColors.primary,
+  yellow: chartSeriesColors.secondary,
+  red: chartSeriesColors.tertiary,
+};
+
+const getSiteHealthStroke = (band: "green" | "yellow" | "red") =>
+  siteHealthStrokeByBand[band] ?? chartSeriesColors.primary;
+
+const crawlStatusStyles: Record<
+  string,
+  { backgroundColor: string; color: string }
+> = {
+  completed: {
+    backgroundColor:
+      "color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent)",
+    color: "var(--md-sys-color-primary)",
+  },
+  failed: {
+    backgroundColor:
+      "color-mix(in srgb, var(--md-sys-color-error) 18%, transparent)",
+    color: "var(--md-sys-color-error)",
+  },
+  pending: {
+    backgroundColor:
+      "color-mix(in srgb, var(--md-sys-color-secondary) 18%, transparent)",
+    color: "var(--md-sys-color-secondary)",
+  },
+};
+
+const getCrawlStatusStyle = (status: string) =>
+  crawlStatusStyles[status] ?? crawlStatusStyles.pending;
+
 const DEFAULT_WIDGET_ORDER = [
   "domain-authority",
   "backlinks",
@@ -407,18 +466,7 @@ export default function ProjectDashboard() {
   if (loading || !stats) return <div>{t("app.loading")}</div>;
   const { last_crawl, issues_breakdown, analytics } = stats;
   const hasGrowth = analytics.period.growth_pct >= 0;
-  const siteHealthColorClass =
-    stats.site_health_band === "green"
-      ? "text-green-600"
-      : stats.site_health_band === "yellow"
-        ? "text-yellow-600"
-        : "text-red-600";
-  const siteHealthStroke =
-    stats.site_health_band === "green"
-      ? "#16a34a"
-      : stats.site_health_band === "yellow"
-        ? "#ca8a04"
-        : "#dc2626";
+  const siteHealthStroke = getSiteHealthStroke(stats.site_health_band);
   const healthRadius = 40;
   const healthCircumference = 2 * Math.PI * healthRadius;
   const healthDashOffset =
@@ -574,7 +622,8 @@ export default function ProjectDashboard() {
             <p className="md-label-medium uppercase text-[var(--md-sys-color-on-surface-variant)]">
               Site Health
             </p>{" "}
-            <p className={`md-display-large ${siteHealthColorClass}`}>
+            <p className="md-display-large"
+              style={{ color: siteHealthStroke }}>
               {" "}
               {stats.site_health_score}{" "}
             </p>{" "}
@@ -595,7 +644,7 @@ export default function ProjectDashboard() {
               cx="55"
               cy="55"
               r={healthRadius}
-              stroke="#e2e8f0"
+              stroke="var(--md-sys-color-outline-variant)"
               strokeWidth="10"
               fill="none"
             />{" "}
@@ -615,7 +664,7 @@ export default function ProjectDashboard() {
               x="55"
               y="60"
               textAnchor="middle"
-              className="fill-slate-700"
+              fill="var(--md-sys-color-on-surface)"
               fontSize="18"
               fontWeight="700"
             >
@@ -806,12 +855,18 @@ export default function ProjectDashboard() {
               {" "}
               <LineChart data={stats.technical_health.trend}>
                 {" "}
-                <CartesianGrid strokeDasharray="3 3" /> <XAxis dataKey="date" />{" "}
-                <YAxis domain={[0, 100]} /> <Tooltip />{" "}
+                <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
+                <XAxis dataKey="date" tick={{ fill: chartAxisText }} />{" "}
+                <YAxis domain={[0, 100]} tick={{ fill: chartAxisText }} />{" "}
+                <Tooltip
+                  contentStyle={chartTooltipStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  cursor={chartTooltipCursor}
+                />{" "}
                 <Line
                   type="monotone"
                   dataKey="pass_rate"
-                  stroke="#2563eb"
+                  stroke={chartSeriesColors.primary}
                   strokeWidth={2}
                 />{" "}
               </LineChart>{" "}
@@ -915,12 +970,18 @@ export default function ProjectDashboard() {
             {" "}
             <LineChart data={authority?.history ?? []}>
               {" "}
-              <CartesianGrid strokeDasharray="3 3" /> <XAxis dataKey="date" />{" "}
-              <YAxis /> <Tooltip />{" "}
+              <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
+              <XAxis dataKey="date" tick={{ fill: chartAxisText }} />{" "}
+              <YAxis tick={{ fill: chartAxisText }} />{" "}
+              <Tooltip
+                contentStyle={chartTooltipStyle}
+                labelStyle={chartTooltipLabelStyle}
+                cursor={chartTooltipCursor}
+              />{" "}
               <Line
                 type="monotone"
                 dataKey="domain_authority"
-                stroke="#2563eb"
+                stroke={chartSeriesColors.primary}
                 strokeWidth={2}
               />{" "}
             </LineChart>{" "}
@@ -1014,18 +1075,24 @@ export default function ProjectDashboard() {
                 {" "}
                 <LineChart data={backlinkTrendSeries}>
                   {" "}
-                  <CartesianGrid strokeDasharray="3 3" />{" "}
-                  <XAxis dataKey="date" /> <YAxis /> <Tooltip />{" "}
+                  <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
+                  <XAxis dataKey="date" tick={{ fill: chartAxisText }} />{" "}
+                  <YAxis tick={{ fill: chartAxisText }} />{" "}
+                  <Tooltip
+                    contentStyle={chartTooltipStyle}
+                    labelStyle={chartTooltipLabelStyle}
+                    cursor={chartTooltipCursor}
+                  />{" "}
                   <Line
                     type="monotone"
                     dataKey="backlinks_total"
-                    stroke="#16a34a"
+                    stroke={chartSeriesColors.primary}
                     strokeWidth={2}
                   />{" "}
                   <Line
                     type="monotone"
                     dataKey="ref_domains"
-                    stroke="#f59e0b"
+                    stroke={chartSeriesColors.secondary}
                     strokeWidth={2}
                   />{" "}
                 </LineChart>{" "}
@@ -1209,13 +1276,19 @@ export default function ProjectDashboard() {
               ]}
             >
               {" "}
-              <CartesianGrid strokeDasharray="3 3" /> <XAxis dataKey="name" />{" "}
-              <YAxis /> <Tooltip />{" "}
+              <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
+              <XAxis dataKey="name" tick={{ fill: chartAxisText }} />{" "}
+              <YAxis tick={{ fill: chartAxisText }} />{" "}
+              <Tooltip
+                contentStyle={chartTooltipStyle}
+                labelStyle={chartTooltipLabelStyle}
+                cursor={chartTooltipCursor}
+              />{" "}
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#2563eb"
-                fill="#93c5fd"
+                stroke={chartSeriesColors.primary}
+                fill="color-mix(in srgb, var(--md-sys-color-primary) 28%, transparent)"
               />{" "}
             </AreaChart>{" "}
           </ResponsiveContainer>{" "}
@@ -1438,16 +1511,23 @@ export default function ProjectDashboard() {
             {" "}
             <BarChart data={brandSeries}>
               {" "}
-              <CartesianGrid strokeDasharray="3 3" /> <XAxis dataKey="date" />{" "}
-              <YAxis /> <Tooltip /> <Legend />{" "}
+              <CartesianGrid stroke={chartGridStroke} strokeDasharray="3 3" />{" "}
+              <XAxis dataKey="date" tick={{ fill: chartAxisText }} />{" "}
+              <YAxis tick={{ fill: chartAxisText }} />{" "}
+              <Tooltip
+                contentStyle={chartTooltipStyle}
+                labelStyle={chartTooltipLabelStyle}
+                cursor={chartTooltipCursor}
+              />{" "}
+              <Legend wrapperStyle={{ color: "var(--md-sys-color-on-surface-variant)" }} />{" "}
               <Bar
                 dataKey="brand_sessions"
-                fill="#2563eb"
+                fill={chartSeriesColors.primary}
                 name="Brand Sessions"
               />{" "}
               <Bar
                 dataKey="non_brand_sessions"
-                fill="#94a3b8"
+                fill={chartSeriesColors.secondary}
                 name="Non-brand Sessions"
               />{" "}
             </BarChart>{" "}
@@ -1666,7 +1746,8 @@ export default function ProjectDashboard() {
                 Status:
               </span>{" "}
               <span
-                className={`ml-2 px-2 py-1 rounded text-sm ${last_crawl.status === "completed" ? "bg-green-100 text-green-800" : last_crawl.status === "failed" ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"}`}
+                className="ml-2 px-2 py-1 rounded text-sm"
+                style={getCrawlStatusStyle(last_crawl.status)}
               >
                 {" "}
                 {last_crawl.status}{" "}
