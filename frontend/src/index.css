@@ -164,6 +164,26 @@
     border-radius: var(--shape-large);
   }
 
+  .dashboard-page {
+    min-height: 100%;
+    background-color: var(--md-sys-color-surface);
+    background-image: radial-gradient(
+      circle at 15% 10%,
+      color-mix(
+        in srgb,
+        var(--md-sys-color-primary-container) 24%,
+        transparent
+      ) 0%,
+      color-mix(
+        in srgb,
+        var(--md-sys-color-primary-container) 12%,
+        transparent
+      ) 30%,
+      transparent 62%
+    );
+    background-repeat: no-repeat;
+  }
+
   .dashboard-section {
     margin-bottom: var(--space-4);
   }

@@ -549,7 +549,7 @@ export default function ProjectDashboard() {
     </div>
   );
   return (
-    <div className="text-[var(--md-sys-color-on-surface)]">
+    <div className="dashboard-page text-[var(--md-sys-color-on-surface)]">
       {" "}
       <div className="flex justify-between items-center mb-6">
         {" "}
