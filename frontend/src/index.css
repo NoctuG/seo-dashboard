@@ -9,6 +9,8 @@
     --md-sys-color-primary-container: #c8e6ff;
     --md-sys-color-on-primary-container: #001e2f;
     --md-sys-color-surface: #f7fafd;
+    --md-sys-color-surface-container-low: #f1f5f9;
+    --md-sys-color-surface-container: #eaf0f6;
     --md-sys-color-surface-variant: #e6eef5;
     --md-sys-color-on-surface: #171c22;
     --md-sys-color-on-surface-variant: #414b57;
@@ -26,10 +28,26 @@
     --space-3: 24px;
     --space-4: 32px;
 
-    --md-sys-state-hover: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
-    --md-sys-state-focus: color-mix(in srgb, var(--md-sys-color-primary) 22%, transparent);
-    --md-sys-state-disabled-bg: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
-    --md-sys-state-disabled-text: color-mix(in srgb, var(--md-sys-color-on-surface) 45%, transparent);
+    --md-sys-state-hover: color-mix(
+      in srgb,
+      var(--md-sys-color-primary) 14%,
+      transparent
+    );
+    --md-sys-state-focus: color-mix(
+      in srgb,
+      var(--md-sys-color-primary) 22%,
+      transparent
+    );
+    --md-sys-state-disabled-bg: color-mix(
+      in srgb,
+      var(--md-sys-color-on-surface) 12%,
+      transparent
+    );
+    --md-sys-state-disabled-text: color-mix(
+      in srgb,
+      var(--md-sys-color-on-surface) 45%,
+      transparent
+    );
 
     --md-sys-typescale-display-large-size: 3.5625rem;
     --md-sys-typescale-display-large-line-height: 1.12;
@@ -63,6 +81,8 @@
     --md-sys-color-primary-container: #004b6f;
     --md-sys-color-on-primary-container: #c8e6ff;
     --md-sys-color-surface: #0f141a;
+    --md-sys-color-surface-container-low: #1b222b;
+    --md-sys-color-surface-container: #212a34;
     --md-sys-color-surface-variant: #2a323b;
     --md-sys-color-on-surface: #dfe3ea;
     --md-sys-color-on-surface-variant: #c0c7d1;
@@ -81,7 +101,13 @@
     background-color: var(--md-sys-color-surface);
     color: var(--md-sys-color-on-surface);
     @apply antialiased transition-colors duration-200;
-    font-family: 'Roboto', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family:
+      "Roboto",
+      "Noto Sans SC",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
     font-size: var(--md-sys-typescale-body-large-size);
     line-height: var(--md-sys-typescale-body-large-line-height);
     font-weight: var(--md-sys-typescale-body-large-weight);
@@ -108,21 +134,57 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--md-sys-color-on-surface) 30%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--md-sys-color-on-surface) 30%,
+      transparent
+    );
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--md-sys-color-on-surface) 45%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--md-sys-color-on-surface) 45%,
+      transparent
+    );
   }
 }
 
 @layer components {
   .app-card {
-    background: var(--md-sys-color-surface);
+    background: var(--md-sys-color-surface-container);
     color: var(--md-sys-color-on-surface);
     border: 1px solid var(--md-sys-color-outline);
     border-radius: var(--shape-large);
     @apply shadow-sm;
+  }
+
+  .dashboard-card {
+    @apply p-6 rounded shadow;
+  }
+
+  .dashboard-card-compact {
+    @apply p-4;
+  }
+
+  .dashboard-subcard {
+    border: 1px solid var(--md-sys-color-outline);
+    background: var(--md-sys-color-surface-container-low);
+    color: var(--md-sys-color-on-surface);
+    @apply rounded p-4;
+  }
+
+  .dashboard-tonal-block {
+    background: var(--md-sys-color-surface-container-low);
+    @apply rounded p-4;
+  }
+
+  .app-select-sm {
+    @apply px-2 py-1;
+  }
+
+  .app-btn-sm {
+    @apply px-2 py-1;
   }
 
   .app-input,
@@ -244,7 +306,11 @@
   .app-textarea:disabled {
     background: var(--md-sys-state-disabled-bg);
     color: var(--md-sys-state-disabled-text);
-    border-color: color-mix(in srgb, var(--md-sys-color-outline) 70%, transparent);
+    border-color: color-mix(
+      in srgb,
+      var(--md-sys-color-outline) 70%,
+      transparent
+    );
     @apply cursor-not-allowed opacity-70;
   }
 
@@ -283,7 +349,11 @@
   .auth-card {
     width: 100%;
     max-width: 420px;
-    background: color-mix(in srgb, var(--md-sys-color-surface) 85%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--md-sys-color-surface) 85%,
+      transparent
+    );
     border: 1px solid var(--md-sys-color-outline);
     border-radius: var(--shape-large);
     padding: var(--space-4);
@@ -316,11 +386,21 @@
     animation: scaleIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  .animate-stagger-1 { animation-delay: 0.06s; }
-  .animate-stagger-2 { animation-delay: 0.12s; }
-  .animate-stagger-3 { animation-delay: 0.18s; }
-  .animate-stagger-4 { animation-delay: 0.24s; }
-  .animate-stagger-5 { animation-delay: 0.30s; }
+  .animate-stagger-1 {
+    animation-delay: 0.06s;
+  }
+  .animate-stagger-2 {
+    animation-delay: 0.12s;
+  }
+  .animate-stagger-3 {
+    animation-delay: 0.18s;
+  }
+  .animate-stagger-4 {
+    animation-delay: 0.24s;
+  }
+  .animate-stagger-5 {
+    animation-delay: 0.3s;
+  }
 
   /* ── Loading spinner ── */
   .loading-spinner {
@@ -352,25 +432,49 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeSlideDown {
-  from { opacity: 0; transform: translateY(-12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
