@@ -712,7 +712,7 @@ export default function ProjectDashboard() {
           ))}{" "}
         </div>
       )}{" "}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 dashboard-grid dashboard-section">
         {" "}
         <div className="app-card dashboard-card">
           {" "}
@@ -755,7 +755,7 @@ export default function ProjectDashboard() {
           </p>{" "}
         </div>{" "}
       </div>{" "}
-      <div className="app-card dashboard-card mb-8">
+      <div className="app-card dashboard-card dashboard-section">
         {" "}
         <div className="flex items-center justify-between mb-4">
           {" "}
@@ -961,7 +961,7 @@ export default function ProjectDashboard() {
           },
         ]}
       />{" "}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 dashboard-grid dashboard-section">
         {" "}
         <div className="app-card dashboard-card h-72">
           {" "}
@@ -989,7 +989,7 @@ export default function ProjectDashboard() {
         </div>{" "}
         <div className="app-card dashboard-card min-h-72">
           {" "}
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="mb-[var(--space-2)] flex flex-wrap items-center justify-between gap-[var(--space-1)]">
             {" "}
             <h3 className="md-title-medium">Backlink Trend</h3>{" "}
             <div className="flex items-center gap-2">
@@ -1101,7 +1101,7 @@ export default function ProjectDashboard() {
           )}{" "}
         </div>{" "}
       </div>{" "}
-      <div className="app-card dashboard-card mb-8">
+      <div className="app-card dashboard-card dashboard-section">
         {" "}
         <h3 className="md-title-medium mb-3">重要外链 Top N</h3>{" "}
         <ul className="space-y-2 text-sm">
@@ -1122,12 +1122,12 @@ export default function ProjectDashboard() {
           ))}{" "}
         </ul>{" "}
       </div>{" "}
-      <div className="app-card dashboard-card mb-8 overflow-x-auto">
+      <div className="app-card dashboard-card dashboard-section overflow-x-auto">
         {" "}
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="mb-[var(--space-2)] flex flex-wrap items-center justify-between gap-[var(--space-1)]">
           {" "}
           <h3 className="md-title-medium">最近新增 / 失效外链</h3>{" "}
-          <div className="flex gap-2">
+          <div className="flex gap-[var(--space-1)]">
             {" "}
             <input
               value={backlinkQuery}
@@ -1178,15 +1178,15 @@ export default function ProjectDashboard() {
           </tbody>{" "}
         </table>{" "}
       </div>{" "}
-      <div className="app-card dashboard-card mb-8">
+      <div className="app-card dashboard-card dashboard-section">
         {" "}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-[var(--space-2)] mb-[var(--space-2)]">
           {" "}
           <h3 className="md-title-medium flex items-center gap-2">
             {" "}
             <BadgePercent size={18} /> SEO ROI{" "}
           </h3>{" "}
-          <div className="flex gap-2">
+          <div className="flex gap-[var(--space-1)]">
             {" "}
             <select
               value={roiRange}
@@ -1216,7 +1216,7 @@ export default function ProjectDashboard() {
             </select>{" "}
           </div>{" "}
         </div>{" "}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-[var(--space-2)] mb-[var(--space-2)]">
           {" "}
           <div className="rounded bg-[var(--md-sys-color-surface-container-low)] p-4">
             {" "}
@@ -1298,7 +1298,7 @@ export default function ProjectDashboard() {
           provider={roi?.provider ?? analytics.provider}
         />{" "}
       </div>{" "}
-      <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="dashboard-section grid grid-cols-1 md:grid-cols-4 dashboard-grid">
         {" "}
         <div className="app-card dashboard-card">
           {" "}
@@ -1347,7 +1347,7 @@ export default function ProjectDashboard() {
           </p>{" "}
         </div>{" "}
       </div>{" "}
-      <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="dashboard-section grid grid-cols-1 md:grid-cols-4 dashboard-grid">
         {" "}
         {qualityCards.map((card) => (
           <div
@@ -1362,9 +1362,9 @@ export default function ProjectDashboard() {
           </div>
         ))}{" "}
       </div>{" "}
-      <div className="app-card dashboard-card mb-8">
+      <div className="app-card dashboard-card dashboard-section">
         {" "}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-[var(--space-2)] mb-[var(--space-2)]">
           {" "}
           <h3 className="md-headline-large">Competitor Overview</h3>{" "}
           <select
@@ -1461,7 +1461,7 @@ export default function ProjectDashboard() {
             </>
           )}{" "}
       </div>{" "}
-      <div className="app-card dashboard-card mb-8">
+      <div className="app-card dashboard-card dashboard-section">
         {" "}
         <div className="flex items-center justify-between mb-3">
           {" "}
@@ -1534,7 +1534,7 @@ export default function ProjectDashboard() {
           </ResponsiveContainer>{" "}
         </div>{" "}
       </div>{" "}
-      <div className="mb-4 flex flex-wrap gap-3 items-center">
+      <div className="mb-4 flex flex-wrap gap-[var(--space-2)] items-center">
         {" "}
         <h2 className="md-headline-large mr-3">Content Performance</h2>{" "}
         <select
@@ -1567,7 +1567,7 @@ export default function ProjectDashboard() {
           View page details{" "}
         </Link>{" "}
       </div>{" "}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 dashboard-grid dashboard-section">
         {" "}
         {renderContentList(
           "热门内容",
@@ -1582,9 +1582,9 @@ export default function ProjectDashboard() {
           contentPerformance?.decaying_content ?? [],
         )}{" "}
       </div>{" "}
-      <div className="app-card dashboard-card mb-8">
+      <div className="app-card dashboard-card dashboard-section">
         {" "}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-[var(--space-2)] mb-[var(--space-2)]">
           {" "}
           <h2 className="md-headline-large">关键词波动热力图</h2>{" "}
           <div className="flex items-center gap-2 text-sm">
@@ -1660,10 +1660,10 @@ export default function ProjectDashboard() {
             </table>{" "}
           </div>
         )}{" "}
-        <div className="mt-4 flex items-center justify-between md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
+        <div className="mt-[var(--space-2)] flex items-center justify-between md-label-medium text-[var(--md-sys-color-on-surface-variant)]">
           {" "}
           <span> 图例: Top3 / Top10 / Top20 / Top50 / Out / Missing </span>{" "}
-          <div className="flex gap-2">
+          <div className="flex gap-[var(--space-1)]">
             {" "}
             <button
               className="app-btn app-btn-outline app-btn-sm disabled:opacity-40"
@@ -1697,10 +1697,10 @@ export default function ProjectDashboard() {
           </div>{" "}
         </div>{" "}
       </div>{" "}
-      <div className="app-card dashboard-card mb-8">
+      <div className="app-card dashboard-card dashboard-section">
         {" "}
         <h2 className="md-headline-large mb-4">流量地理分布图</h2>{" "}
-        <div className="space-y-3">
+        <div className="space-y-[var(--space-2)]">
           {" "}
           {searchInsights?.geo_distribution.rows.map((row) => (
             <div key={row.country}>
