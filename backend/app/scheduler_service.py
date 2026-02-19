@@ -29,6 +29,11 @@ from app.models import (
 )
 from app.report_service import report_service
 from app.serp_service import check_keyword_rank
+from app.webhook_service import (
+    WEBHOOK_EVENT_RANK_DROPPED_SIGNIFICANTLY,
+    is_significant_rank_drop,
+    webhook_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +210,7 @@ class SchedulerService:
                 try:
                     result = check_keyword_rank(keyword.term, project.domain, competitor_domains, gl=gl, hl=hl)
                     now = datetime.utcnow()
+                    previous_rank = keyword.current_rank
                     keyword.current_rank = result.rank
                     keyword.last_checked = now
                     keyword.serp_features_json = json.dumps(result.serp_features, ensure_ascii=False)
@@ -219,6 +225,20 @@ class SchedulerService:
                             checked_at=now,
                         )
                     )
+                    if is_significant_rank_drop(previous_rank, result.rank):
+                        webhook_service.dispatch_event(
+                            session,
+                            WEBHOOK_EVENT_RANK_DROPPED_SIGNIFICANTLY,
+                            {
+                                "project_id": schedule.project_id,
+                                "keyword_id": keyword.id,
+                                "keyword_term": keyword.term,
+                                "previous_rank": previous_rank,
+                                "current_rank": result.rank,
+                                "drop": result.rank - previous_rank,
+                                "trigger": "keyword_schedule",
+                            },
+                        )
                     success_count += 1
                 except Exception:  # noqa: BLE001
                     failed_count += 1
