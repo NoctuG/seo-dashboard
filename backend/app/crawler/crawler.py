@@ -26,6 +26,8 @@ from app.site_audit import calculate_site_health_score
 from app.webhook_service import (
     WEBHOOK_EVENT_CRAWL_COMPLETED,
     WEBHOOK_EVENT_CRITICAL_ISSUE_FOUND,
+    WEBHOOK_EVENT_SITE_AUDIT_SCORE_LOW,
+    SITE_AUDIT_LOW_SCORE_THRESHOLD,
     webhook_service,
 )
 
@@ -361,14 +363,27 @@ class CrawlerService:
 
                 if crawl.status == CrawlStatus.COMPLETED:
                     crawl_issues = session.exec(select(Issue).where(Issue.crawl_id == crawl.id)).all()
+                    score = calculate_site_health_score(crawl_issues)
                     session.add(
                         SiteAuditHistory(
                             project_id=crawl.project_id,
                             crawl_id=crawl.id,
-                            score=calculate_site_health_score(crawl_issues),
+                            score=score,
                         )
                     )
                     session.commit()
+
+                    if score < SITE_AUDIT_LOW_SCORE_THRESHOLD:
+                        webhook_service.dispatch_event(
+                            session,
+                            WEBHOOK_EVENT_SITE_AUDIT_SCORE_LOW,
+                            {
+                                "crawl_id": crawl.id,
+                                "project_id": crawl.project_id,
+                                "score": score,
+                                "threshold": SITE_AUDIT_LOW_SCORE_THRESHOLD,
+                            },
+                        )
 
                     webhook_service.dispatch_event(
                         session,

@@ -17,12 +17,31 @@ logger = logging.getLogger(__name__)
 WEBHOOK_EVENT_CRAWL_COMPLETED = "crawl.completed"
 WEBHOOK_EVENT_CRITICAL_ISSUE_FOUND = "issue.critical_found"
 WEBHOOK_EVENT_REPORT_GENERATED = "report.generated"
+WEBHOOK_EVENT_RANK_DROPPED_SIGNIFICANTLY = "rank.dropped_significantly"
+WEBHOOK_EVENT_SITE_AUDIT_SCORE_LOW = "site_audit.score_low"
+
+TOP_10_THRESHOLD = 10
+SIGNIFICANT_RANK_DROP_MIN_DELTA = 5
+SITE_AUDIT_LOW_SCORE_THRESHOLD = 80
 
 SUPPORTED_WEBHOOK_EVENTS = {
     WEBHOOK_EVENT_CRAWL_COMPLETED,
     WEBHOOK_EVENT_CRITICAL_ISSUE_FOUND,
     WEBHOOK_EVENT_REPORT_GENERATED,
+    WEBHOOK_EVENT_RANK_DROPPED_SIGNIFICANTLY,
+    WEBHOOK_EVENT_SITE_AUDIT_SCORE_LOW,
 }
+
+
+def is_significant_rank_drop(previous_rank: int | None, current_rank: int | None) -> bool:
+    if previous_rank is None or current_rank is None:
+        return False
+    if previous_rank <= 0 or current_rank <= 0:
+        return False
+
+    dropped_out_of_top_10 = previous_rank <= TOP_10_THRESHOLD < current_rank
+    large_delta_drop = (current_rank - previous_rank) >= SIGNIFICANT_RANK_DROP_MIN_DELTA
+    return dropped_out_of_top_10 or large_delta_drop
 
 
 class WebhookService:

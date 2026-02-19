@@ -32,6 +32,11 @@ from app.serp_service import check_keyword_rank
 from app.visibility_service import visibility_service
 from app.api.deps import require_project_role
 from app.scheduler_service import scheduler_service
+from app.webhook_service import (
+    WEBHOOK_EVENT_RANK_DROPPED_SIGNIFICANTLY,
+    is_significant_rank_drop,
+    webhook_service,
+)
 
 router = APIRouter()
 
@@ -41,6 +46,30 @@ def _resolve_geo_language(project: Project, keyword: Keyword) -> tuple[str, str]
     gl = (keyword.market or project.default_gl or "us").strip().lower()
     hl = (keyword.locale or project.default_hl or "en").strip().lower()
     return gl, hl
+
+
+def _dispatch_rank_drop_webhook(
+    session: Session,
+    project_id: int,
+    keyword: Keyword,
+    previous_rank: int | None,
+    current_rank: int | None,
+) -> None:
+    if not is_significant_rank_drop(previous_rank, current_rank):
+        return
+
+    webhook_service.dispatch_event(
+        session,
+        WEBHOOK_EVENT_RANK_DROPPED_SIGNIFICANTLY,
+        {
+            "project_id": project_id,
+            "keyword_id": keyword.id,
+            "keyword_term": keyword.term,
+            "previous_rank": previous_rank,
+            "current_rank": current_rank,
+            "drop": (current_rank - previous_rank) if previous_rank and current_rank else None,
+        },
+    )
 
 
 def _bucket_start_for_dt(value: datetime, bucket: str) -> datetime:
@@ -486,6 +515,7 @@ def check_rank(
     gl, hl = _resolve_geo_language(project, keyword)
     result = check_keyword_rank(keyword.term, project.domain, [c.domain for c in competitors], gl=gl, hl=hl)
 
+    previous_rank = keyword.current_rank
     keyword.current_rank = result.rank
     keyword.last_checked = datetime.utcnow()
     keyword.serp_features_json = json.dumps(result.serp_features, ensure_ascii=False)
@@ -499,6 +529,7 @@ def check_rank(
     )
     session.add(history)
     session.add(keyword)
+    _dispatch_rank_drop_webhook(session, project_id, keyword, previous_rank, result.rank)
     session.commit()
     session.refresh(keyword)
     return keyword
@@ -521,6 +552,7 @@ def check_all_ranks(
     for keyword in keywords:
         gl, hl = _resolve_geo_language(project, keyword)
         result = check_keyword_rank(keyword.term, project.domain, gl=gl, hl=hl)
+        previous_rank = keyword.current_rank
         keyword.current_rank = result.rank
         keyword.last_checked = datetime.utcnow()
         keyword.serp_features_json = json.dumps(result.serp_features, ensure_ascii=False)
@@ -534,6 +566,7 @@ def check_all_ranks(
         )
         session.add(history)
         session.add(keyword)
+        _dispatch_rank_drop_webhook(session, project_id, keyword, previous_rank, result.rank)
 
     session.commit()
     for keyword in keywords:
@@ -561,11 +594,13 @@ def check_all_compare(
         gl, hl = _resolve_geo_language(project, keyword)
         result = check_keyword_rank(keyword.term, project.domain, competitor_domains, gl=gl, hl=hl)
 
+        previous_rank = keyword.current_rank
         keyword.current_rank = result.rank
         keyword.last_checked = now
         keyword.serp_features_json = json.dumps(result.serp_features, ensure_ascii=False)
         session.add(keyword)
         session.add(RankHistory(keyword_id=keyword.id, rank=result.rank, url=result.url, gl=gl, hl=hl, checked_at=now))
+        _dispatch_rank_drop_webhook(session, project_id, keyword, previous_rank, result.rank)
 
         base_row = visibility_service.create_visibility_row(
             project_id=project_id,
