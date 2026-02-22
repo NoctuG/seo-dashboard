@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from app.runtime_settings import get_runtime_settings
 from app.db import engine
 from app.models import Crawl, Page, Link, Issue, CrawlStatus, IssueStatus, PagePerformanceSnapshot, SiteAuditHistory
-from app.crawler.fetcher import Fetcher
+from app.crawler.fetcher import Fetcher, FetcherConfig
 from app.crawler.parser import Parser
 from app.crawler.analyzer import Analyzer
 from app.crawler.events import crawl_event_broker
@@ -25,8 +25,11 @@ from app.metrics import (
 from app.site_audit import calculate_site_health_score
 from app.webhook_service import (
     WEBHOOK_EVENT_CRAWL_COMPLETED,
+    WEBHOOK_EVENT_CRAWL_STARTED,
     WEBHOOK_EVENT_CRITICAL_ISSUE_FOUND,
+    WEBHOOK_EVENT_SERVER_ERROR_SURGE,
     WEBHOOK_EVENT_SITE_AUDIT_SCORE_LOW,
+    SERVER_ERROR_SURGE_THRESHOLD,
     SITE_AUDIT_LOW_SCORE_THRESHOLD,
     webhook_service,
 )
@@ -96,7 +99,7 @@ class CrawlerService:
 
         return urls
 
-    def run_crawl(self, crawl_id: int, max_pages: Optional[int] = None, sitemap_url: Optional[str] = None):
+    def run_crawl(self, crawl_id: int, max_pages: Optional[int] = None, sitemap_url: Optional[str] = None, rendering_mode: Optional[str] = None):
         with Session(engine) as session:
             crawl = session.get(Crawl, crawl_id)
             if not crawl:
@@ -137,7 +140,14 @@ class CrawlerService:
             queue: List[str] = [start_url]
             visited: Set[str] = set()
 
-            fetcher = Fetcher()
+            # Build fetcher config from runtime settings and request params
+            proxy_urls = getattr(runtime, "proxy_urls", []) or []
+            effective_rendering = rendering_mode or getattr(runtime, "rendering_mode", "html") or "html"
+            fetcher_config = FetcherConfig(
+                proxy_urls=proxy_urls,
+                rendering_mode=effective_rendering,
+            )
+            fetcher = Fetcher(config=fetcher_config)
             parser = Parser()
             analyzer = Analyzer()
             robots = self._load_robot_parser(start_url)
@@ -148,11 +158,25 @@ class CrawlerService:
                 queue.extend(sitemap_urls)
                 logger.info(f"Added {len(sitemap_urls)} URLs from sitemap")
 
+            # Dispatch crawl.started webhook
+            webhook_service.dispatch_event(
+                session,
+                WEBHOOK_EVENT_CRAWL_STARTED,
+                {
+                    "crawl_id": crawl.id,
+                    "project_id": crawl.project_id,
+                    "max_pages": crawl_max_pages,
+                    "rendering_mode": effective_rendering,
+                },
+            )
+
             pages_processed = 0
             issues_found = 0
             error_count = 0
+            server_error_count = 0
             internal_link_validation_cache: Dict[str, Tuple[Optional[int], int]] = {}
             critical_issue_alert_sent = False
+            server_error_surge_sent = False
 
             try:
                 while queue and pages_processed < crawl_max_pages:
@@ -189,6 +213,24 @@ class CrawlerService:
 
                     status_code = response.status_code
                     html_content = response.text
+
+                    # Track 5xx server errors for surge detection
+                    if status_code >= 500:
+                        server_error_count += 1
+                        if server_error_count >= SERVER_ERROR_SURGE_THRESHOLD and not server_error_surge_sent:
+                            webhook_service.dispatch_event(
+                                session,
+                                WEBHOOK_EVENT_SERVER_ERROR_SURGE,
+                                {
+                                    "crawl_id": crawl.id,
+                                    "project_id": crawl.project_id,
+                                    "server_error_count": server_error_count,
+                                    "threshold": SERVER_ERROR_SURGE_THRESHOLD,
+                                    "latest_url": url,
+                                    "latest_status_code": status_code,
+                                },
+                            )
+                            server_error_surge_sent = True
 
                     parse_result = parser.parse(html_content, url)
                     parse_result["url"] = str(response.url)
@@ -355,6 +397,7 @@ class CrawlerService:
                     "error_count": error_count,
                 })
             finally:
+                fetcher.close()
                 crawl.end_time = datetime.utcnow()
                 crawl.total_pages = pages_processed
                 crawl.issues_count = issues_found

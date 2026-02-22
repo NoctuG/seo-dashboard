@@ -14,6 +14,7 @@ from app.rate_limit import limiter, rate_limit_exceeded_handler
 from app.logging_config import REQUEST_PATH_CONTEXT, TRACE_ID_CONTEXT, generate_trace_id
 from app.metrics import finish_timed_request, observe_http_request, timed_request
 from app.scheduler_service import scheduler_service
+from app.task_queue import task_queue
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from slowapi.errors import RateLimitExceeded
 
@@ -77,3 +78,4 @@ def read_root():
 @app.on_event("shutdown")
 def on_shutdown():
     scheduler_service.shutdown()
+    task_queue.shutdown(wait=False)

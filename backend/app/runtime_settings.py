@@ -34,6 +34,8 @@ class RuntimeSettings:
     ai_model: str
 
     default_crawl_max_pages: int
+    rendering_mode: str  # "html" or "js" (headless browser)
+    proxy_urls: list  # list of proxy URLs for the crawler
 
 
 DEFAULT_SYSTEM_SETTINGS = {
@@ -60,6 +62,8 @@ DEFAULT_SYSTEM_SETTINGS = {
     },
     "crawler": {
         "default_max_pages": settings.DEFAULT_CRAWL_MAX_PAGES,
+        "rendering_mode": getattr(settings, "CRAWLER_RENDERING_MODE", "html"),
+        "proxy_urls": [],
     },
 }
 
@@ -89,6 +93,21 @@ def _to_bool(value, fallback: bool) -> bool:
         if lowered in {"false", "0", "no", "off"}:
             return False
     return fallback
+
+
+def _to_list(value) -> list:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return []
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else []
+        except json.JSONDecodeError:
+            return [item.strip() for item in value.split(",") if item.strip()]
+    return []
 
 
 def _overlay(defaults: dict, override: dict) -> dict:
@@ -128,6 +147,8 @@ def _from_row(row: SystemSettings | None) -> RuntimeSettings:
         ai_api_key=str(ai.get("api_key") or ""),
         ai_model=str(ai.get("model") or settings.AI_MODEL),
         default_crawl_max_pages=max(1, _to_int(crawler.get("default_max_pages"), settings.DEFAULT_CRAWL_MAX_PAGES)),
+        rendering_mode=str(crawler.get("rendering_mode") or "html"),
+        proxy_urls=_to_list(crawler.get("proxy_urls")),
     )
 
 

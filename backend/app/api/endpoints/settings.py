@@ -41,6 +41,8 @@ class AISettingsPayload(BaseModel):
 
 class CrawlerSettingsPayload(BaseModel):
     default_max_pages: int = 50
+    rendering_mode: str = "html"  # "html" (static) or "js" (headless browser)
+    proxy_urls: list[str] = []
 
 
 class SystemSettingsPayload(BaseModel):
@@ -92,7 +94,11 @@ def get_system_settings(
             "api_key": MASKED_SECRET if runtime.ai_api_key else "",
             "model": runtime.ai_model,
         },
-        crawler={"default_max_pages": runtime.default_crawl_max_pages},
+        crawler={
+            "default_max_pages": runtime.default_crawl_max_pages,
+            "rendering_mode": runtime.rendering_mode,
+            "proxy_urls": runtime.proxy_urls,
+        },
         masked_fields=masked_fields,
     )
 
@@ -144,6 +150,8 @@ def update_system_settings(
     }
     crawler_store = {
         "default_max_pages": max(1, payload.crawler.default_max_pages),
+        "rendering_mode": payload.crawler.rendering_mode if payload.crawler.rendering_mode in ("html", "js") else "html",
+        "proxy_urls": payload.crawler.proxy_urls,
     }
 
     save_system_settings(

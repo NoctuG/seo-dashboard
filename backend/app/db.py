@@ -1,15 +1,22 @@
+import logging
+
 from sqlalchemy import event, text
 from sqlmodel import Session, create_engine
 
 from app.metrics import record_db_pool_event
 from .config import settings
 
+_logger = logging.getLogger(__name__)
+
+
+def _is_sqlite() -> bool:
+    return settings.DATABASE_URL.startswith("sqlite:///") or settings.DATABASE_URL.startswith("sqlite+")
+
 
 def _build_engine():
     database_url = settings.DATABASE_URL
-    is_sqlite = database_url.startswith("sqlite:///") or database_url.startswith("sqlite+")
 
-    if is_sqlite:
+    if _is_sqlite():
         return create_engine(database_url, echo=True, connect_args={"check_same_thread": False})
 
     return create_engine(database_url, echo=True)
@@ -21,6 +28,17 @@ engine = _build_engine()
 @event.listens_for(engine, "connect")
 def on_db_connect(dbapi_connection, connection_record):  # noqa: ANN001, ARG001
     record_db_pool_event("connect")
+
+    # Enable WAL mode for SQLite to support concurrent reads during crawler writes.
+    # WAL (Write-Ahead Logging) allows readers and a single writer to operate
+    # concurrently without blocking each other, which is essential when the
+    # crawler is writing crawl results while the API serves read requests.
+    if _is_sqlite():
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
+        _logger.debug("SQLite WAL mode and busy_timeout enabled")
 
 
 @event.listens_for(engine, "checkout")
