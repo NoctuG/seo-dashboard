@@ -44,6 +44,7 @@ from app.backlink_service import backlink_service
 from app.visibility_service import visibility_service
 from app.report_service import report_service
 from app.scheduler_service import scheduler_service
+from app.task_queue import task_queue
 from app.api.deps import get_current_user, require_project_role, write_audit_log
 from app.config import settings
 from app.metrics import update_crawl_status
@@ -183,6 +184,7 @@ def start_crawl(
     background_tasks: BackgroundTasks,
     max_pages: Optional[int] = None,
     sitemap_url: Optional[str] = None,
+    rendering_mode: Optional[str] = None,
     session: Session = Depends(get_session),
     user: User = Depends(require_project_role(ProjectRoleType.ADMIN))
 ):
@@ -196,7 +198,14 @@ def start_crawl(
     session.refresh(crawl)
     update_crawl_status(None, CrawlStatus.PENDING.value)
 
-    background_tasks.add_task(crawler_service.run_crawl, crawl.id, max_pages, sitemap_url)
+    task_queue.submit(
+        "crawl",
+        crawler_service.run_crawl,
+        crawl.id,
+        max_pages,
+        sitemap_url,
+        rendering_mode,
+    )
     write_audit_log(session, AuditActionType.CRAWL_START, user.id, "crawl", crawl.id, {"project_id": project_id})
 
     return crawl

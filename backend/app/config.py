@@ -98,6 +98,8 @@ class Settings:
 
     # Crawl settings
     DEFAULT_CRAWL_MAX_PAGES: int = int(os.getenv("DEFAULT_CRAWL_MAX_PAGES", "50"))
+    CRAWLER_RENDERING_MODE: str = os.getenv("CRAWLER_RENDERING_MODE", "html")  # html or js
+    CRAWLER_PROXY_URLS: str = os.getenv("CRAWLER_PROXY_URLS", "")  # comma-separated or JSON array
 
     # Rate limit settings
     RATE_LIMIT_LOGIN: str = os.getenv("RATE_LIMIT_LOGIN", "5/minute")

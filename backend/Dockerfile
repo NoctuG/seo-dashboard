@@ -17,13 +17,14 @@ COPY --from=builder /install /usr/local
 # Copy application code
 COPY . .
 
-# Create directory for SQLite database persistence
-RUN mkdir -p /data
+# Create directories for SQLite database and backups
+RUN mkdir -p /data /data/backups
 
 # Default database path points to the persistent volume
 ENV DATABASE_URL=sqlite:////data/seo_tool.db
 
 EXPOSE 28000
 
-# Run migrations then start the server
-CMD ["sh", "-c", "cd /app && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 28000"]
+# Run preflight checks, then migrations, then start the server.
+# Preflight uses --quick to avoid needing a live DB connection before migrations.
+CMD ["sh", "-c", "cd /app && python -m app.preflight --quick && alembic upgrade head && python -m app.preflight && uvicorn app.main:app --host 0.0.0.0 --port 28000"]
