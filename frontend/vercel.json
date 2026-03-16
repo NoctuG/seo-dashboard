@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://seo-dashboard-backend-085p.onrender.com/api/:path*"
+      "destination": "https://28000-i4ktkmfyq98kdeikml63d-745d7648.us1.manus.computer/api/:path*"
     }
   ]
 }
