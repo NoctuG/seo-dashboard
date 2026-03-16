@@ -1072,7 +1072,7 @@ def get_project_ref_domains(
     search: Optional[str] = None,
     sort_by: Literal["backlinks_count", "da", "first_seen", "last_seen"] = "backlinks_count",
     sort_order: Literal["asc", "desc"] = "desc",
-    background_tasks: Optional[BackgroundTasks] = None,
+    background_tasks: BackgroundTasks = None,
     session: Session = Depends(get_session),
 ):
     project = session.get(Project, project_id)
