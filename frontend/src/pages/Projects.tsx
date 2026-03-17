@@ -1,30 +1,41 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import type { Project } from '../api';
 import { useAuth } from '../auth';
 
 export default function Projects() {
   const { t } = useTranslation();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', domain: '' });
   const { user } = useAuth();
 
-  async function fetchProjects() {
-    try {
-      const res = await api.get('/projects');
-      setProjects(res.data);
-    } catch (error) {
-      console.error(error);
-    }
-  }
+  const {
+    data: projects = [],
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ['projects'],
+    queryFn: async () => {
+      const res = await api.get<Project[]>('/projects');
+      return res.data;
+    },
+  });
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  const createProjectMutation = useMutation({
+    mutationFn: async (payload: { name: string; domain: string }) => {
+      await api.post('/projects', payload);
+    },
+    onSuccess: () => {
+      setIsCreating(false);
+      setNewProject({ name: '', domain: '' });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
 
   const recentActiveProjects = useMemo(() => {
     if (!projects.length) {
@@ -42,15 +53,24 @@ export default function Projects() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await api.post('/projects', newProject);
-      setIsCreating(false);
-      setNewProject({ name: '', domain: '' });
-      fetchProjects();
-    } catch (error) {
-      console.error(error);
-    }
+    createProjectMutation.mutate(newProject);
   };
+
+  if (isLoading) {
+    return (
+      <div className="app-card p-6 md-body-medium text-[color:var(--md-sys-color-on-surface-variant)]">
+        Loading...
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="app-card p-6 md-body-medium text-[color:var(--md-sys-color-error)]">
+        Failed to load projects.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -88,7 +108,9 @@ export default function Projects() {
             </div>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setIsCreating(false)} className="app-btn app-btn-outline">{t('common.cancel')}</button>
-              <button type="submit" className="app-btn app-btn-primary">{t('common.create')}</button>
+              <button type="submit" className="app-btn app-btn-primary" disabled={createProjectMutation.isPending}>
+                {createProjectMutation.isPending ? 'Creating...' : t('common.create')}
+              </button>
             </div>
           </form>
         </div>
