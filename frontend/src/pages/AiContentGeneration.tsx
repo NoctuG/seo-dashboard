@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   generateSeoArticle,
@@ -50,6 +50,93 @@ const TONES_SOCIAL = [
   { value: 'humorous', labelKey: 'aiContent.tones.humorous' },
   { value: 'inspirational', labelKey: 'aiContent.tones.inspirational' },
 ];
+
+
+type ArticleWorkflowStageKey = 'drafting' | 'on_page_optimization' | 'quality_review' | 'retrospective';
+
+type ArticleKeywordPlanState = {
+  primary_keyword: string;
+  secondary_keywords: string[];
+  long_tail_questions: string[];
+};
+
+type ArticleSerpEntryState = {
+  rank: number;
+  content_type: string;
+  title_angle: string;
+  structure: string;
+  word_count: number;
+  content_gap: string;
+};
+
+type ArticleSeoBriefState = {
+  audience: string;
+  intent: string;
+  outline: string[];
+  entities: string[];
+  internal_links: string[];
+  cta: string;
+  metadata: {
+    seo_title: string;
+    meta_description: string;
+    slug: string;
+  };
+};
+
+type ArticleWorkflowStageState = {
+  goal: string;
+  notes: string;
+};
+
+const createDefaultSerpEntry = (rank: number): ArticleSerpEntryState => ({
+  rank,
+  content_type: '',
+  title_angle: '',
+  structure: '',
+  word_count: 0,
+  content_gap: '',
+});
+
+const DEFAULT_KEYWORD_PLAN: ArticleKeywordPlanState = {
+  primary_keyword: '',
+  secondary_keywords: ['', '', ''],
+  long_tail_questions: ['', '', ''],
+};
+
+const DEFAULT_SERP_ANALYSIS = {
+  summary: '',
+  top_results: Array.from({ length: 10 }, (_, index) => createDefaultSerpEntry(index + 1)),
+};
+
+const DEFAULT_SEO_BRIEF: ArticleSeoBriefState = {
+  audience: '',
+  intent: '',
+  outline: ['', '', ''],
+  entities: ['', '', ''],
+  internal_links: ['', ''],
+  cta: '',
+  metadata: {
+    seo_title: '',
+    meta_description: '',
+    slug: '',
+  },
+};
+
+const DEFAULT_WORKFLOW: Record<ArticleWorkflowStageKey, ArticleWorkflowStageState> = {
+  drafting: { goal: '', notes: '' },
+  on_page_optimization: { goal: '', notes: '' },
+  quality_review: { goal: '', notes: '' },
+  retrospective: { goal: '', notes: '' },
+};
+
+const WORKFLOW_STAGE_CONFIG: { key: ArticleWorkflowStageKey; title: string; description: string; icon: string }[] = [
+  { key: 'drafting', title: '初稿生成', description: '定义初稿要覆盖的核心论点、信息密度与语气。', icon: 'fa-solid fa-pen-nib' },
+  { key: 'on_page_optimization', title: 'On-page 优化', description: '明确标题、链接、关键词布局、可读性和结构优化要求。', icon: 'fa-solid fa-screwdriver-wrench' },
+  { key: 'quality_review', title: '质量审校', description: '记录事实核验、品牌一致性、E-E-A-T 与风险检查标准。', icon: 'fa-solid fa-shield-heart' },
+  { key: 'retrospective', title: '复盘记录', description: '说明文章发布后要复盘的数据、假设和后续迭代方向。', icon: 'fa-solid fa-clipboard-list' },
+];
+
+const filterNonEmpty = (values: string[]) => values.map((value) => value.trim()).filter(Boolean);
 
 export default function AiContentGeneration() {
   const { t } = useTranslation();
@@ -115,10 +202,12 @@ function useProjectOptions() {
 function ArticleGenerator() {
   const { t } = useTranslation();
   const [topic, setTopic] = useState('');
-  const [keywords, setKeywords] = useState('');
+  const [keywordPlan, setKeywordPlan] = useState<ArticleKeywordPlanState>(DEFAULT_KEYWORD_PLAN);
+  const [serpAnalysis, setSerpAnalysis] = useState(DEFAULT_SERP_ANALYSIS);
+  const [seoBrief, setSeoBrief] = useState<ArticleSeoBriefState>(DEFAULT_SEO_BRIEF);
+  const [workflow, setWorkflow] = useState<Record<ArticleWorkflowStageKey, ArticleWorkflowStageState>>(DEFAULT_WORKFLOW);
   const [tone, setTone] = useState('professional');
   const [wordCount, setWordCount] = useState(1500);
-  const [outline, setOutline] = useState('');
   const [language, setLanguage] = useState('zh-CN');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -134,17 +223,84 @@ function ArticleGenerator() {
 
   const activeDraft = useMemo(() => drafts.find((item) => item.id === activeDraftId) ?? null, [drafts, activeDraftId]);
 
+  const updateKeywordPlanField = (field: 'secondary_keywords' | 'long_tail_questions', index: number, value: string) => {
+    setKeywordPlan((prev) => {
+      const next = [...prev[field]];
+      next[index] = value;
+      return { ...prev, [field]: next };
+    });
+  };
+
+  const updateSerpEntry = (index: number, field: keyof ArticleSerpEntryState, value: string | number) => {
+    setSerpAnalysis((prev) => ({
+      ...prev,
+      top_results: prev.top_results.map((entry, entryIndex) => entryIndex === index ? { ...entry, [field]: value } : entry),
+    }));
+  };
+
+  const updateSeoBriefList = (field: 'outline' | 'entities' | 'internal_links', index: number, value: string) => {
+    setSeoBrief((prev) => {
+      const next = [...prev[field]];
+      next[index] = value;
+      return { ...prev, [field]: next };
+    });
+  };
+
+  const updateWorkflowStage = (stage: ArticleWorkflowStageKey, field: keyof ArticleWorkflowStageState, value: string) => {
+    setWorkflow((prev) => ({
+      ...prev,
+      [stage]: {
+        ...prev[stage],
+        [field]: value,
+      },
+    }));
+  };
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setResult(null);
     await runWithUiState(async () => {
       const data = await generateSeoArticle({
+        article_mode: 'workflow',
         topic,
-        keywords: keywords.split(',').map((k) => k.trim()).filter(Boolean),
         tone,
         language,
         word_count: wordCount,
-        outline: outline || undefined,
+        keyword_plan: {
+          primary_keyword: keywordPlan.primary_keyword.trim(),
+          secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 5),
+          long_tail_questions: filterNonEmpty(keywordPlan.long_tail_questions),
+        },
+        serp_analysis: {
+          summary: serpAnalysis.summary.trim() || undefined,
+          top_results: serpAnalysis.top_results.map((entry) => ({
+            rank: entry.rank,
+            content_type: entry.content_type.trim(),
+            title_angle: entry.title_angle.trim(),
+            structure: entry.structure.trim(),
+            word_count: entry.word_count,
+            content_gap: entry.content_gap.trim(),
+          })),
+        },
+        seo_brief: {
+          audience: seoBrief.audience.trim(),
+          intent: seoBrief.intent.trim(),
+          outline: filterNonEmpty(seoBrief.outline),
+          entities: filterNonEmpty(seoBrief.entities),
+          internal_links: filterNonEmpty(seoBrief.internal_links),
+          cta: seoBrief.cta.trim(),
+          metadata: {
+            seo_title: seoBrief.metadata.seo_title.trim(),
+            meta_description: seoBrief.metadata.meta_description.trim(),
+            slug: seoBrief.metadata.slug.trim(),
+          },
+        },
+        workflow: {
+          drafting: { goal: workflow.drafting.goal.trim(), notes: workflow.drafting.notes.trim() || undefined },
+          on_page_optimization: { goal: workflow.on_page_optimization.goal.trim(), notes: workflow.on_page_optimization.notes.trim() || undefined },
+          quality_review: { goal: workflow.quality_review.goal.trim(), notes: workflow.quality_review.notes.trim() || undefined },
+          retrospective: { goal: workflow.retrospective.goal.trim(), notes: workflow.retrospective.notes.trim() || undefined },
+        },
       });
       setResult(data);
       const structuredBlocks = data.blocks ?? [];
@@ -177,13 +333,12 @@ function ArticleGenerator() {
     });
   };
 
-
-  const refreshDrafts = async (targetProjectId?: number) => {
+  const refreshDrafts = useCallback(async (targetProjectId?: number) => {
     const pid = targetProjectId ?? (typeof projectId === 'number' ? projectId : null);
     if (!pid) return;
     const data = await listAiContentDrafts(pid, { content_type: 'article' });
     setDrafts(data);
-  };
+  }, [projectId]);
 
   const handleSaveDraft = async (saveAsNewVersion = false) => {
     const pid = typeof projectId === 'number' ? projectId : null;
@@ -222,7 +377,7 @@ function ArticleGenerator() {
       title: draft.title,
       content: draft.export_text,
       meta_description: '',
-      keywords_used: [],
+      keywords_used: filterNonEmpty([keywordPlan.primary_keyword, ...keywordPlan.secondary_keywords]),
       blocks: [],
     }));
   };
@@ -247,23 +402,24 @@ function ArticleGenerator() {
   const handleExport = (content: string) => navigator.clipboard.writeText(content);
 
   useEffect(() => {
-    if (typeof projectId === 'number') {
+    if (typeof projectId !== 'number') return;
+    const timeoutId = window.setTimeout(() => {
       void refreshDrafts(projectId);
-    }
-  }, [projectId]);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [projectId, refreshDrafts]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Left panel - Settings */}
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="lg:col-span-1">
-        <div className="shape-large shadow-md border p-6 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)]" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+        <div className="shape-large border bg-[color:var(--md-sys-color-surface)] p-6 shadow-md" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
           <h2 className="md-title-medium mb-4 flex items-center gap-2">
-            <i className="fa-solid fa-sliders" style={{ color: 'var(--md-sys-color-primary)' }} />
-            {t('aiContent.article.settings')}
+            <i className="fa-solid fa-diagram-project" style={{ color: 'var(--md-sys-color-primary)' }} />
+            文章工作流配置
           </h2>
-          <form onSubmit={handleGenerate} className="space-y-4">
+          <form onSubmit={handleGenerate} className="space-y-5">
             <div>
-              <label className="block md-label-large mb-1">项目（用于草稿保存）</label>
+              <label className="mb-1 block md-label-large">项目（用于草稿保存）</label>
               <select
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : '')}
@@ -276,101 +432,280 @@ function ArticleGenerator() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block md-label-large mb-1">{t('aiContent.article.topic')}</label>
-              <input
-                type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="app-input w-full"
-                style={{ borderColor: 'var(--md-sys-color-outline)' }}
-                placeholder={t('aiContent.article.topicPlaceholder')}
-                required
-              />
-            </div>
 
-            <div>
-              <label className="block md-label-large mb-1">{t('aiContent.article.keywords')}</label>
-              <input
-                type="text"
-                value={keywords}
-                onChange={(e) => setKeywords(e.target.value)}
-                className="app-input w-full"
-                style={{ borderColor: 'var(--md-sys-color-outline)' }}
-                placeholder={t('aiContent.article.keywordsPlaceholder')}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block md-label-large mb-1">{t('aiContent.article.tone')}</label>
-                <select
-                  value={tone}
-                  onChange={(e) => setTone(e.target.value)}
-                  className="app-select w-full"
-                  style={{ borderColor: 'var(--md-sys-color-outline)' }}
-                >
-                  {TONES_ARTICLE.map((t_) => (
-                    <option key={t_.value} value={t_.value}>{t(t_.labelKey)}</option>
-                  ))}
-                </select>
+            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fa-solid fa-bullseye" style={{ color: 'var(--md-sys-color-primary)' }} />
+                <div>
+                  <p className="md-title-small">基础配置</p>
+                  <p className="md-body-small opacity-70">设置文章主题、语言、语气和字数目标。</p>
+                </div>
               </div>
-              <div>
-                <label className="block md-label-large mb-1">{t('aiContent.article.language')}</label>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="app-select w-full"
-                  style={{ borderColor: 'var(--md-sys-color-outline)' }}
-                >
-                  <option value="zh-CN">中文</option>
-                  <option value="en-US">English</option>
-                </select>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block md-label-large">文章主题</label>
+                  <input
+                    type="text"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    className="app-input w-full"
+                    style={{ borderColor: 'var(--md-sys-color-outline)' }}
+                    placeholder={t('aiContent.article.topicPlaceholder')}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block md-label-large">{t('aiContent.article.tone')}</label>
+                    <select
+                      value={tone}
+                      onChange={(e) => setTone(e.target.value)}
+                      className="app-select w-full"
+                      style={{ borderColor: 'var(--md-sys-color-outline)' }}
+                    >
+                      {TONES_ARTICLE.map((t_) => (
+                        <option key={t_.value} value={t_.value}>{t(t_.labelKey)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block md-label-large">{t('aiContent.article.language')}</label>
+                    <select
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
+                      className="app-select w-full"
+                      style={{ borderColor: 'var(--md-sys-color-outline)' }}
+                    >
+                      <option value="zh-CN">中文</option>
+                      <option value="en-US">English</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block md-label-large">{t('aiContent.article.wordCount')}</label>
+                  <input
+                    type="range"
+                    min={300}
+                    max={5000}
+                    step={100}
+                    value={wordCount}
+                    onChange={(e) => setWordCount(Number(e.target.value))}
+                    className="w-full accent-[var(--md-sys-color-primary)]"
+                  />
+                  <div className="mt-1 text-center md-label-medium opacity-60">{wordCount} {t('aiContent.article.words')}</div>
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="block md-label-large mb-1">{t('aiContent.article.wordCount')}</label>
-              <input
-                type="range"
-                min={300}
-                max={5000}
-                step={100}
-                value={wordCount}
-                onChange={(e) => setWordCount(Number(e.target.value))}
-                className="w-full accent-[var(--md-sys-color-primary)]"
-              />
-              <div className="md-label-medium text-center mt-1 opacity-60">{wordCount} {t('aiContent.article.words')}</div>
+            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fa-solid fa-key" style={{ color: 'var(--md-sys-color-primary)' }} />
+                <div>
+                  <p className="md-title-small">1. 关键词规划</p>
+                  <p className="md-body-small opacity-70">填写主关键词、3-5 个次关键词，以及长尾问题列表。</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block md-label-large">主关键词</label>
+                  <input type="text" value={keywordPlan.primary_keyword} onChange={(e) => setKeywordPlan((prev) => ({ ...prev, primary_keyword: e.target.value }))} className="app-input w-full" required />
+                </div>
+                <div>
+                  <label className="mb-1 block md-label-large">次关键词（至少 3 个，最多 5 个）</label>
+                  <div className="space-y-2">
+                    {Array.from({ length: 5 }, (_, index) => (
+                      <input
+                        key={`secondary-${index}`}
+                        type="text"
+                        value={keywordPlan.secondary_keywords[index] ?? ''}
+                        onChange={(e) => updateKeywordPlanField('secondary_keywords', index, e.target.value)}
+                        className="app-input w-full"
+                        placeholder={`次关键词 ${index + 1}`}
+                        required={index < 3}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block md-label-large">长尾问题列表</label>
+                  <div className="space-y-2">
+                    {Array.from({ length: 5 }, (_, index) => (
+                      <input
+                        key={`question-${index}`}
+                        type="text"
+                        value={keywordPlan.long_tail_questions[index] ?? ''}
+                        onChange={(e) => updateKeywordPlanField('long_tail_questions', index, e.target.value)}
+                        className="app-input w-full"
+                        placeholder={`长尾问题 ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label className="block md-label-large mb-1">{t('aiContent.article.outline')}</label>
-              <textarea
-                value={outline}
-                onChange={(e) => setOutline(e.target.value)}
-                className="app-textarea h-24 w-full resize-y"
-                style={{ borderColor: 'var(--md-sys-color-outline)' }}
-                placeholder={t('aiContent.article.outlinePlaceholder')}
-              />
+            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fa-solid fa-chart-line" style={{ color: 'var(--md-sys-color-primary)' }} />
+                <div>
+                  <p className="md-title-small">2. SERP 分析</p>
+                  <p className="md-body-small opacity-70">记录前 10 名的内容类型、标题角度、结构、字数和内容缺口。</p>
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="mb-1 block md-label-large">SERP 总结</label>
+                <textarea value={serpAnalysis.summary} onChange={(e) => setSerpAnalysis((prev) => ({ ...prev, summary: e.target.value }))} className="app-textarea h-24 w-full resize-y" placeholder="例如：结果页以教程与对比文章为主，但缺少面向新手的执行清单。" />
+              </div>
+              <div className="space-y-3">
+                {serpAnalysis.top_results.map((entry, index) => (
+                  <div key={entry.rank} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-sm" style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}>#{entry.rank}</span>
+                      <span className="md-label-large">SERP 第 {entry.rank} 名</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <input type="text" value={entry.content_type} onChange={(e) => updateSerpEntry(index, 'content_type', e.target.value)} className="app-input w-full" placeholder="内容类型：指南 / 清单 / 产品页" required />
+                      <input type="text" value={entry.title_angle} onChange={(e) => updateSerpEntry(index, 'title_angle', e.target.value)} className="app-input w-full" placeholder="标题角度：终极指南 / 对比 / 模板" required />
+                      <input type="text" value={entry.structure} onChange={(e) => updateSerpEntry(index, 'structure', e.target.value)} className="app-input w-full md:col-span-2" placeholder="结构：痛点 -> 步骤 -> FAQ -> CTA" required />
+                      <input type="number" min={0} value={entry.word_count} onChange={(e) => updateSerpEntry(index, 'word_count', Number(e.target.value) || 0)} className="app-input w-full" placeholder="字数" required />
+                      <input type="text" value={entry.content_gap} onChange={(e) => updateSerpEntry(index, 'content_gap', e.target.value)} className="app-input w-full" placeholder="内容缺口：缺少案例 / 更新不及时 / 没有模板" required />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fa-solid fa-file-circle-check" style={{ color: 'var(--md-sys-color-primary)' }} />
+                <div>
+                  <p className="md-title-small">3. SEO Brief</p>
+                  <p className="md-body-small opacity-70">整理 audience、intent、outline、entities、internal links、CTA 和 metadata。</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <input type="text" value={seoBrief.audience} onChange={(e) => setSeoBrief((prev) => ({ ...prev, audience: e.target.value }))} className="app-input w-full" placeholder="Audience：目标受众" required />
+                  <input type="text" value={seoBrief.intent} onChange={(e) => setSeoBrief((prev) => ({ ...prev, intent: e.target.value }))} className="app-input w-full" placeholder="Intent：搜索意图" required />
+                </div>
+                <div>
+                  <label className="mb-1 block md-label-large">Outline</label>
+                  <div className="space-y-2">
+                    {Array.from({ length: 6 }, (_, index) => (
+                      <input
+                        key={`outline-${index}`}
+                        type="text"
+                        value={seoBrief.outline[index] ?? ''}
+                        onChange={(e) => updateSeoBriefList('outline', index, e.target.value)}
+                        className="app-input w-full"
+                        placeholder={`大纲段落 ${index + 1}`}
+                        required={index === 0}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block md-label-large">Entities</label>
+                    <div className="space-y-2">
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <input
+                          key={`entity-${index}`}
+                          type="text"
+                          value={seoBrief.entities[index] ?? ''}
+                          onChange={(e) => updateSeoBriefList('entities', index, e.target.value)}
+                          className="app-input w-full"
+                          placeholder={`实体 ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block md-label-large">Internal Links</label>
+                    <div className="space-y-2">
+                      {Array.from({ length: 4 }, (_, index) => (
+                        <input
+                          key={`link-${index}`}
+                          type="text"
+                          value={seoBrief.internal_links[index] ?? ''}
+                          onChange={(e) => updateSeoBriefList('internal_links', index, e.target.value)}
+                          className="app-input w-full"
+                          placeholder={`内部链接建议 ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block md-label-large">CTA</label>
+                  <input type="text" value={seoBrief.cta} onChange={(e) => setSeoBrief((prev) => ({ ...prev, cta: e.target.value }))} className="app-input w-full" placeholder="例如：预约演示 / 下载模板 / 联系顾问" required />
+                </div>
+                <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                  <p className="mb-2 md-label-large">Metadata</p>
+                  <div className="space-y-2">
+                    <input type="text" value={seoBrief.metadata.seo_title} onChange={(e) => setSeoBrief((prev) => ({ ...prev, metadata: { ...prev.metadata, seo_title: e.target.value } }))} className="app-input w-full" placeholder="SEO title" required />
+                    <textarea value={seoBrief.metadata.meta_description} onChange={(e) => setSeoBrief((prev) => ({ ...prev, metadata: { ...prev.metadata, meta_description: e.target.value } }))} className="app-textarea h-20 w-full resize-y" placeholder="Meta description" required />
+                    <input type="text" value={seoBrief.metadata.slug} onChange={(e) => setSeoBrief((prev) => ({ ...prev, metadata: { ...prev.metadata, slug: e.target.value } }))} className="app-input w-full" placeholder="slug，例如 seo-brief-template" required />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fa-solid fa-route" style={{ color: 'var(--md-sys-color-primary)' }} />
+                <div>
+                  <p className="md-title-small">4. 生成与优化工作流</p>
+                  <p className="md-body-small opacity-70">分别记录初稿生成、on-page 优化、质量审校与复盘记录的目标和备注。</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {WORKFLOW_STAGE_CONFIG.map((stage) => (
+                  <div key={stage.key} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                    <div className="mb-2 flex items-start gap-3">
+                      <i className={`${stage.icon} mt-1`} style={{ color: 'var(--md-sys-color-primary)' }} />
+                      <div>
+                        <p className="md-label-large">{stage.title}</p>
+                        <p className="md-body-small opacity-70">{stage.description}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={workflow[stage.key].goal}
+                        onChange={(e) => updateWorkflowStage(stage.key, 'goal', e.target.value)}
+                        className="app-input w-full"
+                        placeholder={`${stage.title}目标`}
+                        required
+                      />
+                      <textarea
+                        value={workflow[stage.key].notes}
+                        onChange={(e) => updateWorkflowStage(stage.key, 'notes', e.target.value)}
+                        className="app-textarea h-20 w-full resize-y"
+                        placeholder={`${stage.title}备注（可选）`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="app-btn w-full shape-medium py-2 md-label-large transition-all duration-200 hover:shadow-lg disabled:opacity-60"
+              className="app-btn w-full py-2 md-label-large transition-all duration-200 hover:shadow-lg disabled:opacity-60"
               style={{ background: loading ? 'var(--md-sys-state-disabled-text)' : 'var(--md-sys-color-primary)' }}
             >
               <i className={loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles'} />
-              {loading ? t('aiContent.generating') : t('aiContent.article.generate')}
+              {loading ? t('aiContent.generating') : '生成结构化 SEO 文章'}
             </button>
           </form>
         </div>
       </div>
 
-      {/* Right panel - Editor */}
       <div className="lg:col-span-2">
         {error && (
-          <div className="mb-4 shape-medium p-4 flex items-center gap-2 md-body-medium" style={{ background: 'color-mix(in srgb, var(--md-sys-color-error) 14%, transparent)', color: 'var(--md-sys-color-error)', border: '1px solid color-mix(in srgb, var(--md-sys-color-error) 35%, white)' }}>
+          <div className="mb-4 flex items-center gap-2 p-4 md-body-medium shape-medium" style={{ background: 'color-mix(in srgb, var(--md-sys-color-error) 14%, transparent)', color: 'var(--md-sys-color-error)', border: '1px solid color-mix(in srgb, var(--md-sys-color-error) 35%, white)' }}>
             <i className="fa-solid fa-circle-exclamation" />
             {error}
           </div>
@@ -378,25 +713,43 @@ function ArticleGenerator() {
 
         {result && (
           <div className="space-y-4">
-            {/* Article meta info card */}
-            <div className="shape-large shadow-md border p-6 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)]" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
-              <div className="flex items-start justify-between mb-4">
-                <h2 className="md-title-large">{result.title}</h2>
+            <div className="shape-large border bg-[color:var(--md-sys-color-surface)] p-6 shadow-md" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="md-title-large">{result.title}</h2>
+                  <p className="mt-2 md-body-medium opacity-70">{result.meta_description}</p>
+                </div>
                 <button
                   onClick={() => editableDocument && handleExport(exportCanvas(editableDocument, 'text'))}
-                  className="flex items-center gap-1 px-3 py-2 shape-small md-label-medium transition-colors hover:shadow"
+                  className="flex items-center gap-1 px-3 py-2 md-label-medium shape-small transition-colors hover:shadow"
                   style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}
                 >
                   <i className="fa-regular fa-copy" />
                   {t('aiContent.copy')}
                 </button>
               </div>
-              <p className="md-body-medium opacity-70 mb-2">{result.meta_description}</p>
+
+              <div className="mb-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                  <p className="md-label-large">关键词规划</p>
+                  <p className="mt-2 md-body-small opacity-80">主关键词：{keywordPlan.primary_keyword || '—'}</p>
+                  <p className="mt-1 md-body-small opacity-80">次关键词：{filterNonEmpty(keywordPlan.secondary_keywords).join('、') || '—'}</p>
+                  <p className="mt-1 md-body-small opacity-80">长尾问题：{filterNonEmpty(keywordPlan.long_tail_questions).join('；') || '—'}</p>
+                </div>
+                <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                  <p className="md-label-large">SEO Brief</p>
+                  <p className="mt-2 md-body-small opacity-80">Audience：{seoBrief.audience || '—'}</p>
+                  <p className="mt-1 md-body-small opacity-80">Intent：{seoBrief.intent || '—'}</p>
+                  <p className="mt-1 md-body-small opacity-80">CTA：{seoBrief.cta || '—'}</p>
+                  <p className="mt-1 md-body-small opacity-80">Slug：{seoBrief.metadata.slug || '—'}</p>
+                </div>
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 {result.keywords_used.map((kw, i) => (
                   <span
                     key={i}
-                    className="inline-flex items-center px-2.5 py-1 shape-full md-label-medium"
+                    className="inline-flex items-center px-2.5 py-1 md-label-medium shape-full"
                     style={{ background: 'color-mix(in srgb, var(--md-sys-color-primary-container) 70%, white)', color: 'var(--md-sys-color-on-primary-container)' }}
                   >
                     <i className="fa-solid fa-tag mr-1 text-[10px]" />
@@ -406,31 +759,63 @@ function ArticleGenerator() {
               </div>
             </div>
 
-            {/* AI Rewrite bar */}
-            <div className="shape-medium border p-4 flex items-center gap-4 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)]" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
-              <i className="fa-solid fa-rotate" style={{ color: 'var(--md-sys-color-error)' }} />
-              <input
-                type="text"
-                value={rewriteInstruction}
-                onChange={(e) => setRewriteInstruction(e.target.value)}
-                className="flex-1 border-0 bg-transparent md-body-medium text-[color:var(--md-sys-color-on-surface)] focus:outline-none"
-                placeholder={t('aiContent.article.rewritePlaceholder')}
-              />
-              <button
-                onClick={handleRewrite}
-                disabled={rewriting}
-                className="app-btn app-btn-danger px-4 py-2 md-label-large transition-all hover:shadow"
-                style={{ background: 'var(--md-sys-color-error)' }}
-              >
-                {rewriting ? (
-                  <i className="fa-solid fa-spinner fa-spin" />
-                ) : (
-                  t('aiContent.article.rewrite')
-                )}
-              </button>
+            <div className="shape-large border bg-[color:var(--md-sys-color-surface)] p-6 shadow-md" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fa-solid fa-list-check" style={{ color: 'var(--md-sys-color-primary)' }} />
+                <h3 className="md-title-medium">工作流检查点</h3>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {WORKFLOW_STAGE_CONFIG.map((stage) => (
+                  <div key={stage.key} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                    <p className="md-label-large">{stage.title}</p>
+                    <p className="mt-2 md-body-small opacity-80">目标：{workflow[stage.key].goal || '—'}</p>
+                    <p className="mt-1 md-body-small opacity-70">备注：{workflow[stage.key].notes || '—'}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="shape-medium border p-4 bg-[color:var(--md-sys-color-surface)] border-[color:var(--md-sys-color-outline)] space-y-3" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+            <div className="shape-medium border bg-[color:var(--md-sys-color-surface)] p-4" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fa-solid fa-magnifying-glass" style={{ color: 'var(--md-sys-color-primary)' }} />
+                <h3 className="md-title-medium">SERP 前 10 名洞察</h3>
+              </div>
+              <p className="mb-3 md-body-small opacity-70">{serpAnalysis.summary || '未填写 SERP 总结。'}</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                {serpAnalysis.top_results.map((entry) => (
+                  <div key={entry.rank} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                    <p className="md-label-large">#{entry.rank} · {entry.content_type || '未填写类型'}</p>
+                    <p className="mt-2 md-body-small opacity-80">标题角度：{entry.title_angle || '—'}</p>
+                    <p className="mt-1 md-body-small opacity-80">结构：{entry.structure || '—'}</p>
+                    <p className="mt-1 md-body-small opacity-80">字数：{entry.word_count || 0}</p>
+                    <p className="mt-1 md-body-small opacity-70">内容缺口：{entry.content_gap || '—'}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="shape-medium border bg-[color:var(--md-sys-color-surface)] p-4" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+              <div className="flex items-center gap-4">
+                <i className="fa-solid fa-rotate" style={{ color: 'var(--md-sys-color-error)' }} />
+                <input
+                  type="text"
+                  value={rewriteInstruction}
+                  onChange={(e) => setRewriteInstruction(e.target.value)}
+                  className="flex-1 border-0 bg-transparent text-[color:var(--md-sys-color-on-surface)] focus:outline-none md-body-medium"
+                  placeholder={t('aiContent.article.rewritePlaceholder')}
+                />
+                <button
+                  onClick={handleRewrite}
+                  disabled={rewriting}
+                  className="app-btn app-btn-danger px-4 py-2 md-label-large transition-all hover:shadow"
+                  style={{ background: 'var(--md-sys-color-error)' }}
+                >
+                  {rewriting ? <i className="fa-solid fa-spinner fa-spin" /> : t('aiContent.article.rewrite')}
+                </button>
+              </div>
+            </div>
+
+            <div className="shape-medium border bg-[color:var(--md-sys-color-surface)] p-4 space-y-3" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
               <div className="flex flex-wrap items-center gap-2">
                 <button onClick={() => void handleSaveDraft(false)} disabled={savingDraft || !editableDocument || !projectId} className="app-btn app-btn-outline">
                   保存草稿
@@ -445,7 +830,7 @@ function ArticleGenerator() {
                 )}
               </div>
               <div>
-                <label className="block md-label-large mb-1">加载草稿</label>
+                <label className="mb-1 block md-label-large">加载草稿</label>
                 <select
                   value={activeDraftId ?? ''}
                   onChange={(e) => {
@@ -474,16 +859,16 @@ function ArticleGenerator() {
         )}
 
         {!result && !loading && (
-          <div className="shape-large border-2 border-dashed p-16 flex flex-col items-center justify-center text-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
-            <i className="fa-solid fa-file-pen text-5xl mb-4" style={{ color: 'var(--md-sys-color-primary-container)' }} />
-            <p className="md-title-large mb-1">{t('aiContent.article.emptyTitle')}</p>
-            <p className="md-body-medium opacity-50">{t('aiContent.article.emptySubtitle')}</p>
+          <div className="shape-large flex flex-col items-center justify-center border-2 border-dashed p-16 text-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+            <i className="fa-solid fa-diagram-project mb-4 text-5xl" style={{ color: 'var(--md-sys-color-primary-container)' }} />
+            <p className="md-title-large mb-1">先完成文章工作流，再生成内容</p>
+            <p className="md-body-medium opacity-50">左侧已按关键词规划、SERP 分析、SEO brief 与执行流程拆分为多步骤输入。</p>
           </div>
         )}
 
         {loading && !result && (
-          <div className="shape-large border border-[color:var(--md-sys-color-outline)] bg-[color:var(--md-sys-color-surface)] p-16 text-center flex flex-col items-center justify-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
-            <i className="fa-solid fa-spinner fa-spin text-4xl mb-4" style={{ color: 'var(--md-sys-color-primary)' }} />
+          <div className="shape-large flex flex-col items-center justify-center border bg-[color:var(--md-sys-color-surface)] p-16 text-center" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+            <i className="fa-solid fa-spinner fa-spin mb-4 text-4xl" style={{ color: 'var(--md-sys-color-primary)' }} />
             <p className="md-label-large">{t('aiContent.generating')}</p>
           </div>
         )}
@@ -550,10 +935,10 @@ function SocialGenerator() {
     setPostDocuments((prev) => prev.map((item, i) => (i === index ? doc : item)));
   };
 
-  const refreshDrafts = async (pid: number) => {
+  const refreshDrafts = useCallback(async (pid: number) => {
     const data = await listAiContentDrafts(pid, { content_type: 'social' });
     setDrafts(data);
-  };
+  }, []);
 
   const saveSocialDraft = async (saveAsNewVersion = false) => {
     if (typeof projectId !== 'number' || !postDocuments[0]) return;
@@ -575,10 +960,12 @@ function SocialGenerator() {
   };
 
   useEffect(() => {
-    if (typeof projectId === 'number') {
+    if (typeof projectId !== 'number') return;
+    const timeoutId = window.setTimeout(() => {
       void refreshDrafts(projectId);
-    }
-  }, [projectId]);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [projectId, refreshDrafts]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
