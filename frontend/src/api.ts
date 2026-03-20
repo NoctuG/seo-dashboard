@@ -782,6 +782,14 @@ export interface AiArticleKeywordPlanInput {
   long_tail_questions: string[];
 }
 
+export interface AiArticleStrategyInput {
+  topic: string;
+  tone?: string;
+  language?: string;
+  target_word_count?: number;
+  keyword_plan: AiArticleKeywordPlanInput;
+}
+
 export interface AiArticleSerpEntryInput {
   rank: number;
   content_type: string;
@@ -816,19 +824,17 @@ export interface AiArticleWorkflowStageInput {
 }
 
 export interface AiGenerateArticleRequest {
-  article_mode: 'workflow';
-  topic: string;
-  tone?: string;
-  language?: string;
-  word_count?: number;
-  keyword_plan: AiArticleKeywordPlanInput;
-  serp_analysis: AiArticleSerpAnalysisInput;
-  seo_brief: AiArticleSeoBriefInput;
-  workflow: {
-    drafting: AiArticleWorkflowStageInput;
+  article_mode: 'workflow_v2';
+  strategy: AiArticleStrategyInput;
+  research: {
+    serp_analysis: AiArticleSerpAnalysisInput;
+  };
+  brief: AiArticleSeoBriefInput;
+  execution: {
+    draft_generation: AiArticleWorkflowStageInput;
     on_page_optimization: AiArticleWorkflowStageInput;
     quality_review: AiArticleWorkflowStageInput;
-    retrospective: AiArticleWorkflowStageInput;
+    retrospective_record: AiArticleWorkflowStageInput;
   };
 }
 

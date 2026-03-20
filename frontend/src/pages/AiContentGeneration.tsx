@@ -27,6 +27,7 @@ import {
 import type { CanvasDocument } from '../components/ai/canvasTypes';
 
 type TabKey = 'article' | 'social' | 'analyze';
+type ArticleStepKey = 'keyword_planning' | 'serp_analysis' | 'seo_brief' | 'execution';
 
 const PLATFORMS = [
   { value: 'twitter', label: 'Twitter / X', icon: 'fa-brands fa-x-twitter' },
@@ -134,6 +135,13 @@ const WORKFLOW_STAGE_CONFIG: { key: ArticleWorkflowStageKey; title: string; desc
   { key: 'on_page_optimization', title: 'On-page 优化', description: '明确标题、链接、关键词布局、可读性和结构优化要求。', icon: 'fa-solid fa-screwdriver-wrench' },
   { key: 'quality_review', title: '质量审校', description: '记录事实核验、品牌一致性、E-E-A-T 与风险检查标准。', icon: 'fa-solid fa-shield-heart' },
   { key: 'retrospective', title: '复盘记录', description: '说明文章发布后要复盘的数据、假设和后续迭代方向。', icon: 'fa-solid fa-clipboard-list' },
+];
+
+const ARTICLE_STEP_CONFIG: { key: ArticleStepKey; title: string; description: string; icon: string }[] = [
+  { key: 'keyword_planning', title: '1. 关键词规划', description: '主关键词、3-5 个次关键词与长尾问题。', icon: 'fa-solid fa-key' },
+  { key: 'serp_analysis', title: '2. SERP 分析', description: '前 10 名内容类型、标题角度、结构、字数和缺口。', icon: 'fa-solid fa-chart-line' },
+  { key: 'seo_brief', title: '3. SEO Brief', description: '受众、意图、大纲、实体、内链、CTA 与 metadata。', icon: 'fa-solid fa-file-circle-check' },
+  { key: 'execution', title: '4. 执行工作流', description: '初稿、on-page、质检与复盘的操作目标。', icon: 'fa-solid fa-route' },
 ];
 
 const filterNonEmpty = (values: string[]) => values.map((value) => value.trim()).filter(Boolean);
@@ -257,6 +265,7 @@ function useProjectOptions() {
 
 function ArticleGenerator() {
   const { t } = useTranslation();
+  const [activeStep, setActiveStep] = useState<ArticleStepKey>('keyword_planning');
   const [topic, setTopic] = useState('');
   const [keywordPlan, setKeywordPlan] = useState<ArticleKeywordPlanState>(DEFAULT_KEYWORD_PLAN);
   const [serpAnalysis, setSerpAnalysis] = useState(DEFAULT_SERP_ANALYSIS);
@@ -278,6 +287,17 @@ function ArticleGenerator() {
   const [savingDraft, setSavingDraft] = useState(false);
 
   const activeDraft = useMemo(() => drafts.find((item) => item.id === activeDraftId) ?? null, [drafts, activeDraftId]);
+  const activeStepIndex = ARTICLE_STEP_CONFIG.findIndex((step) => step.key === activeStep);
+
+  const goToStep = (step: ArticleStepKey) => setActiveStep(step);
+  const goToPreviousStep = () => {
+    if (activeStepIndex <= 0) return;
+    setActiveStep(ARTICLE_STEP_CONFIG[activeStepIndex - 1].key);
+  };
+  const goToNextStep = () => {
+    if (activeStepIndex >= ARTICLE_STEP_CONFIG.length - 1) return;
+    setActiveStep(ARTICLE_STEP_CONFIG[activeStepIndex + 1].key);
+  };
 
   const updateKeywordPlanField = (field: 'secondary_keywords' | 'long_tail_questions', index: number, value: string) => {
     setKeywordPlan((prev) => {
@@ -317,28 +337,32 @@ function ArticleGenerator() {
     setResult(null);
     await runWithUiState(async () => {
       const data = await generateSeoArticle({
-        article_mode: 'workflow',
-        topic,
-        tone,
-        language,
-        word_count: wordCount,
-        keyword_plan: {
-          primary_keyword: keywordPlan.primary_keyword.trim(),
-          secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 5),
-          long_tail_questions: filterNonEmpty(keywordPlan.long_tail_questions),
+        article_mode: 'workflow_v2',
+        strategy: {
+          topic,
+          tone,
+          language,
+          target_word_count: wordCount,
+          keyword_plan: {
+            primary_keyword: keywordPlan.primary_keyword.trim(),
+            secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 5),
+            long_tail_questions: filterNonEmpty(keywordPlan.long_tail_questions),
+          },
         },
-        serp_analysis: {
-          summary: serpAnalysis.summary.trim() || undefined,
-          top_results: serpAnalysis.top_results.map((entry) => ({
-            rank: entry.rank,
-            content_type: entry.content_type.trim(),
-            title_angle: entry.title_angle.trim(),
-            structure: entry.structure.trim(),
-            word_count: entry.word_count,
-            content_gap: entry.content_gap.trim(),
-          })),
+        research: {
+          serp_analysis: {
+            summary: serpAnalysis.summary.trim() || undefined,
+            top_results: serpAnalysis.top_results.map((entry) => ({
+              rank: entry.rank,
+              content_type: entry.content_type.trim(),
+              title_angle: entry.title_angle.trim(),
+              structure: entry.structure.trim(),
+              word_count: entry.word_count,
+              content_gap: entry.content_gap.trim(),
+            })),
+          },
         },
-        seo_brief: {
+        brief: {
           audience: seoBrief.audience.trim(),
           intent: seoBrief.intent.trim(),
           outline: filterNonEmpty(seoBrief.outline),
@@ -351,11 +375,11 @@ function ArticleGenerator() {
             slug: seoBrief.metadata.slug.trim(),
           },
         },
-        workflow: {
-          drafting: { goal: workflow.drafting.goal.trim(), notes: workflow.drafting.notes.trim() || undefined },
+        execution: {
+          draft_generation: { goal: workflow.drafting.goal.trim(), notes: workflow.drafting.notes.trim() || undefined },
           on_page_optimization: { goal: workflow.on_page_optimization.goal.trim(), notes: workflow.on_page_optimization.notes.trim() || undefined },
           quality_review: { goal: workflow.quality_review.goal.trim(), notes: workflow.quality_review.notes.trim() || undefined },
-          retrospective: { goal: workflow.retrospective.goal.trim(), notes: workflow.retrospective.notes.trim() || undefined },
+          retrospective_record: { goal: workflow.retrospective.goal.trim(), notes: workflow.retrospective.notes.trim() || undefined },
         },
       });
       setResult(data);
@@ -621,195 +645,258 @@ function ArticleGenerator() {
             </div>
 
             <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-              <div className="mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-key" style={{ color: 'var(--md-sys-color-primary)' }} />
+              <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="md-title-small">1. 关键词规划</p>
-                  <p className="md-body-small opacity-70">填写主关键词、3-5 个次关键词，以及长尾问题列表。</p>
+                  <p className="md-title-small">文章模式多步骤流程</p>
+                  <p className="md-body-small opacity-70">按步骤完善研究与 brief，再统一生成文章。</p>
                 </div>
+                <span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}>
+                  Step {activeStepIndex + 1} / {ARTICLE_STEP_CONFIG.length}
+                </span>
               </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="mb-1 block md-label-large">主关键词</label>
-                  <input type="text" value={keywordPlan.primary_keyword} onChange={(e) => setKeywordPlan((prev) => ({ ...prev, primary_keyword: e.target.value }))} className="app-input w-full" required />
-                </div>
-                <div>
-                  <label className="mb-1 block md-label-large">次关键词（至少 3 个，最多 5 个）</label>
-                  <div className="space-y-2">
-                    {Array.from({ length: 5 }, (_, index) => (
-                      <input
-                        key={`secondary-${index}`}
-                        type="text"
-                        value={keywordPlan.secondary_keywords[index] ?? ''}
-                        onChange={(e) => updateKeywordPlanField('secondary_keywords', index, e.target.value)}
-                        className="app-input w-full"
-                        placeholder={`次关键词 ${index + 1}`}
-                        required={index < 3}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block md-label-large">长尾问题列表</label>
-                  <div className="space-y-2">
-                    {Array.from({ length: 5 }, (_, index) => (
-                      <input
-                        key={`question-${index}`}
-                        type="text"
-                        value={keywordPlan.long_tail_questions[index] ?? ''}
-                        onChange={(e) => updateKeywordPlanField('long_tail_questions', index, e.target.value)}
-                        className="app-input w-full"
-                        placeholder={`长尾问题 ${index + 1}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-              <div className="mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-chart-line" style={{ color: 'var(--md-sys-color-primary)' }} />
-                <div>
-                  <p className="md-title-small">2. SERP 分析</p>
-                  <p className="md-body-small opacity-70">记录前 10 名的内容类型、标题角度、结构、字数和内容缺口。</p>
-                </div>
+              <div className="mb-4 grid gap-2">
+                {ARTICLE_STEP_CONFIG.map((step, index) => {
+                  const isActive = step.key === activeStep;
+                  const isCompleted = index < activeStepIndex;
+                  return (
+                    <button
+                      key={step.key}
+                      type="button"
+                      onClick={() => goToStep(step.key)}
+                      className="flex items-start gap-3 rounded-xl border p-3 text-left transition-colors"
+                      style={{
+                        borderColor: isActive ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-outline-variant)',
+                        background: isActive ? 'color-mix(in srgb, var(--md-sys-color-primary-container) 45%, white)' : 'transparent',
+                      }}
+                    >
+                      <span
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm"
+                        style={{
+                          background: isCompleted || isActive ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-surface-variant)',
+                          color: isCompleted || isActive ? 'var(--md-sys-color-on-primary)' : 'var(--md-sys-color-on-surface-variant)',
+                        }}
+                      >
+                        {isCompleted ? <i className="fa-solid fa-check" /> : index + 1}
+                      </span>
+                      <div>
+                        <p className="md-label-large flex items-center gap-2">
+                          <i className={step.icon} />
+                          {step.title}
+                        </p>
+                        <p className="md-body-small opacity-70">{step.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-              <div className="mb-3">
-                <label className="mb-1 block md-label-large">SERP 总结</label>
-                <textarea value={serpAnalysis.summary} onChange={(e) => setSerpAnalysis((prev) => ({ ...prev, summary: e.target.value }))} className="app-textarea h-24 w-full resize-y" placeholder="例如：结果页以教程与对比文章为主，但缺少面向新手的执行清单。" />
-              </div>
-              <div className="space-y-3">
-                {serpAnalysis.top_results.map((entry, index) => (
-                  <div key={entry.rank} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-                    <div className="mb-2 flex items-center gap-2">
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-sm" style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}>#{entry.rank}</span>
-                      <span className="md-label-large">SERP 第 {entry.rank} 名</span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <input type="text" value={entry.content_type} onChange={(e) => updateSerpEntry(index, 'content_type', e.target.value)} className="app-input w-full" placeholder="内容类型：指南 / 清单 / 产品页" required />
-                      <input type="text" value={entry.title_angle} onChange={(e) => updateSerpEntry(index, 'title_angle', e.target.value)} className="app-input w-full" placeholder="标题角度：终极指南 / 对比 / 模板" required />
-                      <input type="text" value={entry.structure} onChange={(e) => updateSerpEntry(index, 'structure', e.target.value)} className="app-input w-full md:col-span-2" placeholder="结构：痛点 -> 步骤 -> FAQ -> CTA" required />
-                      <input type="number" min={0} value={entry.word_count} onChange={(e) => updateSerpEntry(index, 'word_count', Number(e.target.value) || 0)} className="app-input w-full" placeholder="字数" required />
-                      <input type="text" value={entry.content_gap} onChange={(e) => updateSerpEntry(index, 'content_gap', e.target.value)} className="app-input w-full" placeholder="内容缺口：缺少案例 / 更新不及时 / 没有模板" required />
+
+              {activeStep === 'keyword_planning' && (
+                <div className="space-y-3">
+                  <div className="mb-3 flex items-center gap-2">
+                    <i className="fa-solid fa-key" style={{ color: 'var(--md-sys-color-primary)' }} />
+                    <div>
+                      <p className="md-title-small">1. 关键词规划</p>
+                      <p className="md-body-small opacity-70">填写主关键词、3-5 个次关键词，以及长尾问题列表。</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-              <div className="mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-file-circle-check" style={{ color: 'var(--md-sys-color-primary)' }} />
-                <div>
-                  <p className="md-title-small">3. SEO Brief</p>
-                  <p className="md-body-small opacity-70">整理 audience、intent、outline、entities、internal links、CTA 和 metadata。</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <input type="text" value={seoBrief.audience} onChange={(e) => setSeoBrief((prev) => ({ ...prev, audience: e.target.value }))} className="app-input w-full" placeholder="Audience：目标受众" required />
-                  <input type="text" value={seoBrief.intent} onChange={(e) => setSeoBrief((prev) => ({ ...prev, intent: e.target.value }))} className="app-input w-full" placeholder="Intent：搜索意图" required />
-                </div>
-                <div>
-                  <label className="mb-1 block md-label-large">Outline</label>
-                  <div className="space-y-2">
-                    {Array.from({ length: 6 }, (_, index) => (
-                      <input
-                        key={`outline-${index}`}
-                        type="text"
-                        value={seoBrief.outline[index] ?? ''}
-                        onChange={(e) => updateSeoBriefList('outline', index, e.target.value)}
-                        className="app-input w-full"
-                        placeholder={`大纲段落 ${index + 1}`}
-                        required={index === 0}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div>
-                    <label className="mb-1 block md-label-large">Entities</label>
+                    <label className="mb-1 block md-label-large">主关键词</label>
+                    <input type="text" value={keywordPlan.primary_keyword} onChange={(e) => setKeywordPlan((prev) => ({ ...prev, primary_keyword: e.target.value }))} className="app-input w-full" required />
+                  </div>
+                  <div>
+                    <label className="mb-1 block md-label-large">次关键词（至少 3 个，最多 5 个）</label>
                     <div className="space-y-2">
                       {Array.from({ length: 5 }, (_, index) => (
                         <input
-                          key={`entity-${index}`}
+                          key={`secondary-${index}`}
                           type="text"
-                          value={seoBrief.entities[index] ?? ''}
-                          onChange={(e) => updateSeoBriefList('entities', index, e.target.value)}
+                          value={keywordPlan.secondary_keywords[index] ?? ''}
+                          onChange={(e) => updateKeywordPlanField('secondary_keywords', index, e.target.value)}
                           className="app-input w-full"
-                          placeholder={`实体 ${index + 1}`}
+                          placeholder={`次关键词 ${index + 1}`}
+                          required={index < 3}
                         />
                       ))}
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block md-label-large">Internal Links</label>
+                    <label className="mb-1 block md-label-large">长尾问题列表</label>
                     <div className="space-y-2">
-                      {Array.from({ length: 4 }, (_, index) => (
+                      {Array.from({ length: 5 }, (_, index) => (
                         <input
-                          key={`link-${index}`}
+                          key={`question-${index}`}
                           type="text"
-                          value={seoBrief.internal_links[index] ?? ''}
-                          onChange={(e) => updateSeoBriefList('internal_links', index, e.target.value)}
+                          value={keywordPlan.long_tail_questions[index] ?? ''}
+                          onChange={(e) => updateKeywordPlanField('long_tail_questions', index, e.target.value)}
                           className="app-input w-full"
-                          placeholder={`内部链接建议 ${index + 1}`}
+                          placeholder={`长尾问题 ${index + 1}`}
                         />
                       ))}
                     </div>
                   </div>
                 </div>
-                <div>
-                  <label className="mb-1 block md-label-large">CTA</label>
-                  <input type="text" value={seoBrief.cta} onChange={(e) => setSeoBrief((prev) => ({ ...prev, cta: e.target.value }))} className="app-input w-full" placeholder="例如：预约演示 / 下载模板 / 联系顾问" required />
-                </div>
-                <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-                  <p className="mb-2 md-label-large">Metadata</p>
-                  <div className="space-y-2">
-                    <input type="text" value={seoBrief.metadata.seo_title} onChange={(e) => setSeoBrief((prev) => ({ ...prev, metadata: { ...prev.metadata, seo_title: e.target.value } }))} className="app-input w-full" placeholder="SEO title" required />
-                    <textarea value={seoBrief.metadata.meta_description} onChange={(e) => setSeoBrief((prev) => ({ ...prev, metadata: { ...prev.metadata, meta_description: e.target.value } }))} className="app-textarea h-20 w-full resize-y" placeholder="Meta description" required />
-                    <input type="text" value={seoBrief.metadata.slug} onChange={(e) => setSeoBrief((prev) => ({ ...prev, metadata: { ...prev.metadata, slug: e.target.value } }))} className="app-input w-full" placeholder="slug，例如 seo-brief-template" required />
+              )}
+
+              {activeStep === 'serp_analysis' && (
+                <div className="space-y-3">
+                  <div className="mb-3 flex items-center gap-2">
+                    <i className="fa-solid fa-chart-line" style={{ color: 'var(--md-sys-color-primary)' }} />
+                    <div>
+                      <p className="md-title-small">2. SERP 分析</p>
+                      <p className="md-body-small opacity-70">记录前 10 名的内容类型、标题角度、结构、字数和内容缺口。</p>
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <label className="mb-1 block md-label-large">SERP 总结</label>
+                    <textarea value={serpAnalysis.summary} onChange={(e) => setSerpAnalysis((prev) => ({ ...prev, summary: e.target.value }))} className="app-textarea h-24 w-full resize-y" placeholder="例如：结果页以教程与对比文章为主，但缺少面向新手的执行清单。" />
+                  </div>
+                  <div className="space-y-3">
+                    {serpAnalysis.top_results.map((entry, index) => (
+                      <div key={entry.rank} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-sm" style={{ background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}>#{entry.rank}</span>
+                          <span className="md-label-large">SERP 第 {entry.rank} 名</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <input type="text" value={entry.content_type} onChange={(e) => updateSerpEntry(index, 'content_type', e.target.value)} className="app-input w-full" placeholder="内容类型：指南 / 清单 / 产品页" required />
+                          <input type="text" value={entry.title_angle} onChange={(e) => updateSerpEntry(index, 'title_angle', e.target.value)} className="app-input w-full" placeholder="标题角度：终极指南 / 对比 / 模板" required />
+                          <input type="text" value={entry.structure} onChange={(e) => updateSerpEntry(index, 'structure', e.target.value)} className="app-input w-full md:col-span-2" placeholder="结构：痛点 -> 步骤 -> FAQ -> CTA" required />
+                          <input type="number" min={0} value={entry.word_count} onChange={(e) => updateSerpEntry(index, 'word_count', Number(e.target.value) || 0)} className="app-input w-full" placeholder="字数" required />
+                          <input type="text" value={entry.content_gap} onChange={(e) => updateSerpEntry(index, 'content_gap', e.target.value)} className="app-input w-full" placeholder="内容缺口：缺少案例 / 更新不及时 / 没有模板" required />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            </div>
+              )}
 
-            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-              <div className="mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-route" style={{ color: 'var(--md-sys-color-primary)' }} />
-                <div>
-                  <p className="md-title-small">4. 生成与优化工作流</p>
-                  <p className="md-body-small opacity-70">分别记录初稿生成、on-page 优化、质量审校与复盘记录的目标和备注。</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {WORKFLOW_STAGE_CONFIG.map((stage) => (
-                  <div key={stage.key} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-                    <div className="mb-2 flex items-start gap-3">
-                      <i className={`${stage.icon} mt-1`} style={{ color: 'var(--md-sys-color-primary)' }} />
-                      <div>
-                        <p className="md-label-large">{stage.title}</p>
-                        <p className="md-body-small opacity-70">{stage.description}</p>
+              {activeStep === 'seo_brief' && (
+                <div className="space-y-3">
+                  <div className="mb-3 flex items-center gap-2">
+                    <i className="fa-solid fa-file-circle-check" style={{ color: 'var(--md-sys-color-primary)' }} />
+                    <div>
+                      <p className="md-title-small">3. SEO Brief</p>
+                      <p className="md-body-small opacity-70">整理 audience、intent、outline、entities、internal links、CTA 和 metadata。</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <input type="text" value={seoBrief.audience} onChange={(e) => setSeoBrief((prev) => ({ ...prev, audience: e.target.value }))} className="app-input w-full" placeholder="Audience：目标受众" required />
+                    <input type="text" value={seoBrief.intent} onChange={(e) => setSeoBrief((prev) => ({ ...prev, intent: e.target.value }))} className="app-input w-full" placeholder="Intent：搜索意图" required />
+                  </div>
+                  <div>
+                    <label className="mb-1 block md-label-large">Outline</label>
+                    <div className="space-y-2">
+                      {Array.from({ length: 6 }, (_, index) => (
+                        <input
+                          key={`outline-${index}`}
+                          type="text"
+                          value={seoBrief.outline[index] ?? ''}
+                          onChange={(e) => updateSeoBriefList('outline', index, e.target.value)}
+                          className="app-input w-full"
+                          placeholder={`大纲段落 ${index + 1}`}
+                          required={index === 0}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block md-label-large">Entities</label>
+                      <div className="space-y-2">
+                        {Array.from({ length: 5 }, (_, index) => (
+                          <input
+                            key={`entity-${index}`}
+                            type="text"
+                            value={seoBrief.entities[index] ?? ''}
+                            onChange={(e) => updateSeoBriefList('entities', index, e.target.value)}
+                            className="app-input w-full"
+                            placeholder={`实体 ${index + 1}`}
+                          />
+                        ))}
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={workflow[stage.key].goal}
-                        onChange={(e) => updateWorkflowStage(stage.key, 'goal', e.target.value)}
-                        className="app-input w-full"
-                        placeholder={`${stage.title}目标`}
-                        required
-                      />
-                      <textarea
-                        value={workflow[stage.key].notes}
-                        onChange={(e) => updateWorkflowStage(stage.key, 'notes', e.target.value)}
-                        className="app-textarea h-20 w-full resize-y"
-                        placeholder={`${stage.title}备注（可选）`}
-                      />
+                    <div>
+                      <label className="mb-1 block md-label-large">Internal Links</label>
+                      <div className="space-y-2">
+                        {Array.from({ length: 4 }, (_, index) => (
+                          <input
+                            key={`link-${index}`}
+                            type="text"
+                            value={seoBrief.internal_links[index] ?? ''}
+                            onChange={(e) => updateSeoBriefList('internal_links', index, e.target.value)}
+                            className="app-input w-full"
+                            placeholder={`内部链接建议 ${index + 1}`}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
-                ))}
+                  <div>
+                    <label className="mb-1 block md-label-large">CTA</label>
+                    <input type="text" value={seoBrief.cta} onChange={(e) => setSeoBrief((prev) => ({ ...prev, cta: e.target.value }))} className="app-input w-full" placeholder="例如：预约演示 / 下载模板 / 联系顾问" required />
+                  </div>
+                  <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                    <p className="mb-2 md-label-large">Metadata</p>
+                    <div className="space-y-2">
+                      <input type="text" value={seoBrief.metadata.seo_title} onChange={(e) => setSeoBrief((prev) => ({ ...prev, metadata: { ...prev.metadata, seo_title: e.target.value } }))} className="app-input w-full" placeholder="SEO title" required />
+                      <textarea value={seoBrief.metadata.meta_description} onChange={(e) => setSeoBrief((prev) => ({ ...prev, metadata: { ...prev.metadata, meta_description: e.target.value } }))} className="app-textarea h-20 w-full resize-y" placeholder="Meta description" required />
+                      <input type="text" value={seoBrief.metadata.slug} onChange={(e) => setSeoBrief((prev) => ({ ...prev, metadata: { ...prev.metadata, slug: e.target.value } }))} className="app-input w-full" placeholder="slug，例如 seo-brief-template" required />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeStep === 'execution' && (
+                <div className="space-y-3">
+                  <div className="mb-3 flex items-center gap-2">
+                    <i className="fa-solid fa-route" style={{ color: 'var(--md-sys-color-primary)' }} />
+                    <div>
+                      <p className="md-title-small">4. 生成与优化工作流</p>
+                      <p className="md-body-small opacity-70">分别记录初稿生成、on-page 优化、质量审校与复盘记录的目标和备注。</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {WORKFLOW_STAGE_CONFIG.map((stage) => (
+                      <div key={stage.key} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                        <div className="mb-2 flex items-start gap-3">
+                          <i className={`${stage.icon} mt-1`} style={{ color: 'var(--md-sys-color-primary)' }} />
+                          <div>
+                            <p className="md-label-large">{stage.title}</p>
+                            <p className="md-body-small opacity-70">{stage.description}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={workflow[stage.key].goal}
+                            onChange={(e) => updateWorkflowStage(stage.key, 'goal', e.target.value)}
+                            className="app-input w-full"
+                            placeholder={`${stage.title}目标`}
+                            required
+                          />
+                          <textarea
+                            value={workflow[stage.key].notes}
+                            onChange={(e) => updateWorkflowStage(stage.key, 'notes', e.target.value)}
+                            className="app-textarea h-20 w-full resize-y"
+                            placeholder={`${stage.title}备注（可选）`}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button type="button" onClick={goToPreviousStep} disabled={activeStepIndex === 0} className="app-btn app-btn-outline">
+                  上一步
+                </button>
+                {activeStepIndex < ARTICLE_STEP_CONFIG.length - 1 && (
+                  <button type="button" onClick={goToNextStep} className="app-btn app-btn-outline">
+                    下一步
+                  </button>
+                )}
               </div>
             </div>
 

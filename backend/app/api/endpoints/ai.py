@@ -70,23 +70,31 @@ class AiArticleWorkflowStage(BaseModel):
     notes: Optional[str] = Field(default=None, description="Optional notes or constraints")
 
 
-class AiArticleWorkflow(BaseModel):
-    drafting: AiArticleWorkflowStage
-    on_page_optimization: AiArticleWorkflowStage
-    quality_review: AiArticleWorkflowStage
-    retrospective: AiArticleWorkflowStage
-
-
-class AiGenerateArticleRequest(BaseModel):
-    article_mode: str = Field(default="workflow", description="Structured article generation mode")
+class AiArticleStrategy(BaseModel):
     topic: str = Field(..., min_length=1, description="Article topic")
     tone: str = Field(default="professional", description="Writing tone: professional, casual, authoritative, friendly")
     language: str = Field(default="zh-CN", description="Output language")
-    word_count: int = Field(default=1500, ge=300, le=5000, description="Target word count")
+    target_word_count: int = Field(default=1500, ge=300, le=5000, description="Target word count")
     keyword_plan: AiArticleKeywordPlan
+
+
+class AiArticleResearch(BaseModel):
     serp_analysis: AiArticleSerpAnalysis
-    seo_brief: AiArticleSeoBrief
-    workflow: AiArticleWorkflow
+
+
+class AiArticleExecution(BaseModel):
+    draft_generation: AiArticleWorkflowStage
+    on_page_optimization: AiArticleWorkflowStage
+    quality_review: AiArticleWorkflowStage
+    retrospective_record: AiArticleWorkflowStage
+
+
+class AiGenerateArticleRequest(BaseModel):
+    article_mode: str = Field(default="workflow_v2", description="Structured article generation mode")
+    strategy: AiArticleStrategy
+    research: AiArticleResearch
+    brief: AiArticleSeoBrief
+    execution: AiArticleExecution
 
 
 class AiContentBlock(BaseModel):
@@ -587,12 +595,13 @@ async def generate_seo_article(payload: LegacyAiGenerateArticleRequest):
 
 @router.post("/generate-article-v2", response_model=AiGenerateArticleResponse)
 async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
-    lang_hint = "请用中文回复。" if payload.language.startswith("zh") else f"Please respond in {payload.language}."
-    keyword_plan = payload.keyword_plan
-    seo_brief = payload.seo_brief
+    lang_hint = "请用中文回复。" if payload.strategy.language.startswith("zh") else f"Please respond in {payload.strategy.language}."
+    keyword_plan = payload.strategy.keyword_plan
+    seo_brief = payload.brief
+    serp_analysis = payload.research.serp_analysis
     serp_rows = "\n".join(
         f"- #{item.rank}: 类型={item.content_type}; 标题角度={item.title_angle}; 结构={item.structure}; 字数={item.word_count}; 内容缺口={item.content_gap}"
-        for item in payload.serp_analysis.top_results
+        for item in serp_analysis.top_results
     )
     outline_rows = "\n".join(f"- {item}" for item in seo_brief.outline)
     entity_rows = ", ".join(seo_brief.entities) or "无"
@@ -623,14 +632,14 @@ async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
         f"CTA: {seo_brief.cta}\n"
         f"Metadata: SEO标题={seo_brief.metadata.seo_title}; Meta描述={seo_brief.metadata.meta_description}; Slug={seo_brief.metadata.slug}\n\n"
         f"[执行工作流]\n"
-        f"初稿生成目标: {payload.workflow.drafting.goal}\n"
-        f"初稿备注: {payload.workflow.drafting.notes or '无'}\n"
-        f"On-page 优化目标: {payload.workflow.on_page_optimization.goal}\n"
-        f"On-page 备注: {payload.workflow.on_page_optimization.notes or '无'}\n"
-        f"质量审校目标: {payload.workflow.quality_review.goal}\n"
-        f"质量审校备注: {payload.workflow.quality_review.notes or '无'}\n"
-        f"复盘记录目标: {payload.workflow.retrospective.goal}\n"
-        f"复盘备注: {payload.workflow.retrospective.notes or '无'}\n\n"
+        f"初稿生成目标: {payload.execution.draft_generation.goal}\n"
+        f"初稿备注: {payload.execution.draft_generation.notes or '无'}\n"
+        f"On-page 优化目标: {payload.execution.on_page_optimization.goal}\n"
+        f"On-page 备注: {payload.execution.on_page_optimization.notes or '无'}\n"
+        f"质量审校目标: {payload.execution.quality_review.goal}\n"
+        f"质量审校备注: {payload.execution.quality_review.notes or '无'}\n"
+        f"复盘记录目标: {payload.execution.retrospective_record.goal}\n"
+        f"复盘备注: {payload.execution.retrospective_record.notes or '无'}\n\n"
         f"[输出要求]\n"
         f"- 文风: {payload.tone}\n"
         f"- 目标字数: 约{payload.word_count}字\n"
@@ -700,7 +709,8 @@ async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
     )
 
     raw = await _call_ai(system_prompt, user_prompt)
-    return _build_article_response(raw, payload)
+    fallback_keywords = [keyword_plan.primary_keyword, *keyword_plan.secondary_keywords, *keyword_plan.long_tail_questions]
+    return _build_article_response(raw, payload.strategy.topic, fallback_keywords)
 
 
 @router.post("/generate-social", response_model=AiGenerateSocialResponse)
