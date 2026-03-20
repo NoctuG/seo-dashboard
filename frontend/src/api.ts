@@ -845,12 +845,84 @@ export interface AiContentBlock {
   meta?: Record<string, unknown>;
 }
 
-export interface AiGenerateArticleResponse {
-  title: string;
-  content: string;
+export interface AiArticleIntentSummary {
+  summary: string;
+  target_audience: string;
+}
+
+export interface AiArticleKeywordPlanResult {
+  primary_keyword: string;
+  secondary_keywords: string[];
+  long_tail_questions: string[];
+  intent: AiArticleIntentSummary;
+}
+
+export interface AiArticleHeadingNode {
+  level: number;
+  text: string;
+}
+
+export interface AiArticleSerpSummary {
+  summary: string;
+  key_patterns: string[];
+  information_gain: string[];
+  differentiators: string[];
+}
+
+export interface AiArticleBriefResult {
+  title_tag: string;
   meta_description: string;
+  url_slug: string;
+  heading_tree: AiArticleHeadingNode[];
+  internal_links: string[];
+  image_alt: string[];
+  schema_recommendations: string[];
+}
+
+export interface AiArticleDraftResult {
+  title: string;
+  summary: string;
+  content: string;
   keywords_used: string[];
   blocks?: AiContentBlock[];
+}
+
+export interface AiArticleOnPageResult {
+  title_tag: string;
+  meta_description: string;
+  url_slug: string;
+  heading_tree: AiArticleHeadingNode[];
+  internal_links: string[];
+  image_alt: string[];
+  schema_recommendations: string[];
+  checklist: string[];
+}
+
+export interface AiArticleQualityReviewResult {
+  verdict: string;
+  fluff: string;
+  missing_examples: string;
+  experience_evidence: string;
+  skim_friendly: string;
+  strengths: string[];
+  risks: string[];
+  fixes: string[];
+}
+
+export interface AiArticlePublishReviewPlanResult {
+  pre_publish_checks: string[];
+  post_publish_metrics: string[];
+  iteration_ideas: string[];
+}
+
+export interface AiGenerateArticleResponse {
+  keyword_plan: AiArticleKeywordPlanResult;
+  serp_summary: AiArticleSerpSummary;
+  brief: AiArticleBriefResult;
+  draft: AiArticleDraftResult;
+  on_page: AiArticleOnPageResult;
+  quality_review: AiArticleQualityReviewResult;
+  publish_review_plan: AiArticlePublishReviewPlanResult;
 }
 
 export async function generateSeoArticle(

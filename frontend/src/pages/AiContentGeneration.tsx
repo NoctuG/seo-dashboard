@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   generateSeoArticle,
@@ -145,6 +145,62 @@ const ARTICLE_STEP_CONFIG: { key: ArticleStepKey; title: string; description: st
 ];
 
 const filterNonEmpty = (values: string[]) => values.map((value) => value.trim()).filter(Boolean);
+
+function ResultCard({
+  title,
+  icon,
+  children,
+  className = '',
+}: {
+  title: string;
+  icon: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`shape-medium border bg-[color:var(--md-sys-color-surface)] p-4 ${className}`} style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+      <div className="mb-3 flex items-center gap-2">
+        <i className={icon} style={{ color: 'var(--md-sys-color-primary)' }} />
+        <h3 className="md-title-medium">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ResultList({ items, emptyText = '—' }: { items: string[]; emptyText?: string }) {
+  if (items.length === 0) {
+    return <p className="md-body-small opacity-60">{emptyText}</p>;
+  }
+
+  return (
+    <ul className="space-y-2">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`} className="flex items-start gap-2 md-body-small opacity-85">
+          <i className="fa-solid fa-check mt-1 text-[10px]" style={{ color: 'var(--md-sys-color-primary)' }} />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function HeadingTreeList({ items }: { items: { level: number; text: string }[] }) {
+  if (items.length === 0) {
+    return <p className="md-body-small opacity-60">—</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.map((item, index) => (
+        <div key={`${item.text}-${index}`} className="rounded-lg border px-3 py-2 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)', marginLeft: `${Math.max(item.level - 1, 0) * 12}px` }}>
+          <span className="mr-2 opacity-60">H{item.level}</span>
+          <span>{item.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AiContentGeneration() {
   const { t } = useTranslation();
@@ -327,11 +383,11 @@ function ArticleGenerator() {
         },
       });
       setResult(data);
-      const structuredBlocks = data.blocks ?? [];
+      const structuredBlocks = data.draft.blocks ?? [];
       setEditableDocument(
         structuredBlocks.length > 0
-          ? articleBlocksToCanvas(structuredBlocks, data.title)
-          : articleMarkdownToCanvas(data.content, data.title),
+          ? articleBlocksToCanvas(structuredBlocks, data.draft.title)
+          : articleMarkdownToCanvas(data.draft.content, data.draft.title),
       );
     }, {
       setLoading,
@@ -349,7 +405,15 @@ function ArticleGenerator() {
         instruction: rewriteInstruction,
         language,
       });
-      setEditableDocument(articleMarkdownToCanvas(data.result, result?.title));
+      setEditableDocument(articleMarkdownToCanvas(data.result, result?.draft.title));
+      setResult((prev) => prev ? {
+        ...prev,
+        draft: {
+          ...prev.draft,
+          content: data.result,
+          blocks: [],
+        },
+      } : prev);
     }, {
       setLoading: setRewriting,
       setError,
@@ -370,7 +434,7 @@ function ArticleGenerator() {
     await runWithUiState(async () => {
       if (activeDraft) {
         const updated = await updateAiContentDraft(activeDraft.id, {
-          title: result?.title || topic || activeDraft.title,
+          title: result?.draft.title || topic || activeDraft.title,
           canvas_document_json: editableDocument as unknown as Record<string, unknown>,
           export_text: exportCanvas(editableDocument, 'text'),
           expected_version: activeDraft.version,
@@ -380,7 +444,7 @@ function ArticleGenerator() {
       } else {
         const created = await createAiContentDraft(pid, {
           content_type: 'article',
-          title: result?.title || topic || 'Untitled Article Draft',
+          title: result?.draft.title || topic || 'Untitled Article Draft',
           canvas_document_json: editableDocument as unknown as Record<string, unknown>,
           export_text: exportCanvas(editableDocument, 'text'),
         });
@@ -397,12 +461,71 @@ function ArticleGenerator() {
   const handleLoadDraft = (draft: AiContentDraft) => {
     setActiveDraftId(draft.id);
     setEditableDocument(draft.canvas_document_json as unknown as CanvasDocument);
-    setResult((prev) => (prev ? { ...prev, title: draft.title } : {
-      title: draft.title,
-      content: draft.export_text,
-      meta_description: '',
-      keywords_used: filterNonEmpty([keywordPlan.primary_keyword, ...keywordPlan.secondary_keywords]),
-      blocks: [],
+    setResult((prev) => (prev ? {
+      ...prev,
+      draft: {
+        ...prev.draft,
+        title: draft.title,
+        content: draft.export_text,
+        blocks: [],
+      },
+    } : {
+      keyword_plan: {
+        primary_keyword: keywordPlan.primary_keyword,
+        secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords),
+        long_tail_questions: filterNonEmpty(keywordPlan.long_tail_questions),
+        intent: {
+          summary: seoBrief.intent || '—',
+          target_audience: seoBrief.audience || '—',
+        },
+      },
+      serp_summary: {
+        summary: serpAnalysis.summary || '草稿已从保存版本载入。',
+        key_patterns: [],
+        information_gain: [],
+        differentiators: [],
+      },
+      brief: {
+        title_tag: seoBrief.metadata.seo_title || draft.title,
+        meta_description: seoBrief.metadata.meta_description || '—',
+        url_slug: seoBrief.metadata.slug || '—',
+        heading_tree: filterNonEmpty(seoBrief.outline).map((text) => ({ level: 2, text })),
+        internal_links: filterNonEmpty(seoBrief.internal_links),
+        image_alt: [],
+        schema_recommendations: [],
+      },
+      draft: {
+        title: draft.title,
+        summary: '草稿已从保存版本载入。',
+        content: draft.export_text,
+        keywords_used: filterNonEmpty([keywordPlan.primary_keyword, ...keywordPlan.secondary_keywords]),
+        blocks: [],
+      },
+      on_page: {
+        title_tag: seoBrief.metadata.seo_title || draft.title,
+        meta_description: seoBrief.metadata.meta_description || '—',
+        url_slug: seoBrief.metadata.slug || '—',
+        heading_tree: filterNonEmpty(seoBrief.outline).map((text) => ({ level: 2, text })),
+        internal_links: filterNonEmpty(seoBrief.internal_links),
+        image_alt: [],
+        schema_recommendations: [],
+        checklist: [],
+      },
+      quality_review: {
+        verdict: '草稿已加载，待重新审校',
+        fluff: '未评估',
+        missing_examples: '未评估',
+        experience_evidence: '未评估',
+        skim_friendly: '未评估',
+        strengths: [],
+        risks: [],
+        fixes: [],
+      },
+      publish_review_plan: {
+        pre_publish_checks: [],
+        post_publish_metrics: [],
+        iteration_ideas: [],
+      },
     }));
   };
 
@@ -803,8 +926,8 @@ function ArticleGenerator() {
             <div className="shape-large border bg-[color:var(--md-sys-color-surface)] p-6 shadow-md" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="md-title-large">{result.title}</h2>
-                  <p className="mt-2 md-body-medium opacity-70">{result.meta_description}</p>
+                  <h2 className="md-title-large">{result.draft.title}</h2>
+                  <p className="mt-2 md-body-medium opacity-70">{result.draft.summary}</p>
                 </div>
                 <button
                   onClick={() => editableDocument && handleExport(exportCanvas(editableDocument, 'text'))}
@@ -816,24 +939,8 @@ function ArticleGenerator() {
                 </button>
               </div>
 
-              <div className="mb-4 grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-                  <p className="md-label-large">关键词规划</p>
-                  <p className="mt-2 md-body-small opacity-80">主关键词：{keywordPlan.primary_keyword || '—'}</p>
-                  <p className="mt-1 md-body-small opacity-80">次关键词：{filterNonEmpty(keywordPlan.secondary_keywords).join('、') || '—'}</p>
-                  <p className="mt-1 md-body-small opacity-80">长尾问题：{filterNonEmpty(keywordPlan.long_tail_questions).join('；') || '—'}</p>
-                </div>
-                <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-                  <p className="md-label-large">SEO Brief</p>
-                  <p className="mt-2 md-body-small opacity-80">Audience：{seoBrief.audience || '—'}</p>
-                  <p className="mt-1 md-body-small opacity-80">Intent：{seoBrief.intent || '—'}</p>
-                  <p className="mt-1 md-body-small opacity-80">CTA：{seoBrief.cta || '—'}</p>
-                  <p className="mt-1 md-body-small opacity-80">Slug：{seoBrief.metadata.slug || '—'}</p>
-                </div>
-              </div>
-
               <div className="flex flex-wrap gap-2">
-                {result.keywords_used.map((kw, i) => (
+                {result.draft.keywords_used.map((kw, i) => (
                   <span
                     key={i}
                     className="inline-flex items-center px-2.5 py-1 md-label-medium shape-full"
@@ -846,11 +953,108 @@ function ArticleGenerator() {
               </div>
             </div>
 
-            <div className="shape-large border bg-[color:var(--md-sys-color-surface)] p-6 shadow-md" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
-              <div className="mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-list-check" style={{ color: 'var(--md-sys-color-primary)' }} />
-                <h3 className="md-title-medium">工作流检查点</h3>
-              </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <ResultCard title="Keyword Plan" icon="fa-solid fa-key">
+                <p className="md-body-small opacity-80">主关键词：{result.keyword_plan.primary_keyword || '—'}</p>
+                <p className="mt-2 md-body-small opacity-80">搜索意图：{result.keyword_plan.intent.summary || '—'}</p>
+                <p className="mt-1 md-body-small opacity-80">目标读者：{result.keyword_plan.intent.target_audience || '—'}</p>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">次关键词</p>
+                  <ResultList items={result.keyword_plan.secondary_keywords} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">长尾问题</p>
+                  <ResultList items={result.keyword_plan.long_tail_questions} />
+                </div>
+              </ResultCard>
+
+              <ResultCard title="SERP Summary" icon="fa-solid fa-magnifying-glass-chart">
+                <p className="md-body-small opacity-85">{result.serp_summary.summary}</p>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">共性模式</p>
+                  <ResultList items={result.serp_summary.key_patterns} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">信息增量</p>
+                  <ResultList items={result.serp_summary.information_gain} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">差异化角度</p>
+                  <ResultList items={result.serp_summary.differentiators} />
+                </div>
+              </ResultCard>
+
+              <ResultCard title="Brief" icon="fa-solid fa-file-circle-check">
+                <p className="md-body-small opacity-80">Title tag：{result.brief.title_tag || '—'}</p>
+                <p className="mt-1 md-body-small opacity-80">Meta description：{result.brief.meta_description || '—'}</p>
+                <p className="mt-1 md-body-small opacity-80">URL slug：{result.brief.url_slug || '—'}</p>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">Heading Tree</p>
+                  <HeadingTreeList items={result.brief.heading_tree} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">Internal Links</p>
+                  <ResultList items={result.brief.internal_links} />
+                </div>
+              </ResultCard>
+
+              <ResultCard title="On-page" icon="fa-solid fa-screwdriver-wrench">
+                <p className="md-body-small opacity-80">优化标题：{result.on_page.title_tag || '—'}</p>
+                <p className="mt-1 md-body-small opacity-80">优化描述：{result.on_page.meta_description || '—'}</p>
+                <p className="mt-1 md-body-small opacity-80">URL：{result.on_page.url_slug || '—'}</p>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">Image Alt 建议</p>
+                  <ResultList items={result.on_page.image_alt} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">Schema 建议</p>
+                  <ResultList items={result.on_page.schema_recommendations} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">执行清单</p>
+                  <ResultList items={result.on_page.checklist} />
+                </div>
+              </ResultCard>
+
+              <ResultCard title="Quality Review" icon="fa-solid fa-shield-heart">
+                <p className="md-body-small opacity-80">结论：{result.quality_review.verdict || '—'}</p>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  <div className="rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>废话：{result.quality_review.fluff || '—'}</div>
+                  <div className="rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>例子：{result.quality_review.missing_examples || '—'}</div>
+                  <div className="rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>经验/证据：{result.quality_review.experience_evidence || '—'}</div>
+                  <div className="rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>适合扫读：{result.quality_review.skim_friendly || '—'}</div>
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">亮点</p>
+                  <ResultList items={result.quality_review.strengths} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">风险</p>
+                  <ResultList items={result.quality_review.risks} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">修正建议</p>
+                  <ResultList items={result.quality_review.fixes} />
+                </div>
+              </ResultCard>
+
+              <ResultCard title="Publish Review Plan" icon="fa-solid fa-rocket">
+                <div>
+                  <p className="mb-2 md-label-large">发布前检查</p>
+                  <ResultList items={result.publish_review_plan.pre_publish_checks} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">发布后指标</p>
+                  <ResultList items={result.publish_review_plan.post_publish_metrics} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">后续迭代</p>
+                  <ResultList items={result.publish_review_plan.iteration_ideas} />
+                </div>
+              </ResultCard>
+            </div>
+
+            <ResultCard title="工作流检查点" icon="fa-solid fa-list-check">
               <div className="grid gap-3 md:grid-cols-2">
                 {WORKFLOW_STAGE_CONFIG.map((stage) => (
                   <div key={stage.key} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
@@ -860,26 +1064,7 @@ function ArticleGenerator() {
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="shape-medium border bg-[color:var(--md-sys-color-surface)] p-4" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
-              <div className="mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-magnifying-glass" style={{ color: 'var(--md-sys-color-primary)' }} />
-                <h3 className="md-title-medium">SERP 前 10 名洞察</h3>
-              </div>
-              <p className="mb-3 md-body-small opacity-70">{serpAnalysis.summary || '未填写 SERP 总结。'}</p>
-              <div className="grid gap-3 md:grid-cols-2">
-                {serpAnalysis.top_results.map((entry) => (
-                  <div key={entry.rank} className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
-                    <p className="md-label-large">#{entry.rank} · {entry.content_type || '未填写类型'}</p>
-                    <p className="mt-2 md-body-small opacity-80">标题角度：{entry.title_angle || '—'}</p>
-                    <p className="mt-1 md-body-small opacity-80">结构：{entry.structure || '—'}</p>
-                    <p className="mt-1 md-body-small opacity-80">字数：{entry.word_count || 0}</p>
-                    <p className="mt-1 md-body-small opacity-70">内容缺口：{entry.content_gap || '—'}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            </ResultCard>
 
             <div className="shape-medium border bg-[color:var(--md-sys-color-surface)] p-4" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
               <div className="flex items-center gap-4">

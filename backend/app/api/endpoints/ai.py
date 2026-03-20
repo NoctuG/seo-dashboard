@@ -104,12 +104,84 @@ class AiContentBlock(BaseModel):
     meta: dict = Field(default_factory=dict, description="Extra metadata for the block")
 
 
+class AiArticleIntentSummary(BaseModel):
+    summary: str = Field(..., min_length=1, description="Search intent summary")
+    target_audience: str = Field(..., min_length=1, description="Target audience")
+
+
+class AiArticleKeywordPlanResult(BaseModel):
+    primary_keyword: str = Field(..., min_length=1, description="Primary keyword")
+    secondary_keywords: List[str] = Field(default_factory=list, description="Supporting keywords")
+    long_tail_questions: List[str] = Field(default_factory=list, description="Long-tail question list")
+    intent: AiArticleIntentSummary
+
+
+class AiArticleSerpSummary(BaseModel):
+    summary: str = Field(..., min_length=1, description="SERP summary")
+    key_patterns: List[str] = Field(default_factory=list, description="Common SERP patterns")
+    information_gain: List[str] = Field(default_factory=list, description="Information gain opportunities")
+    differentiators: List[str] = Field(default_factory=list, description="Differentiated angles")
+
+
+class AiArticleHeadingNode(BaseModel):
+    level: int = Field(..., ge=1, le=6, description="Heading level")
+    text: str = Field(..., min_length=1, description="Heading text")
+
+
+class AiArticleBrief(BaseModel):
+    title_tag: str = Field(..., min_length=1, description="Suggested title tag")
+    meta_description: str = Field(..., min_length=1, description="Suggested meta description")
+    url_slug: str = Field(..., min_length=1, description="Suggested URL slug")
+    heading_tree: List[AiArticleHeadingNode] = Field(default_factory=list, description="Heading tree")
+    internal_links: List[str] = Field(default_factory=list, description="Suggested internal links")
+    image_alt: List[str] = Field(default_factory=list, description="Suggested image alt text")
+    schema_recommendations: List[str] = Field(default_factory=list, description="Suggested schema markup")
+
+
+class AiArticleDraft(BaseModel):
+    title: str = Field(..., min_length=1, description="Draft title")
+    summary: str = Field(..., min_length=1, description="Draft summary")
+    content: str = Field(..., min_length=1, description="Draft body markdown")
+    keywords_used: List[str] = Field(default_factory=list, description="Keywords used in draft")
+    blocks: List[AiContentBlock] = Field(default_factory=list, description="Structured content blocks")
+
+
+class AiArticleOnPage(BaseModel):
+    title_tag: str = Field(..., min_length=1, description="Optimized title tag")
+    meta_description: str = Field(..., min_length=1, description="Optimized meta description")
+    url_slug: str = Field(..., min_length=1, description="Optimized URL slug")
+    heading_tree: List[AiArticleHeadingNode] = Field(default_factory=list, description="Optimized heading tree")
+    internal_links: List[str] = Field(default_factory=list, description="Internal links placement")
+    image_alt: List[str] = Field(default_factory=list, description="Image alt text suggestions")
+    schema_recommendations: List[str] = Field(default_factory=list, description="Schema suggestions")
+    checklist: List[str] = Field(default_factory=list, description="On-page optimization checklist")
+
+
+class AiArticleQualityReview(BaseModel):
+    verdict: str = Field(..., min_length=1, description="Overall review verdict")
+    fluff: str = Field(..., min_length=1, description="Whether fluff is present")
+    missing_examples: str = Field(..., min_length=1, description="Whether examples are missing")
+    experience_evidence: str = Field(..., min_length=1, description="Whether the draft includes experience or evidence")
+    skim_friendly: str = Field(..., min_length=1, description="Whether the draft is scannable")
+    strengths: List[str] = Field(default_factory=list, description="Key strengths")
+    risks: List[str] = Field(default_factory=list, description="Key weaknesses or risks")
+    fixes: List[str] = Field(default_factory=list, description="Recommended fixes")
+
+
+class AiArticlePublishReviewPlan(BaseModel):
+    pre_publish_checks: List[str] = Field(default_factory=list, description="Checks before publish")
+    post_publish_metrics: List[str] = Field(default_factory=list, description="Metrics to monitor after publish")
+    iteration_ideas: List[str] = Field(default_factory=list, description="Ideas for future iteration")
+
+
 class AiGenerateArticleResponse(BaseModel):
-    title: str
-    content: str
-    meta_description: str
-    keywords_used: List[str]
-    blocks: List[AiContentBlock] = Field(default_factory=list)
+    keyword_plan: AiArticleKeywordPlanResult
+    serp_summary: AiArticleSerpSummary
+    brief: AiArticleBrief
+    draft: AiArticleDraft
+    on_page: AiArticleOnPage
+    quality_review: AiArticleQualityReview
+    publish_review_plan: AiArticlePublishReviewPlan
 
 
 class AiGenerateSocialRequest(BaseModel):
@@ -290,60 +362,164 @@ async def analyze_with_ai(payload: AiAnalyzeRequest):
     return AiAnalyzeResponse(result=content)
 
 
-def _build_article_response(raw: str, fallback_title: str, fallback_keywords: List[str]) -> AiGenerateArticleResponse:
-    title = ""
-    meta_description = ""
-    keywords_used: List[str] = []
-    content = raw
-
-    if "[TITLE]" in raw:
-        parts = raw.split("[TITLE]")
-        rest = parts[-1] if len(parts) > 1 else parts[0]
-
-        if "[META_DESCRIPTION]" in rest:
-            title_part, rest = rest.split("[META_DESCRIPTION]", 1)
-            title = title_part.strip()
-        if "[KEYWORDS_USED]" in rest:
-            meta_part, rest = rest.split("[KEYWORDS_USED]", 1)
-            meta_description = meta_part.strip()
-        if "[CONTENT]" in rest:
-            kw_part, content_part = rest.split("[CONTENT]", 1)
-            keywords_used = [k.strip() for k in kw_part.strip().split(",") if k.strip()]
-            content = content_part.strip()
-        else:
-            content = rest.strip()
-
-    if not title:
-        lines = content.split("\n")
-        title = lines[0].lstrip("# ").strip() if lines else fallback_title
-
-    parsed = _extract_json(raw)
-    blocks: List[AiContentBlock] = []
-    if parsed is not None:
-        parsed_title = str(parsed.get("title", "")).strip()
-        parsed_meta = str(parsed.get("meta_description", "")).strip()
-        parsed_content = str(parsed.get("content", "")).strip()
-        parsed_keywords = parsed.get("keywords_used")
-
-        if parsed_title:
-            title = parsed_title
-        if parsed_meta:
-            meta_description = parsed_meta
-        if parsed_content:
-            content = parsed_content
-        if isinstance(parsed_keywords, list):
-            keywords_used = [str(k).strip() for k in parsed_keywords if str(k).strip()]
-
-        blocks = _normalize_blocks(parsed.get("blocks"))
-    else:
-        logger.warning("ai.generate_article.structured_parse_failed", extra={"topic": fallback_title})
+def _default_article_response(payload: AiGenerateArticleRequest) -> AiGenerateArticleResponse:
+    fallback_keywords = [payload.keyword_plan.primary_keyword, *payload.keyword_plan.secondary_keywords]
+    heading_tree = [AiArticleHeadingNode(level=2, text=item) for item in payload.seo_brief.outline if item.strip()]
+    summary = payload.serp_analysis.summary or f"围绕 {payload.topic} 的结构化 SEO 草稿。"
 
     return AiGenerateArticleResponse(
-        title=title,
-        content=content,
-        meta_description=meta_description or title,
-        keywords_used=keywords_used or fallback_keywords,
-        blocks=blocks,
+        keyword_plan=AiArticleKeywordPlanResult(
+            primary_keyword=payload.keyword_plan.primary_keyword,
+            secondary_keywords=payload.keyword_plan.secondary_keywords,
+            long_tail_questions=payload.keyword_plan.long_tail_questions,
+            intent=AiArticleIntentSummary(
+                summary=payload.seo_brief.intent,
+                target_audience=payload.seo_brief.audience,
+            ),
+        ),
+        serp_summary=AiArticleSerpSummary(
+            summary=summary,
+            key_patterns=[],
+            information_gain=[],
+            differentiators=[],
+        ),
+        brief=AiArticleBrief(
+            title_tag=payload.seo_brief.metadata.seo_title,
+            meta_description=payload.seo_brief.metadata.meta_description,
+            url_slug=payload.seo_brief.metadata.slug,
+            heading_tree=heading_tree,
+            internal_links=payload.seo_brief.internal_links,
+            image_alt=[],
+            schema_recommendations=[],
+        ),
+        draft=AiArticleDraft(
+            title=payload.seo_brief.metadata.seo_title or payload.topic,
+            summary=summary,
+            content=f"# {payload.seo_brief.metadata.seo_title or payload.topic}\n",
+            keywords_used=[kw for kw in fallback_keywords if kw],
+            blocks=[],
+        ),
+        on_page=AiArticleOnPage(
+            title_tag=payload.seo_brief.metadata.seo_title,
+            meta_description=payload.seo_brief.metadata.meta_description,
+            url_slug=payload.seo_brief.metadata.slug,
+            heading_tree=heading_tree,
+            internal_links=payload.seo_brief.internal_links,
+            image_alt=[],
+            schema_recommendations=[],
+            checklist=[],
+        ),
+        quality_review=AiArticleQualityReview(
+            verdict="需要人工复核",
+            fluff="未评估",
+            missing_examples="未评估",
+            experience_evidence="未评估",
+            skim_friendly="未评估",
+            strengths=[],
+            risks=[],
+            fixes=[],
+        ),
+        publish_review_plan=AiArticlePublishReviewPlan(
+            pre_publish_checks=[],
+            post_publish_metrics=[],
+            iteration_ideas=[],
+        ),
+    )
+
+
+
+def _build_article_response(raw: str, payload: AiGenerateArticleRequest) -> AiGenerateArticleResponse:
+    parsed = _extract_json(raw)
+    if parsed is None:
+        logger.warning("ai.generate_article.structured_parse_failed", extra={"topic": payload.topic})
+        return _default_article_response(payload)
+
+    keyword_plan_data = parsed.get("keyword_plan") if isinstance(parsed.get("keyword_plan"), dict) else {}
+    intent_data = keyword_plan_data.get("intent") if isinstance(keyword_plan_data.get("intent"), dict) else {}
+    serp_summary_data = parsed.get("serp_summary") if isinstance(parsed.get("serp_summary"), dict) else {}
+    brief_data = parsed.get("brief") if isinstance(parsed.get("brief"), dict) else {}
+    draft_data = parsed.get("draft") if isinstance(parsed.get("draft"), dict) else {}
+    on_page_data = parsed.get("on_page") if isinstance(parsed.get("on_page"), dict) else {}
+    quality_review_data = parsed.get("quality_review") if isinstance(parsed.get("quality_review"), dict) else {}
+    publish_plan_data = parsed.get("publish_review_plan") if isinstance(parsed.get("publish_review_plan"), dict) else {}
+
+    def _string_list(value: object) -> List[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    def _heading_nodes(value: object) -> List[AiArticleHeadingNode]:
+        if not isinstance(value, list):
+            return []
+        nodes: List[AiArticleHeadingNode] = []
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            level = item.get("level")
+            text = str(item.get("text", "")).strip()
+            if isinstance(level, int) and 1 <= level <= 6 and text:
+                nodes.append(AiArticleHeadingNode(level=level, text=text))
+        return nodes
+
+    fallback = _default_article_response(payload)
+
+    return AiGenerateArticleResponse(
+        keyword_plan=AiArticleKeywordPlanResult(
+            primary_keyword=str(keyword_plan_data.get("primary_keyword") or fallback.keyword_plan.primary_keyword).strip(),
+            secondary_keywords=_string_list(keyword_plan_data.get("secondary_keywords")) or fallback.keyword_plan.secondary_keywords,
+            long_tail_questions=_string_list(keyword_plan_data.get("long_tail_questions")) or fallback.keyword_plan.long_tail_questions,
+            intent=AiArticleIntentSummary(
+                summary=str(intent_data.get("summary") or fallback.keyword_plan.intent.summary).strip(),
+                target_audience=str(intent_data.get("target_audience") or fallback.keyword_plan.intent.target_audience).strip(),
+            ),
+        ),
+        serp_summary=AiArticleSerpSummary(
+            summary=str(serp_summary_data.get("summary") or fallback.serp_summary.summary).strip(),
+            key_patterns=_string_list(serp_summary_data.get("key_patterns")),
+            information_gain=_string_list(serp_summary_data.get("information_gain")),
+            differentiators=_string_list(serp_summary_data.get("differentiators")),
+        ),
+        brief=AiArticleBrief(
+            title_tag=str(brief_data.get("title_tag") or fallback.brief.title_tag).strip(),
+            meta_description=str(brief_data.get("meta_description") or fallback.brief.meta_description).strip(),
+            url_slug=str(brief_data.get("url_slug") or fallback.brief.url_slug).strip(),
+            heading_tree=_heading_nodes(brief_data.get("heading_tree")) or fallback.brief.heading_tree,
+            internal_links=_string_list(brief_data.get("internal_links")) or fallback.brief.internal_links,
+            image_alt=_string_list(brief_data.get("image_alt")),
+            schema_recommendations=_string_list(brief_data.get("schema_recommendations")),
+        ),
+        draft=AiArticleDraft(
+            title=str(draft_data.get("title") or fallback.draft.title).strip(),
+            summary=str(draft_data.get("summary") or fallback.draft.summary).strip(),
+            content=str(draft_data.get("content") or fallback.draft.content).strip(),
+            keywords_used=_string_list(draft_data.get("keywords_used")) or fallback.draft.keywords_used,
+            blocks=_normalize_blocks(draft_data.get("blocks")),
+        ),
+        on_page=AiArticleOnPage(
+            title_tag=str(on_page_data.get("title_tag") or brief_data.get("title_tag") or fallback.on_page.title_tag).strip(),
+            meta_description=str(on_page_data.get("meta_description") or brief_data.get("meta_description") or fallback.on_page.meta_description).strip(),
+            url_slug=str(on_page_data.get("url_slug") or brief_data.get("url_slug") or fallback.on_page.url_slug).strip(),
+            heading_tree=_heading_nodes(on_page_data.get("heading_tree")) or _heading_nodes(brief_data.get("heading_tree")) or fallback.on_page.heading_tree,
+            internal_links=_string_list(on_page_data.get("internal_links")) or _string_list(brief_data.get("internal_links")) or fallback.on_page.internal_links,
+            image_alt=_string_list(on_page_data.get("image_alt")) or _string_list(brief_data.get("image_alt")),
+            schema_recommendations=_string_list(on_page_data.get("schema_recommendations")) or _string_list(brief_data.get("schema_recommendations")),
+            checklist=_string_list(on_page_data.get("checklist")),
+        ),
+        quality_review=AiArticleQualityReview(
+            verdict=str(quality_review_data.get("verdict") or fallback.quality_review.verdict).strip(),
+            fluff=str(quality_review_data.get("fluff") or fallback.quality_review.fluff).strip(),
+            missing_examples=str(quality_review_data.get("missing_examples") or fallback.quality_review.missing_examples).strip(),
+            experience_evidence=str(quality_review_data.get("experience_evidence") or fallback.quality_review.experience_evidence).strip(),
+            skim_friendly=str(quality_review_data.get("skim_friendly") or fallback.quality_review.skim_friendly).strip(),
+            strengths=_string_list(quality_review_data.get("strengths")),
+            risks=_string_list(quality_review_data.get("risks")),
+            fixes=_string_list(quality_review_data.get("fixes")),
+        ),
+        publish_review_plan=AiArticlePublishReviewPlan(
+            pre_publish_checks=_string_list(publish_plan_data.get("pre_publish_checks")),
+            post_publish_metrics=_string_list(publish_plan_data.get("post_publish_metrics")),
+            iteration_ideas=_string_list(publish_plan_data.get("iteration_ideas")),
+        ),
     )
 
 
@@ -383,7 +559,38 @@ async def generate_seo_article(payload: LegacyAiGenerateArticleRequest):
     )
 
     raw = await _call_ai(system_prompt, user_prompt)
-    return _build_article_response(raw, payload.topic, payload.keywords)
+    workflow_payload = AiGenerateArticleRequest(
+        topic=payload.topic,
+        tone=payload.tone,
+        language=payload.language,
+        word_count=payload.word_count,
+        keyword_plan=AiArticleKeywordPlan(
+            primary_keyword=payload.topic,
+            secondary_keywords=payload.keywords[:5],
+            long_tail_questions=[],
+        ),
+        serp_analysis=AiArticleSerpAnalysis(summary=None, top_results=[]),
+        seo_brief=AiArticleSeoBrief(
+            audience="通用搜索用户",
+            intent="获取与主题相关的完整信息",
+            outline=[item.strip() for item in (payload.outline or "").splitlines() if item.strip()] or [payload.topic],
+            entities=[],
+            internal_links=[],
+            cta="继续了解更多相关信息",
+            metadata=AiArticleMetadata(
+                seo_title=payload.topic,
+                meta_description=payload.topic,
+                slug=payload.topic.lower().replace(" ", "-"),
+            ),
+        ),
+        workflow=AiArticleWorkflow(
+            drafting=AiArticleWorkflowStage(goal="输出完整 SEO 初稿", notes=None),
+            on_page_optimization=AiArticleWorkflowStage(goal="补齐基础 on-page 元素", notes=None),
+            quality_review=AiArticleWorkflowStage(goal="完成基础质量审校", notes=None),
+            retrospective=AiArticleWorkflowStage(goal="给出发布后复盘建议", notes=None),
+        ),
+    )
+    return _build_article_response(raw, workflow_payload)
 
 
 @router.post("/generate-article-v2", response_model=AiGenerateArticleResponse)
@@ -402,21 +609,20 @@ async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
     long_tail_rows = "\n".join(f"- {item}" for item in keyword_plan.long_tail_questions) or "- 无"
 
     system_prompt = (
-        "你是一名资深SEO内容总监。你需要严格依据用户提供的多步骤工作流，"
-        "整合关键词规划、SERP洞察、SEO brief、初稿、on-page优化、质量审校与复盘要求来生成最终文章。"
+        "你是一名资深 SEO 内容总监与编辑主管。你必须把关键词规划、SERP 洞察、SEO brief、正文初稿、on-page 优化、质量审校、发布复盘全部整理成结构化 JSON。"
         f"{lang_hint}"
     )
 
     user_prompt = (
-        f"请根据以下结构化工作流生成一篇SEO文章：\n\n"
-        f"[文章主题]\n{payload.strategy.topic}\n\n"
+        f"请根据以下结构化工作流生成 SEO 文章方案与初稿。\n\n"
+        f"[文章主题]\n{payload.topic}\n\n"
         f"[关键词规划]\n"
         f"主关键词: {keyword_plan.primary_keyword}\n"
         f"次关键词: {', '.join(keyword_plan.secondary_keywords)}\n"
         f"长尾问题:\n{long_tail_rows}\n\n"
         f"[SERP 分析]\n"
-        f"总结: {serp_analysis.summary or '无'}\n"
-        f"前10名观察:\n{serp_rows}\n\n"
+        f"总结: {payload.serp_analysis.summary or '无'}\n"
+        f"前10名观察:\n{serp_rows or '- 无'}\n\n"
         f"[SEO Brief]\n"
         f"Audience: {seo_brief.audience}\n"
         f"Intent: {seo_brief.intent}\n"
@@ -435,23 +641,70 @@ async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
         f"复盘记录目标: {payload.execution.retrospective_record.goal}\n"
         f"复盘备注: {payload.execution.retrospective_record.notes or '无'}\n\n"
         f"[输出要求]\n"
-        f"- 文风: {payload.strategy.tone}\n"
-        f"- 目标字数: 约{payload.strategy.target_word_count}字\n"
-        f"- 必须融入用户提供的关键词、SERP差异化和brief要求。\n"
-        f"- 在正文中自然覆盖长尾问题，并确保CTA与metadata对齐。\n"
-        f"- 在末尾增加一个简短复盘小节，总结本文如何弥补SERP内容缺口。\n\n"
-        f"请严格按以下格式输出（不要加额外标记）：\n"
-        f"[TITLE]\n文章标题\n"
-        f"[META_DESCRIPTION]\n一句话SEO描述（120-160字符）\n"
-        f"[KEYWORDS_USED]\n实际使用的关键词，逗号分隔\n"
-        f"[CONTENT]\n正文（使用Markdown格式，包含H2/H3标题、段落、列表、CTA、复盘小节等）\n\n"
-        f"另外，请在末尾附加严格JSON对象（无Markdown代码块、无额外解释），字段必须匹配：\n"
+        f"- 文风: {payload.tone}\n"
+        f"- 目标字数: 约{payload.word_count}字\n"
+        f"- draft.content 使用 Markdown，需包含清晰的 H2/H3、列表、示例、CTA。\n"
+        f"- 你必须分别输出以下内容：\n"
+        f"  1. 搜索意图摘要与目标读者。\n"
+        f"  2. 信息增量与差异化角度。\n"
+        f"  3. title tag、meta description、URL slug、heading tree、internal links、image alt、schema 建议。\n"
+        f"  4. 质量审校结论：是否有废话、是否缺例子、是否有经验/证据、是否适合扫读。\n"
+        f"- 只输出一个严格 JSON 对象，不要使用 Markdown 代码块，不要添加任何额外解释。\n"
+        f"- JSON 字段必须精确匹配以下结构：\n"
         f"{{\n"
-        f"  \"title\": string,\n"
-        f"  \"meta_description\": string,\n"
-        f"  \"keywords_used\": string[],\n"
-        f"  \"content\": string,\n"
-        f"  \"blocks\": [{{\"type\": \"heading\"|\"paragraph\"|\"list\"|\"cta\", \"text\": string, \"level\": number|null, \"meta\": object}}]\n"
+        f"  \"keyword_plan\": {{\n"
+        f"    \"primary_keyword\": string,\n"
+        f"    \"secondary_keywords\": string[],\n"
+        f"    \"long_tail_questions\": string[],\n"
+        f"    \"intent\": {{\"summary\": string, \"target_audience\": string}}\n"
+        f"  }},\n"
+        f"  \"serp_summary\": {{\n"
+        f"    \"summary\": string,\n"
+        f"    \"key_patterns\": string[],\n"
+        f"    \"information_gain\": string[],\n"
+        f"    \"differentiators\": string[]\n"
+        f"  }},\n"
+        f"  \"brief\": {{\n"
+        f"    \"title_tag\": string,\n"
+        f"    \"meta_description\": string,\n"
+        f"    \"url_slug\": string,\n"
+        f"    \"heading_tree\": [{{\"level\": number, \"text\": string}}],\n"
+        f"    \"internal_links\": string[],\n"
+        f"    \"image_alt\": string[],\n"
+        f"    \"schema_recommendations\": string[]\n"
+        f"  }},\n"
+        f"  \"draft\": {{\n"
+        f"    \"title\": string,\n"
+        f"    \"summary\": string,\n"
+        f"    \"content\": string,\n"
+        f"    \"keywords_used\": string[],\n"
+        f"    \"blocks\": [{{\"type\": \"heading\"|\"paragraph\"|\"list\"|\"cta\", \"text\": string, \"level\": number|null, \"meta\": object}}]\n"
+        f"  }},\n"
+        f"  \"on_page\": {{\n"
+        f"    \"title_tag\": string,\n"
+        f"    \"meta_description\": string,\n"
+        f"    \"url_slug\": string,\n"
+        f"    \"heading_tree\": [{{\"level\": number, \"text\": string}}],\n"
+        f"    \"internal_links\": string[],\n"
+        f"    \"image_alt\": string[],\n"
+        f"    \"schema_recommendations\": string[],\n"
+        f"    \"checklist\": string[]\n"
+        f"  }},\n"
+        f"  \"quality_review\": {{\n"
+        f"    \"verdict\": string,\n"
+        f"    \"fluff\": string,\n"
+        f"    \"missing_examples\": string,\n"
+        f"    \"experience_evidence\": string,\n"
+        f"    \"skim_friendly\": string,\n"
+        f"    \"strengths\": string[],\n"
+        f"    \"risks\": string[],\n"
+        f"    \"fixes\": string[]\n"
+        f"  }},\n"
+        f"  \"publish_review_plan\": {{\n"
+        f"    \"pre_publish_checks\": string[],\n"
+        f"    \"post_publish_metrics\": string[],\n"
+        f"    \"iteration_ideas\": string[]\n"
+        f"  }}\n"
         f"}}"
     )
 
