@@ -1105,6 +1105,32 @@ export type AiDraftContentType = "article" | "social";
 
 export type AiDraftPublicationStatus = "draft" | "saved" | "published";
 
+export interface AiDraftKeywordPlanContext {
+  topic?: string;
+  tone?: string;
+  language?: string;
+  target_word_count?: number;
+  plan?: AiArticleKeywordPlanInput;
+  intent?: AiArticleIntentSummary;
+  suggestions?: AiKeywordSuggestionResponse | null;
+}
+
+export interface AiDraftSerpSnapshotContext {
+  analysis?: AiArticleSerpAnalysisInput;
+  summary?: AiArticleSerpSummary;
+  research_data?: AiSerpResearchResponse | null;
+}
+
+export interface AiDraftContentBriefContext {
+  brief?: AiArticleSeoBriefInput;
+  workflow?: AiGenerateArticleRequest["execution"];
+}
+
+export interface AiDraftPublishReviewMetadata {
+  plan?: AiArticlePublishReviewPlanResult;
+  retrospective?: AiDraftRetrospectiveResponse | null;
+}
+
 export interface AiContentDraft {
   id: number;
   project_id: number;
@@ -1113,6 +1139,12 @@ export interface AiContentDraft {
   title: string;
   canvas_document_json: Record<string, unknown>;
   export_text: string;
+  keyword_plan: AiDraftKeywordPlanContext;
+  serp_snapshot: AiDraftSerpSnapshotContext;
+  content_brief: AiDraftContentBriefContext;
+  on_page_recommendations: AiArticleOnPageResult | Record<string, unknown>;
+  quality_review: AiArticleQualityReviewResult | Record<string, unknown>;
+  publish_review_metadata: AiDraftPublishReviewMetadata;
   target_url?: string | null;
   publication_status: AiDraftPublicationStatus;
   version: number;
@@ -1125,6 +1157,12 @@ export interface CreateAiContentDraftPayload {
   title: string;
   canvas_document_json: Record<string, unknown>;
   export_text: string;
+  keyword_plan?: AiDraftKeywordPlanContext;
+  serp_snapshot?: AiDraftSerpSnapshotContext;
+  content_brief?: AiDraftContentBriefContext;
+  on_page_recommendations?: AiArticleOnPageResult | Record<string, unknown>;
+  quality_review?: AiArticleQualityReviewResult | Record<string, unknown>;
+  publish_review_metadata?: AiDraftPublishReviewMetadata;
   target_url?: string;
   publication_status?: AiDraftPublicationStatus;
 }
@@ -1133,6 +1171,12 @@ export interface UpdateAiContentDraftPayload {
   title?: string;
   canvas_document_json?: Record<string, unknown>;
   export_text?: string;
+  keyword_plan?: AiDraftKeywordPlanContext;
+  serp_snapshot?: AiDraftSerpSnapshotContext;
+  content_brief?: AiDraftContentBriefContext;
+  on_page_recommendations?: AiArticleOnPageResult | Record<string, unknown>;
+  quality_review?: AiArticleQualityReviewResult | Record<string, unknown>;
+  publish_review_metadata?: AiDraftPublishReviewMetadata;
   target_url?: string;
   publication_status?: AiDraftPublicationStatus;
   expected_version: number;

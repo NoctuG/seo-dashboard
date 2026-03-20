@@ -9,7 +9,13 @@ import {
   fetchAiSerpAnalysis,
   generateAiContentBrief,
   getAiDraftRetrospective,
+  type AiArticleOnPageResult,
+  type AiArticleQualityReviewResult,
   type AiContentDraft,
+  type AiDraftContentBriefContext,
+  type AiDraftKeywordPlanContext,
+  type AiDraftPublishReviewMetadata,
+  type AiDraftSerpSnapshotContext,
   type AiDraftPublicationStatus,
   type AiDraftRetrospectiveResponse,
   type AiGenerateArticleResponse,
@@ -136,6 +142,155 @@ const DEFAULT_WORKFLOW: Record<ArticleWorkflowStageKey, ArticleWorkflowStageStat
   on_page_optimization: { goal: '', notes: '' },
   quality_review: { goal: '', notes: '' },
   retrospective: { goal: '', notes: '' },
+};
+
+const DEFAULT_PUBLISH_REVIEW_PLAN = {
+  pre_publish_checks: [] as string[],
+  post_publish_metrics: [] as string[],
+  iteration_ideas: [] as string[],
+};
+
+const padValues = (values: string[] | undefined, size: number) => {
+  const normalized = values?.map((value) => value.trim()).filter(Boolean) ?? [];
+  return [...normalized.slice(0, size), ...Array.from({ length: size }, () => '')].slice(0, size);
+};
+
+const buildOnPageFallback = (draftTitle: string, brief: ArticleSeoBriefState): AiArticleOnPageResult => ({
+  title_tag: brief.metadata.seo_title || draftTitle,
+  meta_description: brief.metadata.meta_description || '—',
+  url_slug: brief.metadata.slug || '—',
+  heading_tree: filterNonEmpty(brief.outline).map((text) => ({ level: 2, text })),
+  internal_links: filterNonEmpty(brief.internal_links),
+  image_alt: [],
+  schema_recommendations: [],
+  checklist: [],
+});
+
+const buildQualityReviewFallback = (): AiArticleQualityReviewResult => ({
+  verdict: '草稿已加载，待重新审校',
+  fluff: '未评估',
+  missing_examples: '未评估',
+  experience_evidence: '未评估',
+  skim_friendly: '未评估',
+  strengths: [],
+  risks: [],
+  fixes: [],
+});
+
+const buildKeywordPlanStateFromContext = (context?: AiDraftKeywordPlanContext): ArticleKeywordPlanState => ({
+  primary_keyword: context?.plan?.primary_keyword ?? '',
+  secondary_keywords: padValues(context?.plan?.secondary_keywords, 5),
+  long_tail_questions: padValues(context?.plan?.long_tail_questions, 5),
+});
+
+const buildSerpAnalysisFromContext = (context?: AiDraftSerpSnapshotContext) => {
+  const topResults = context?.analysis?.top_results ?? [];
+  return {
+    summary: context?.analysis?.summary ?? '',
+    top_results: Array.from({ length: 10 }, (_, index) => {
+      const entry = topResults[index];
+      return entry
+        ? {
+            rank: entry.rank ?? index + 1,
+            content_type: entry.content_type ?? '',
+            title_angle: entry.title_angle ?? '',
+            structure: entry.structure ?? '',
+            word_count: entry.word_count ?? 0,
+            content_gap: entry.content_gap ?? '',
+          }
+        : createDefaultSerpEntry(index + 1);
+    }),
+  };
+};
+
+const buildSeoBriefFromContext = (context?: AiDraftContentBriefContext): ArticleSeoBriefState => ({
+  audience: context?.brief?.audience ?? '',
+  intent: context?.brief?.intent ?? '',
+  outline: padValues(context?.brief?.outline, 6),
+  entities: padValues(context?.brief?.entities, 5),
+  internal_links: padValues(context?.brief?.internal_links, 4),
+  cta: context?.brief?.cta ?? '',
+  metadata: {
+    seo_title: context?.brief?.metadata.seo_title ?? '',
+    meta_description: context?.brief?.metadata.meta_description ?? '',
+    slug: context?.brief?.metadata.slug ?? '',
+  },
+});
+
+const buildWorkflowFromContext = (context?: AiDraftContentBriefContext): Record<ArticleWorkflowStageKey, ArticleWorkflowStageState> => ({
+  drafting: {
+    goal: context?.workflow?.draft_generation.goal ?? '',
+    notes: context?.workflow?.draft_generation.notes ?? '',
+  },
+  on_page_optimization: {
+    goal: context?.workflow?.on_page_optimization.goal ?? '',
+    notes: context?.workflow?.on_page_optimization.notes ?? '',
+  },
+  quality_review: {
+    goal: context?.workflow?.quality_review.goal ?? '',
+    notes: context?.workflow?.quality_review.notes ?? '',
+  },
+  retrospective: {
+    goal: context?.workflow?.retrospective_record.goal ?? '',
+    notes: context?.workflow?.retrospective_record.notes ?? '',
+  },
+});
+
+const buildResultFromDraft = (
+  draft: AiContentDraft,
+  briefState: ArticleSeoBriefState,
+): AiGenerateArticleResponse => {
+  const keywordContext = draft.keyword_plan;
+  const serpContext = draft.serp_snapshot;
+  const contentBriefContext = draft.content_brief;
+  const storedOnPage = draft.on_page_recommendations as Partial<AiArticleOnPageResult> | undefined;
+  const storedQualityReview = draft.quality_review as Partial<AiArticleQualityReviewResult> | undefined;
+  const onPage = storedOnPage && 'title_tag' in storedOnPage
+    ? storedOnPage as AiArticleOnPageResult
+    : buildOnPageFallback(draft.title, briefState);
+  const qualityReview = storedQualityReview && 'verdict' in storedQualityReview
+    ? storedQualityReview as AiArticleQualityReviewResult
+    : buildQualityReviewFallback();
+
+  return {
+    keyword_plan: {
+      primary_keyword: keywordContext?.plan?.primary_keyword ?? '',
+      secondary_keywords: keywordContext?.plan?.secondary_keywords ?? [],
+      long_tail_questions: keywordContext?.plan?.long_tail_questions ?? [],
+      intent: keywordContext?.intent ?? {
+        summary: contentBriefContext?.brief?.intent || '—',
+        target_audience: contentBriefContext?.brief?.audience || '—',
+      },
+    },
+    serp_summary: serpContext?.summary ?? {
+      summary: serpContext?.analysis?.summary || '草稿已从保存版本载入。',
+      key_patterns: [],
+      information_gain: [],
+      differentiators: [],
+    },
+    brief: {
+      title_tag: briefState.metadata.seo_title || draft.title,
+      meta_description: briefState.metadata.meta_description || '—',
+      url_slug: briefState.metadata.slug || '—',
+      heading_tree: filterNonEmpty(briefState.outline).map((text) => ({ level: 2, text })),
+      internal_links: filterNonEmpty(briefState.internal_links),
+      image_alt: [],
+      schema_recommendations: [],
+    },
+    draft: {
+      title: draft.title,
+      summary: '草稿已从保存版本载入。',
+      content: draft.export_text,
+      keywords_used: filterNonEmpty([
+        keywordContext?.plan?.primary_keyword ?? '',
+        ...(keywordContext?.plan?.secondary_keywords ?? []),
+      ]),
+      blocks: [],
+    },
+    on_page: onPage,
+    quality_review: qualityReview,
+    publish_review_plan: draft.publish_review_metadata?.plan ?? DEFAULT_PUBLISH_REVIEW_PLAN,
+  };
 };
 
 const WORKFLOW_STAGE_CONFIG: { key: ArticleWorkflowStageKey; title: string; description: string; icon: string }[] = [
@@ -581,12 +736,75 @@ function ArticleGenerator() {
   const handleSaveDraft = async (saveAsNewVersion = false) => {
     const pid = typeof projectId === 'number' ? projectId : null;
     if (!pid || !editableDocument) return;
+
+    const keywordPlanPayload: AiDraftKeywordPlanContext = {
+      topic: topic.trim() || undefined,
+      tone,
+      language,
+      target_word_count: wordCount,
+      plan: {
+        primary_keyword: keywordPlan.primary_keyword.trim(),
+        secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 5),
+        long_tail_questions: filterNonEmpty(keywordPlan.long_tail_questions).slice(0, 5),
+      },
+      intent: result?.keyword_plan.intent,
+      suggestions: keywordSuggestionData,
+    };
+    const serpSnapshotPayload: AiDraftSerpSnapshotContext = {
+      analysis: {
+        summary: serpAnalysis.summary.trim() || undefined,
+        top_results: serpAnalysis.top_results.map((entry) => ({
+          rank: entry.rank,
+          content_type: entry.content_type.trim(),
+          title_angle: entry.title_angle.trim(),
+          structure: entry.structure.trim(),
+          word_count: entry.word_count,
+          content_gap: entry.content_gap.trim(),
+        })),
+      },
+      summary: result?.serp_summary,
+      research_data: serpResearchData,
+    };
+    const contentBriefPayload: AiDraftContentBriefContext = {
+      brief: {
+        audience: seoBrief.audience.trim(),
+        intent: seoBrief.intent.trim(),
+        outline: filterNonEmpty(seoBrief.outline),
+        entities: filterNonEmpty(seoBrief.entities),
+        internal_links: filterNonEmpty(seoBrief.internal_links),
+        cta: seoBrief.cta.trim(),
+        metadata: {
+          seo_title: seoBrief.metadata.seo_title.trim(),
+          meta_description: seoBrief.metadata.meta_description.trim(),
+          slug: seoBrief.metadata.slug.trim(),
+        },
+      },
+      workflow: {
+        draft_generation: { goal: workflow.drafting.goal.trim(), notes: workflow.drafting.notes.trim() || undefined },
+        on_page_optimization: { goal: workflow.on_page_optimization.goal.trim(), notes: workflow.on_page_optimization.notes.trim() || undefined },
+        quality_review: { goal: workflow.quality_review.goal.trim(), notes: workflow.quality_review.notes.trim() || undefined },
+        retrospective_record: { goal: workflow.retrospective.goal.trim(), notes: workflow.retrospective.notes.trim() || undefined },
+      },
+    };
+    const onPagePayload = result?.on_page ?? buildOnPageFallback(result?.draft.title || topic || activeDraft?.title || 'Untitled Article Draft', seoBrief);
+    const qualityReviewPayload = result?.quality_review ?? buildQualityReviewFallback();
+    const publishReviewMetadata: AiDraftPublishReviewMetadata = {
+      plan: result?.publish_review_plan ?? DEFAULT_PUBLISH_REVIEW_PLAN,
+      retrospective,
+    };
+
     await runWithUiState(async () => {
       if (activeDraft) {
         const updated = await updateAiContentDraft(activeDraft.id, {
           title: result?.draft.title || topic || activeDraft.title,
           canvas_document_json: editableDocument as unknown as Record<string, unknown>,
           export_text: exportCanvas(editableDocument, 'text'),
+          keyword_plan: keywordPlanPayload,
+          serp_snapshot: serpSnapshotPayload,
+          content_brief: contentBriefPayload,
+          on_page_recommendations: onPagePayload,
+          quality_review: qualityReviewPayload,
+          publish_review_metadata: publishReviewMetadata,
           target_url: targetUrl.trim() || undefined,
           publication_status: publicationStatus,
           expected_version: activeDraft.version,
@@ -599,6 +817,12 @@ function ArticleGenerator() {
           title: result?.draft.title || topic || 'Untitled Article Draft',
           canvas_document_json: editableDocument as unknown as Record<string, unknown>,
           export_text: exportCanvas(editableDocument, 'text'),
+          keyword_plan: keywordPlanPayload,
+          serp_snapshot: serpSnapshotPayload,
+          content_brief: contentBriefPayload,
+          on_page_recommendations: onPagePayload,
+          quality_review: qualityReviewPayload,
+          publish_review_metadata: publishReviewMetadata,
           target_url: targetUrl.trim() || undefined,
           publication_status: publicationStatus,
         });
@@ -613,77 +837,28 @@ function ArticleGenerator() {
   };
 
   const handleLoadDraft = (draft: AiContentDraft) => {
+    const restoredKeywordPlan = buildKeywordPlanStateFromContext(draft.keyword_plan);
+    const restoredSerpAnalysis = buildSerpAnalysisFromContext(draft.serp_snapshot);
+    const restoredSeoBrief = buildSeoBriefFromContext(draft.content_brief);
+    const restoredWorkflow = buildWorkflowFromContext(draft.content_brief);
+
     setActiveDraftId(draft.id);
+    setTopic(draft.keyword_plan.topic ?? draft.title);
+    setTone(draft.keyword_plan.tone ?? 'professional');
+    setLanguage(draft.keyword_plan.language ?? 'zh-CN');
+    setWordCount(draft.keyword_plan.target_word_count ?? 1500);
+    setKeywordPlan(restoredKeywordPlan);
+    setKeywordSuggestionData(draft.keyword_plan.suggestions ?? null);
+    setSerpAnalysis(restoredSerpAnalysis);
+    setSerpResearchData(draft.serp_snapshot.research_data ?? null);
+    setSeoBrief(restoredSeoBrief);
+    setWorkflow(restoredWorkflow);
     setTargetUrl(draft.target_url ?? '');
     setPublicationStatus(draft.publication_status);
-    setRetrospective(null);
+    setRetrospective(draft.publish_review_metadata?.retrospective ?? null);
     setEditableDocument(draft.canvas_document_json as unknown as CanvasDocument);
-    setResult((prev) => (prev ? {
-      ...prev,
-      draft: {
-        ...prev.draft,
-        title: draft.title,
-        content: draft.export_text,
-        blocks: [],
-      },
-    } : {
-      keyword_plan: {
-        primary_keyword: keywordPlan.primary_keyword,
-        secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords),
-        long_tail_questions: filterNonEmpty(keywordPlan.long_tail_questions),
-        intent: {
-          summary: seoBrief.intent || '—',
-          target_audience: seoBrief.audience || '—',
-        },
-      },
-      serp_summary: {
-        summary: serpAnalysis.summary || '草稿已从保存版本载入。',
-        key_patterns: [],
-        information_gain: [],
-        differentiators: [],
-      },
-      brief: {
-        title_tag: seoBrief.metadata.seo_title || draft.title,
-        meta_description: seoBrief.metadata.meta_description || '—',
-        url_slug: seoBrief.metadata.slug || '—',
-        heading_tree: filterNonEmpty(seoBrief.outline).map((text) => ({ level: 2, text })),
-        internal_links: filterNonEmpty(seoBrief.internal_links),
-        image_alt: [],
-        schema_recommendations: [],
-      },
-      draft: {
-        title: draft.title,
-        summary: '草稿已从保存版本载入。',
-        content: draft.export_text,
-        keywords_used: filterNonEmpty([keywordPlan.primary_keyword, ...keywordPlan.secondary_keywords]),
-        blocks: [],
-      },
-      on_page: {
-        title_tag: seoBrief.metadata.seo_title || draft.title,
-        meta_description: seoBrief.metadata.meta_description || '—',
-        url_slug: seoBrief.metadata.slug || '—',
-        heading_tree: filterNonEmpty(seoBrief.outline).map((text) => ({ level: 2, text })),
-        internal_links: filterNonEmpty(seoBrief.internal_links),
-        image_alt: [],
-        schema_recommendations: [],
-        checklist: [],
-      },
-      quality_review: {
-        verdict: '草稿已加载，待重新审校',
-        fluff: '未评估',
-        missing_examples: '未评估',
-        experience_evidence: '未评估',
-        skim_friendly: '未评估',
-        strengths: [],
-        risks: [],
-        fixes: [],
-      },
-      publish_review_plan: {
-        pre_publish_checks: [],
-        post_publish_metrics: [],
-        iteration_ideas: [],
-      },
-    }));
+    setResult(buildResultFromDraft(draft, restoredSeoBrief));
+    setActiveStep('execution');
   };
 
   const handleRollback = async (targetVersion: number) => {
