@@ -20,13 +20,73 @@ class AiAnalyzeResponse(BaseModel):
     result: str
 
 
-class AiGenerateArticleRequest(BaseModel):
+class LegacyAiGenerateArticleRequest(BaseModel):
     topic: str = Field(..., min_length=1, description="Article topic or main keyword")
     keywords: List[str] = Field(default_factory=list, description="Target SEO keywords")
     tone: str = Field(default="professional", description="Writing tone: professional, casual, authoritative, friendly")
     language: str = Field(default="zh-CN", description="Output language")
     word_count: int = Field(default=1500, ge=300, le=5000, description="Target word count")
     outline: Optional[str] = Field(default=None, description="Custom article outline")
+
+
+class AiArticleKeywordPlan(BaseModel):
+    primary_keyword: str = Field(..., min_length=1, description="Primary keyword")
+    secondary_keywords: List[str] = Field(default_factory=list, min_length=3, max_length=5, description="3-5 supporting keywords")
+    long_tail_questions: List[str] = Field(default_factory=list, description="Long-tail question list")
+
+
+class AiArticleSerpEntry(BaseModel):
+    rank: int = Field(..., ge=1, le=10, description="SERP rank position")
+    content_type: str = Field(..., min_length=1, description="Ranking page content type")
+    title_angle: str = Field(..., min_length=1, description="Title framing or angle")
+    structure: str = Field(..., min_length=1, description="Observed structure or sections")
+    word_count: int = Field(..., ge=0, description="Estimated competitor word count")
+    content_gap: str = Field(..., min_length=1, description="Gap or weakness to exploit")
+
+
+class AiArticleSerpAnalysis(BaseModel):
+    summary: Optional[str] = Field(default=None, description="Overall SERP observation summary")
+    top_results: List[AiArticleSerpEntry] = Field(default_factory=list, min_length=10, max_length=10, description="Top 10 SERP observations")
+
+
+class AiArticleMetadata(BaseModel):
+    seo_title: str = Field(..., min_length=1, description="SEO title")
+    meta_description: str = Field(..., min_length=1, description="Meta description")
+    slug: str = Field(..., min_length=1, description="Suggested URL slug")
+
+
+class AiArticleSeoBrief(BaseModel):
+    audience: str = Field(..., min_length=1, description="Target audience")
+    intent: str = Field(..., min_length=1, description="Search intent")
+    outline: List[str] = Field(default_factory=list, min_length=1, description="Approved outline sections")
+    entities: List[str] = Field(default_factory=list, description="Important topical entities")
+    internal_links: List[str] = Field(default_factory=list, description="Suggested internal link targets")
+    cta: str = Field(..., min_length=1, description="Primary CTA")
+    metadata: AiArticleMetadata
+
+
+class AiArticleWorkflowStage(BaseModel):
+    goal: str = Field(..., min_length=1, description="Goal for the workflow stage")
+    notes: Optional[str] = Field(default=None, description="Optional notes or constraints")
+
+
+class AiArticleWorkflow(BaseModel):
+    drafting: AiArticleWorkflowStage
+    on_page_optimization: AiArticleWorkflowStage
+    quality_review: AiArticleWorkflowStage
+    retrospective: AiArticleWorkflowStage
+
+
+class AiGenerateArticleRequest(BaseModel):
+    article_mode: str = Field(default="workflow", description="Structured article generation mode")
+    topic: str = Field(..., min_length=1, description="Article topic")
+    tone: str = Field(default="professional", description="Writing tone: professional, casual, authoritative, friendly")
+    language: str = Field(default="zh-CN", description="Output language")
+    word_count: int = Field(default=1500, ge=300, le=5000, description="Target word count")
+    keyword_plan: AiArticleKeywordPlan
+    serp_analysis: AiArticleSerpAnalysis
+    seo_brief: AiArticleSeoBrief
+    workflow: AiArticleWorkflow
 
 
 class AiContentBlock(BaseModel):
@@ -222,8 +282,65 @@ async def analyze_with_ai(payload: AiAnalyzeRequest):
     return AiAnalyzeResponse(result=content)
 
 
+def _build_article_response(raw: str, fallback_title: str, fallback_keywords: List[str]) -> AiGenerateArticleResponse:
+    title = ""
+    meta_description = ""
+    keywords_used: List[str] = []
+    content = raw
+
+    if "[TITLE]" in raw:
+        parts = raw.split("[TITLE]")
+        rest = parts[-1] if len(parts) > 1 else parts[0]
+
+        if "[META_DESCRIPTION]" in rest:
+            title_part, rest = rest.split("[META_DESCRIPTION]", 1)
+            title = title_part.strip()
+        if "[KEYWORDS_USED]" in rest:
+            meta_part, rest = rest.split("[KEYWORDS_USED]", 1)
+            meta_description = meta_part.strip()
+        if "[CONTENT]" in rest:
+            kw_part, content_part = rest.split("[CONTENT]", 1)
+            keywords_used = [k.strip() for k in kw_part.strip().split(",") if k.strip()]
+            content = content_part.strip()
+        else:
+            content = rest.strip()
+
+    if not title:
+        lines = content.split("\n")
+        title = lines[0].lstrip("# ").strip() if lines else fallback_title
+
+    parsed = _extract_json(raw)
+    blocks: List[AiContentBlock] = []
+    if parsed is not None:
+        parsed_title = str(parsed.get("title", "")).strip()
+        parsed_meta = str(parsed.get("meta_description", "")).strip()
+        parsed_content = str(parsed.get("content", "")).strip()
+        parsed_keywords = parsed.get("keywords_used")
+
+        if parsed_title:
+            title = parsed_title
+        if parsed_meta:
+            meta_description = parsed_meta
+        if parsed_content:
+            content = parsed_content
+        if isinstance(parsed_keywords, list):
+            keywords_used = [str(k).strip() for k in parsed_keywords if str(k).strip()]
+
+        blocks = _normalize_blocks(parsed.get("blocks"))
+    else:
+        logger.warning("ai.generate_article.structured_parse_failed", extra={"topic": fallback_title})
+
+    return AiGenerateArticleResponse(
+        title=title,
+        content=content,
+        meta_description=meta_description or title,
+        keywords_used=keywords_used or fallback_keywords,
+        blocks=blocks,
+    )
+
+
 @router.post("/generate-article", response_model=AiGenerateArticleResponse)
-async def generate_seo_article(payload: AiGenerateArticleRequest):
+async def generate_seo_article(payload: LegacyAiGenerateArticleRequest):
     lang_hint = "请用中文回复。" if payload.language.startswith("zh") else f"Please respond in {payload.language}."
     keywords_str = ", ".join(payload.keywords) if payload.keywords else payload.topic
 
@@ -258,61 +375,80 @@ async def generate_seo_article(payload: AiGenerateArticleRequest):
     )
 
     raw = await _call_ai(system_prompt, user_prompt)
+    return _build_article_response(raw, payload.topic, payload.keywords)
 
-    title = ""
-    meta_description = ""
-    keywords_used: List[str] = []
-    content = raw
 
-    if "[TITLE]" in raw:
-        parts = raw.split("[TITLE]")
-        rest = parts[-1] if len(parts) > 1 else parts[0]
-
-        if "[META_DESCRIPTION]" in rest:
-            title_part, rest = rest.split("[META_DESCRIPTION]", 1)
-            title = title_part.strip()
-        if "[KEYWORDS_USED]" in rest:
-            meta_part, rest = rest.split("[KEYWORDS_USED]", 1)
-            meta_description = meta_part.strip()
-        if "[CONTENT]" in rest:
-            kw_part, content_part = rest.split("[CONTENT]", 1)
-            keywords_used = [k.strip() for k in kw_part.strip().split(",") if k.strip()]
-            content = content_part.strip()
-        else:
-            content = rest.strip()
-
-    if not title:
-        lines = content.split("\n")
-        title = lines[0].lstrip("# ").strip() if lines else payload.topic
-
-    parsed = _extract_json(raw)
-    blocks: List[AiContentBlock] = []
-    if parsed is not None:
-        parsed_title = str(parsed.get("title", "")).strip()
-        parsed_meta = str(parsed.get("meta_description", "")).strip()
-        parsed_content = str(parsed.get("content", "")).strip()
-        parsed_keywords = parsed.get("keywords_used")
-
-        if parsed_title:
-            title = parsed_title
-        if parsed_meta:
-            meta_description = parsed_meta
-        if parsed_content:
-            content = parsed_content
-        if isinstance(parsed_keywords, list):
-            keywords_used = [str(k).strip() for k in parsed_keywords if str(k).strip()]
-
-        blocks = _normalize_blocks(parsed.get("blocks"))
-    else:
-        logger.warning("ai.generate_article.structured_parse_failed", extra={"topic": payload.topic})
-
-    return AiGenerateArticleResponse(
-        title=title,
-        content=content,
-        meta_description=meta_description or title,
-        keywords_used=keywords_used or payload.keywords,
-        blocks=blocks,
+@router.post("/generate-article-v2", response_model=AiGenerateArticleResponse)
+async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
+    lang_hint = "请用中文回复。" if payload.language.startswith("zh") else f"Please respond in {payload.language}."
+    keyword_plan = payload.keyword_plan
+    seo_brief = payload.seo_brief
+    serp_rows = "\n".join(
+        f"- #{item.rank}: 类型={item.content_type}; 标题角度={item.title_angle}; 结构={item.structure}; 字数={item.word_count}; 内容缺口={item.content_gap}"
+        for item in payload.serp_analysis.top_results
     )
+    outline_rows = "\n".join(f"- {item}" for item in seo_brief.outline)
+    entity_rows = ", ".join(seo_brief.entities) or "无"
+    internal_link_rows = "\n".join(f"- {item}" for item in seo_brief.internal_links) or "- 无"
+    long_tail_rows = "\n".join(f"- {item}" for item in keyword_plan.long_tail_questions) or "- 无"
+
+    system_prompt = (
+        "你是一名资深SEO内容总监。你需要严格依据用户提供的多步骤工作流，"
+        "整合关键词规划、SERP洞察、SEO brief、初稿、on-page优化、质量审校与复盘要求来生成最终文章。"
+        f"{lang_hint}"
+    )
+
+    user_prompt = (
+        f"请根据以下结构化工作流生成一篇SEO文章：\n\n"
+        f"[文章主题]\n{payload.topic}\n\n"
+        f"[关键词规划]\n"
+        f"主关键词: {keyword_plan.primary_keyword}\n"
+        f"次关键词: {', '.join(keyword_plan.secondary_keywords)}\n"
+        f"长尾问题:\n{long_tail_rows}\n\n"
+        f"[SERP 分析]\n"
+        f"总结: {payload.serp_analysis.summary or '无'}\n"
+        f"前10名观察:\n{serp_rows}\n\n"
+        f"[SEO Brief]\n"
+        f"Audience: {seo_brief.audience}\n"
+        f"Intent: {seo_brief.intent}\n"
+        f"Outline:\n{outline_rows}\n"
+        f"Entities: {entity_rows}\n"
+        f"Internal Links:\n{internal_link_rows}\n"
+        f"CTA: {seo_brief.cta}\n"
+        f"Metadata: SEO标题={seo_brief.metadata.seo_title}; Meta描述={seo_brief.metadata.meta_description}; Slug={seo_brief.metadata.slug}\n\n"
+        f"[执行工作流]\n"
+        f"初稿生成目标: {payload.workflow.drafting.goal}\n"
+        f"初稿备注: {payload.workflow.drafting.notes or '无'}\n"
+        f"On-page 优化目标: {payload.workflow.on_page_optimization.goal}\n"
+        f"On-page 备注: {payload.workflow.on_page_optimization.notes or '无'}\n"
+        f"质量审校目标: {payload.workflow.quality_review.goal}\n"
+        f"质量审校备注: {payload.workflow.quality_review.notes or '无'}\n"
+        f"复盘记录目标: {payload.workflow.retrospective.goal}\n"
+        f"复盘备注: {payload.workflow.retrospective.notes or '无'}\n\n"
+        f"[输出要求]\n"
+        f"- 文风: {payload.tone}\n"
+        f"- 目标字数: 约{payload.word_count}字\n"
+        f"- 必须融入用户提供的关键词、SERP差异化和brief要求。\n"
+        f"- 在正文中自然覆盖长尾问题，并确保CTA与metadata对齐。\n"
+        f"- 在末尾增加一个简短复盘小节，总结本文如何弥补SERP内容缺口。\n\n"
+        f"请严格按以下格式输出（不要加额外标记）：\n"
+        f"[TITLE]\n文章标题\n"
+        f"[META_DESCRIPTION]\n一句话SEO描述（120-160字符）\n"
+        f"[KEYWORDS_USED]\n实际使用的关键词，逗号分隔\n"
+        f"[CONTENT]\n正文（使用Markdown格式，包含H2/H3标题、段落、列表、CTA、复盘小节等）\n\n"
+        f"另外，请在末尾附加严格JSON对象（无Markdown代码块、无额外解释），字段必须匹配：\n"
+        f"{{\n"
+        f"  \"title\": string,\n"
+        f"  \"meta_description\": string,\n"
+        f"  \"keywords_used\": string[],\n"
+        f"  \"content\": string,\n"
+        f"  \"blocks\": [{{\"type\": \"heading\"|\"paragraph\"|\"list\"|\"cta\", \"text\": string, \"level\": number|null, \"meta\": object}}]\n"
+        f"}}"
+    )
+
+    raw = await _call_ai(system_prompt, user_prompt)
+    fallback_keywords = [keyword_plan.primary_keyword, *keyword_plan.secondary_keywords, *keyword_plan.long_tail_questions]
+    return _build_article_response(raw, payload.topic, fallback_keywords)
 
 
 @router.post("/generate-social", response_model=AiGenerateSocialResponse)

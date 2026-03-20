@@ -776,13 +776,60 @@ export async function analyzeSeoWithAi(
   return res.data;
 }
 
+export interface AiArticleKeywordPlanInput {
+  primary_keyword: string;
+  secondary_keywords: string[];
+  long_tail_questions: string[];
+}
+
+export interface AiArticleSerpEntryInput {
+  rank: number;
+  content_type: string;
+  title_angle: string;
+  structure: string;
+  word_count: number;
+  content_gap: string;
+}
+
+export interface AiArticleSerpAnalysisInput {
+  summary?: string;
+  top_results: AiArticleSerpEntryInput[];
+}
+
+export interface AiArticleSeoBriefInput {
+  audience: string;
+  intent: string;
+  outline: string[];
+  entities: string[];
+  internal_links: string[];
+  cta: string;
+  metadata: {
+    seo_title: string;
+    meta_description: string;
+    slug: string;
+  };
+}
+
+export interface AiArticleWorkflowStageInput {
+  goal: string;
+  notes?: string;
+}
+
 export interface AiGenerateArticleRequest {
+  article_mode: 'workflow';
   topic: string;
-  keywords?: string[];
   tone?: string;
   language?: string;
   word_count?: number;
-  outline?: string;
+  keyword_plan: AiArticleKeywordPlanInput;
+  serp_analysis: AiArticleSerpAnalysisInput;
+  seo_brief: AiArticleSeoBriefInput;
+  workflow: {
+    drafting: AiArticleWorkflowStageInput;
+    on_page_optimization: AiArticleWorkflowStageInput;
+    quality_review: AiArticleWorkflowStageInput;
+    retrospective: AiArticleWorkflowStageInput;
+  };
 }
 
 export interface AiContentBlock {
@@ -803,7 +850,7 @@ export interface AiGenerateArticleResponse {
 export async function generateSeoArticle(
   payload: AiGenerateArticleRequest,
 ): Promise<AiGenerateArticleResponse> {
-  const res = await api.post<AiGenerateArticleResponse>("/ai/generate-article", payload);
+  const res = await api.post<AiGenerateArticleResponse>("/ai/generate-article-v2", payload);
   return res.data;
 }
 
