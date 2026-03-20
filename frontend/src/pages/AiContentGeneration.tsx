@@ -5,8 +5,16 @@ import {
   generateSocialContent,
   rewriteContent,
   analyzeSeoWithAi,
+  importAiKeywordSuggestions,
+  fetchAiSerpAnalysis,
+  generateAiContentBrief,
+  getAiDraftRetrospective,
   type AiContentDraft,
+  type AiDraftPublicationStatus,
+  type AiDraftRetrospectiveResponse,
   type AiGenerateArticleResponse,
+  type AiKeywordSuggestionResponse,
+  type AiSerpResearchResponse,
   type AiSocialPost,
   createAiContentDraft,
   listAiContentDrafts,
@@ -285,9 +293,19 @@ function ArticleGenerator() {
   const [drafts, setDrafts] = useState<AiContentDraft[]>([]);
   const [activeDraftId, setActiveDraftId] = useState<number | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [keywordSuggestionData, setKeywordSuggestionData] = useState<AiKeywordSuggestionResponse | null>(null);
+  const [serpResearchData, setSerpResearchData] = useState<AiSerpResearchResponse | null>(null);
+  const [retrospective, setRetrospective] = useState<AiDraftRetrospectiveResponse | null>(null);
+  const [targetUrl, setTargetUrl] = useState('');
+  const [publicationStatus, setPublicationStatus] = useState<AiDraftPublicationStatus>('draft');
+  const [keywordLoading, setKeywordLoading] = useState(false);
+  const [serpLoading, setSerpLoading] = useState(false);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [retrospectiveLoading, setRetrospectiveLoading] = useState(false);
 
   const activeDraft = useMemo(() => drafts.find((item) => item.id === activeDraftId) ?? null, [drafts, activeDraftId]);
   const activeStepIndex = ARTICLE_STEP_CONFIG.findIndex((step) => step.key === activeStep);
+  const inferredMarket = useMemo(() => (language.toLowerCase().startsWith('zh') ? 'cn' : 'us'), [language]);
 
   const goToStep = (step: ArticleStepKey) => setActiveStep(step);
   const goToPreviousStep = () => {
@@ -330,6 +348,138 @@ function ArticleGenerator() {
         [field]: value,
       },
     }));
+  };
+
+  const handleImportKeywordSuggestions = async () => {
+    if (!topic.trim()) {
+      setError('请先填写文章主题，再导入关键词建议。');
+      return;
+    }
+    await runWithUiState(async () => {
+      const data = await importAiKeywordSuggestions({
+        seed_term: topic.trim(),
+        locale: language,
+        market: inferredMarket,
+        limit: 20,
+      });
+      setKeywordSuggestionData(data);
+      setKeywordPlan({
+        primary_keyword: data.primary_keyword,
+        secondary_keywords: [...data.secondary_keywords.slice(0, 5), '', '', '', '', ''].slice(0, 5),
+        long_tail_questions: [...data.long_tail_questions.slice(0, 5), '', '', '', '', ''].slice(0, 5),
+      });
+      setActiveStep('keyword_planning');
+    }, {
+      setLoading: setKeywordLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (err: unknown) => getErrorMessage(err, '导入关键词建议失败。'),
+    });
+  };
+
+  const handleFetchSerp = async () => {
+    const term = keywordPlan.primary_keyword.trim() || topic.trim();
+    if (!term) {
+      setError('请先填写文章主题或主关键词，再拉取 SERP。');
+      return;
+    }
+    await runWithUiState(async () => {
+      const data = await fetchAiSerpAnalysis({
+        term,
+        locale: language,
+        market: inferredMarket,
+        limit: 10,
+      });
+      setSerpResearchData(data);
+      setSerpAnalysis({
+        summary: data.summary,
+        top_results: data.top_results.map((entry) => ({
+          rank: entry.rank,
+          content_type: entry.content_type,
+          title_angle: entry.title_angle,
+          structure: entry.structure,
+          word_count: entry.word_count,
+          content_gap: entry.content_gap,
+        })),
+      });
+      setActiveStep('serp_analysis');
+    }, {
+      setLoading: setSerpLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (err: unknown) => getErrorMessage(err, '拉取 SERP 失败。'),
+    });
+  };
+
+  const handleGenerateBrief = async () => {
+    const topicValue = topic.trim();
+    if (!topicValue || !keywordPlan.primary_keyword.trim()) {
+      setError('请先准备文章主题和主关键词，再生成 brief。');
+      return;
+    }
+    await runWithUiState(async () => {
+      const data = await generateAiContentBrief({
+        project_id: typeof projectId === 'number' ? projectId : undefined,
+        topic: topicValue,
+        tone,
+        language,
+        target_word_count: wordCount,
+        keyword_plan: {
+          primary_keyword: keywordPlan.primary_keyword.trim(),
+          secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 5),
+          long_tail_questions: filterNonEmpty(keywordPlan.long_tail_questions).slice(0, 5),
+        },
+        serp_analysis: {
+          summary: serpAnalysis.summary.trim() || undefined,
+          top_results: serpAnalysis.top_results.map((entry) => ({
+            rank: entry.rank,
+            content_type: entry.content_type.trim(),
+            title_angle: entry.title_angle.trim(),
+            structure: entry.structure.trim(),
+            word_count: entry.word_count,
+            content_gap: entry.content_gap.trim(),
+          })),
+        },
+      });
+      setSeoBrief({
+        audience: data.audience,
+        intent: data.intent,
+        outline: [...data.outline.slice(0, 6), '', '', '', '', '', ''].slice(0, 6),
+        entities: [...data.entities.slice(0, 5), '', '', '', '', ''].slice(0, 5),
+        internal_links: [...data.internal_links.slice(0, 4), '', '', '', ''].slice(0, 4),
+        cta: data.cta,
+        metadata: data.metadata,
+      });
+      setWorkflow({
+        drafting: { goal: data.execution.draft_generation.goal, notes: data.execution.draft_generation.notes ?? '' },
+        on_page_optimization: { goal: data.execution.on_page_optimization.goal, notes: data.execution.on_page_optimization.notes ?? '' },
+        quality_review: { goal: data.execution.quality_review.goal, notes: data.execution.quality_review.notes ?? '' },
+        retrospective: { goal: data.execution.retrospective_record.goal, notes: data.execution.retrospective_record.notes ?? '' },
+      });
+      setActiveStep('seo_brief');
+    }, {
+      setLoading: setBriefLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (err: unknown) => getErrorMessage(err, '生成 brief 失败。'),
+    });
+  };
+
+  const handleLoadRetrospective = async () => {
+    const pid = typeof projectId === 'number' ? projectId : null;
+    if (!pid || !activeDraft) {
+      setError('请先选择项目并保存草稿，再查看复盘数据。');
+      return;
+    }
+    await runWithUiState(async () => {
+      const data = await getAiDraftRetrospective(pid, activeDraft.id, '30d');
+      setRetrospective(data);
+    }, {
+      setLoading: setRetrospectiveLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (err: unknown) => getErrorMessage(err, '读取复盘数据失败。'),
+    });
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -437,6 +587,8 @@ function ArticleGenerator() {
           title: result?.draft.title || topic || activeDraft.title,
           canvas_document_json: editableDocument as unknown as Record<string, unknown>,
           export_text: exportCanvas(editableDocument, 'text'),
+          target_url: targetUrl.trim() || undefined,
+          publication_status: publicationStatus,
           expected_version: activeDraft.version,
           save_as_new_version: saveAsNewVersion,
         });
@@ -447,6 +599,8 @@ function ArticleGenerator() {
           title: result?.draft.title || topic || 'Untitled Article Draft',
           canvas_document_json: editableDocument as unknown as Record<string, unknown>,
           export_text: exportCanvas(editableDocument, 'text'),
+          target_url: targetUrl.trim() || undefined,
+          publication_status: publicationStatus,
         });
         setActiveDraftId(created.id);
       }
@@ -460,6 +614,9 @@ function ArticleGenerator() {
 
   const handleLoadDraft = (draft: AiContentDraft) => {
     setActiveDraftId(draft.id);
+    setTargetUrl(draft.target_url ?? '');
+    setPublicationStatus(draft.publication_status);
+    setRetrospective(null);
     setEditableDocument(draft.canvas_document_json as unknown as CanvasDocument);
     setResult((prev) => (prev ? {
       ...prev,
@@ -693,12 +850,18 @@ function ArticleGenerator() {
 
               {activeStep === 'keyword_planning' && (
                 <div className="space-y-3">
-                  <div className="mb-3 flex items-center gap-2">
-                    <i className="fa-solid fa-key" style={{ color: 'var(--md-sys-color-primary)' }} />
-                    <div>
-                      <p className="md-title-small">1. 关键词规划</p>
-                      <p className="md-body-small opacity-70">填写主关键词、3-5 个次关键词，以及长尾问题列表。</p>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <i className="fa-solid fa-key" style={{ color: 'var(--md-sys-color-primary)' }} />
+                      <div>
+                        <p className="md-title-small">1. 关键词规划</p>
+                        <p className="md-body-small opacity-70">填写主关键词、3-5 个次关键词，以及长尾问题列表。</p>
+                      </div>
                     </div>
+                    <button type="button" onClick={() => void handleImportKeywordSuggestions()} disabled={keywordLoading} className="app-btn app-btn-outline">
+                      <i className={keywordLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-file-import'} />
+                      导入关键词建议
+                    </button>
                   </div>
                   <div>
                     <label className="mb-1 block md-label-large">主关键词</label>
@@ -720,6 +883,21 @@ function ArticleGenerator() {
                       ))}
                     </div>
                   </div>
+                  {keywordSuggestionData && (
+                    <div className="rounded-xl border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                      <p className="md-label-large">关键词建议来源：{keywordSuggestionData.provider}</p>
+                      <p className="mt-1 opacity-70">意图信号：{keywordSuggestionData.intent_signals.join(' / ') || '—'}</p>
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        {keywordSuggestionData.supporting_metrics.slice(0, 4).map((item) => (
+                          <div key={item.keyword} className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                            <p className="md-label-medium">{item.keyword}</p>
+                            <p className="opacity-70">SV {item.search_volume} · KD {item.difficulty} · {item.intent}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="mb-1 block md-label-large">长尾问题列表</label>
                     <div className="space-y-2">
@@ -740,13 +918,28 @@ function ArticleGenerator() {
 
               {activeStep === 'serp_analysis' && (
                 <div className="space-y-3">
-                  <div className="mb-3 flex items-center gap-2">
-                    <i className="fa-solid fa-chart-line" style={{ color: 'var(--md-sys-color-primary)' }} />
-                    <div>
-                      <p className="md-title-small">2. SERP 分析</p>
-                      <p className="md-body-small opacity-70">记录前 10 名的内容类型、标题角度、结构、字数和内容缺口。</p>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <i className="fa-solid fa-chart-line" style={{ color: 'var(--md-sys-color-primary)' }} />
+                      <div>
+                        <p className="md-title-small">2. SERP 分析</p>
+                        <p className="md-body-small opacity-70">记录前 10 名的内容类型、标题角度、结构、字数和内容缺口。</p>
+                      </div>
                     </div>
+                    <button type="button" onClick={() => void handleFetchSerp()} disabled={serpLoading} className="app-btn app-btn-outline">
+                      <i className={serpLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-magnifying-glass-chart'} />
+                      拉取 SERP
+                    </button>
                   </div>
+                  {serpResearchData && (
+                    <div className="rounded-xl border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                      <p className="md-label-large">SERP 洞察速览</p>
+                      <p className="mt-1 opacity-80">内容类型：{serpResearchData.patterns.join(' / ') || '—'}</p>
+                      <p className="mt-1 opacity-80">标题角度：{serpResearchData.title_angles.join(' / ') || '—'}</p>
+                      <p className="mt-1 opacity-80">结构特征：{serpResearchData.structure_features.join(' / ') || '—'}</p>
+                    </div>
+                  )}
+
                   <div className="mb-3">
                     <label className="mb-1 block md-label-large">SERP 总结</label>
                     <textarea value={serpAnalysis.summary} onChange={(e) => setSerpAnalysis((prev) => ({ ...prev, summary: e.target.value }))} className="app-textarea h-24 w-full resize-y" placeholder="例如：结果页以教程与对比文章为主，但缺少面向新手的执行清单。" />
@@ -773,12 +966,18 @@ function ArticleGenerator() {
 
               {activeStep === 'seo_brief' && (
                 <div className="space-y-3">
-                  <div className="mb-3 flex items-center gap-2">
-                    <i className="fa-solid fa-file-circle-check" style={{ color: 'var(--md-sys-color-primary)' }} />
-                    <div>
-                      <p className="md-title-small">3. SEO Brief</p>
-                      <p className="md-body-small opacity-70">整理 audience、intent、outline、entities、internal links、CTA 和 metadata。</p>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <i className="fa-solid fa-file-circle-check" style={{ color: 'var(--md-sys-color-primary)' }} />
+                      <div>
+                        <p className="md-title-small">3. SEO Brief</p>
+                        <p className="md-body-small opacity-70">整理 audience、intent、outline、entities、internal links、CTA 和 metadata。</p>
+                      </div>
                     </div>
+                    <button type="button" onClick={() => void handleGenerateBrief()} disabled={briefLoading} className="app-btn app-btn-outline">
+                      <i className={briefLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-file-circle-check'} />
+                      生成 SEO Brief
+                    </button>
                   </div>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <input type="text" value={seoBrief.audience} onChange={(e) => setSeoBrief((prev) => ({ ...prev, audience: e.target.value }))} className="app-input w-full" placeholder="Audience：目标受众" required />
@@ -907,7 +1106,7 @@ function ArticleGenerator() {
               style={{ background: loading ? 'var(--md-sys-state-disabled-text)' : 'var(--md-sys-color-primary)' }}
             >
               <i className={loading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles'} />
-              {loading ? t('aiContent.generating') : '生成结构化 SEO 文章'}
+              {loading ? t('aiContent.generating') : '根据 Brief 生成初稿'}
             </button>
           </form>
         </div>
@@ -1087,7 +1286,27 @@ function ArticleGenerator() {
               </div>
             </div>
 
-            <div className="shape-medium border bg-[color:var(--md-sys-color-surface)] p-4 space-y-3" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+            <div className="shape-medium border bg-[color:var(--md-sys-color-surface)] p-4 space-y-4" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block md-label-large">目标 URL</label>
+                  <input
+                    type="url"
+                    value={targetUrl}
+                    onChange={(e) => setTargetUrl(e.target.value)}
+                    className="app-input w-full"
+                    placeholder="https://example.com/blog/your-article"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block md-label-large">发布状态</label>
+                  <select value={publicationStatus} onChange={(e) => setPublicationStatus(e.target.value as AiDraftPublicationStatus)} className="app-select w-full">
+                    <option value="draft">草稿</option>
+                    <option value="saved">已保存</option>
+                    <option value="published">已发布</option>
+                  </select>
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button onClick={() => void handleSaveDraft(false)} disabled={savingDraft || !editableDocument || !projectId} className="app-btn app-btn-outline">
                   保存草稿
@@ -1100,6 +1319,10 @@ function ArticleGenerator() {
                     回滚到上一版本
                   </button>
                 )}
+                <button onClick={() => void handleLoadRetrospective()} disabled={retrospectiveLoading || !activeDraft || !projectId} className="app-btn app-btn-outline">
+                  <i className={retrospectiveLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-chart-column'} />
+                  查看复盘数据
+                </button>
               </div>
               <div>
                 <label className="mb-1 block md-label-large">加载草稿</label>
@@ -1118,6 +1341,35 @@ function ArticleGenerator() {
                 </select>
               </div>
             </div>
+
+            {retrospective && (
+              <ResultCard title="Retrospective" icon="fa-solid fa-chart-column">
+                <p className="md-body-small opacity-80">目标 URL：{retrospective.target_url || '—'}</p>
+                <p className="mt-1 md-body-small opacity-80">发布状态：{retrospective.publication_status}</p>
+                {retrospective.content_performance && (
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <div className="rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>30 天会话：{retrospective.content_performance.sessions}</div>
+                    <div className="rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>30 天转化率：{retrospective.content_performance.conversion_rate}%</div>
+                    <div className="rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>7 天变化：{retrospective.content_performance.change_7d}%</div>
+                    <div className="rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>30 天变化：{retrospective.content_performance.change_30d}%</div>
+                  </div>
+                )}
+                {retrospective.ranking && (
+                  <div className="mt-3 rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                    已跟踪关键词：{retrospective.ranking.tracked_keywords} · 平均排名：{retrospective.ranking.avg_rank ?? '—'} · Top 10：{retrospective.ranking.top_10}
+                  </div>
+                )}
+                {retrospective.traffic && (
+                  <div className="mt-3 rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                    最近流量快照：{retrospective.traffic.latest_date || '—'} · 近 7 天会话：{retrospective.traffic.sessions_7d} · 近 30 天会话：{retrospective.traffic.sessions_30d}
+                  </div>
+                )}
+                <div className="mt-3">
+                  <p className="mb-2 md-label-large">复盘洞察</p>
+                  <ResultList items={retrospective.insights} />
+                </div>
+              </ResultCard>
+            )}
 
             {editableDocument && (
               <CanvasContentEditor

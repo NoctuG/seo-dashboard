@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 from app.api.deps import get_current_user, require_project_role
 from app.core.error_codes import ErrorCode
 from app.db import get_session
-from app.models import AiContentDraft, AiDraftContentType, Project, ProjectMember, ProjectRoleType, Role, User
+from app.models import AiContentDraft, AiDraftContentType, AiDraftPublicationStatus, Project, ProjectMember, ProjectRoleType, Role, User
 
 router = APIRouter()
 
@@ -19,12 +19,16 @@ class AiDraftCreatePayload(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     canvas_document_json: dict
     export_text: str = ""
+    target_url: str | None = Field(default=None, max_length=2048)
+    publication_status: AiDraftPublicationStatus = AiDraftPublicationStatus.DRAFT
 
 
 class AiDraftUpdatePayload(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     canvas_document_json: dict | None = None
     export_text: str | None = None
+    target_url: str | None = Field(default=None, max_length=2048)
+    publication_status: AiDraftPublicationStatus | None = None
     expected_version: int = Field(ge=1)
     save_as_new_version: bool = False
     rollback_to_version: int | None = Field(default=None, ge=1)
@@ -38,6 +42,8 @@ class AiDraftRead(BaseModel):
     title: str
     canvas_document_json: dict
     export_text: str
+    target_url: str | None
+    publication_status: AiDraftPublicationStatus
     version: int
     updated_by: int
     updated_at: datetime
@@ -61,6 +67,8 @@ def _as_read(draft: AiContentDraft) -> AiDraftRead:
         title=draft.title,
         canvas_document_json=json.loads(draft.canvas_document_json),
         export_text=draft.export_text,
+        target_url=draft.target_url,
+        publication_status=draft.publication_status,
         version=draft.version,
         updated_by=draft.updated_by,
         updated_at=draft.updated_at,
@@ -97,6 +105,8 @@ def create_ai_draft(
         title=payload.title.strip(),
         canvas_document_json=json.dumps(payload.canvas_document_json, ensure_ascii=False),
         export_text=payload.export_text,
+        target_url=payload.target_url.strip() if payload.target_url else None,
+        publication_status=payload.publication_status,
         version=1,
         updated_by=user.id,
         updated_at=datetime.utcnow(),
@@ -175,6 +185,8 @@ def update_ai_draft(
             title=base_title,
             canvas_document_json=json.dumps(base_canvas if base_canvas is not None else json.loads(current.canvas_document_json), ensure_ascii=False),
             export_text=base_text if base_text is not None else current.export_text,
+            target_url=payload.target_url.strip() if payload.target_url is not None else current.target_url,
+            publication_status=payload.publication_status or current.publication_status,
             version=current.version + 1,
             updated_by=user.id,
             updated_at=datetime.utcnow(),
@@ -190,6 +202,10 @@ def update_ai_draft(
         current.canvas_document_json = json.dumps(payload.canvas_document_json, ensure_ascii=False)
     if payload.export_text is not None:
         current.export_text = payload.export_text
+    if payload.target_url is not None:
+        current.target_url = payload.target_url.strip() or None
+    if payload.publication_status is not None:
+        current.publication_status = payload.publication_status
     current.version += 1
     current.updated_by = user.id
     current.updated_at = datetime.utcnow()
