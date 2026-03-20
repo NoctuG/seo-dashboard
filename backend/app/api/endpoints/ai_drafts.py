@@ -19,6 +19,12 @@ class AiDraftCreatePayload(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     canvas_document_json: dict
     export_text: str = ""
+    keyword_plan: dict = Field(default_factory=dict)
+    serp_snapshot: dict = Field(default_factory=dict)
+    content_brief: dict = Field(default_factory=dict)
+    on_page_recommendations: dict = Field(default_factory=dict)
+    quality_review: dict = Field(default_factory=dict)
+    publish_review_metadata: dict = Field(default_factory=dict)
     target_url: str | None = Field(default=None, max_length=2048)
     publication_status: AiDraftPublicationStatus = AiDraftPublicationStatus.DRAFT
 
@@ -27,6 +33,12 @@ class AiDraftUpdatePayload(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     canvas_document_json: dict | None = None
     export_text: str | None = None
+    keyword_plan: dict | None = None
+    serp_snapshot: dict | None = None
+    content_brief: dict | None = None
+    on_page_recommendations: dict | None = None
+    quality_review: dict | None = None
+    publish_review_metadata: dict | None = None
     target_url: str | None = Field(default=None, max_length=2048)
     publication_status: AiDraftPublicationStatus | None = None
     expected_version: int = Field(ge=1)
@@ -42,6 +54,12 @@ class AiDraftRead(BaseModel):
     title: str
     canvas_document_json: dict
     export_text: str
+    keyword_plan: dict
+    serp_snapshot: dict
+    content_brief: dict
+    on_page_recommendations: dict
+    quality_review: dict
+    publish_review_metadata: dict
     target_url: str | None
     publication_status: AiDraftPublicationStatus
     version: int
@@ -67,6 +85,12 @@ def _as_read(draft: AiContentDraft) -> AiDraftRead:
         title=draft.title,
         canvas_document_json=json.loads(draft.canvas_document_json),
         export_text=draft.export_text,
+        keyword_plan=draft.keyword_plan or {},
+        serp_snapshot=draft.serp_snapshot or {},
+        content_brief=draft.content_brief or {},
+        on_page_recommendations=draft.on_page_recommendations or {},
+        quality_review=draft.quality_review or {},
+        publish_review_metadata=draft.publish_review_metadata or {},
         target_url=draft.target_url,
         publication_status=draft.publication_status,
         version=draft.version,
@@ -105,6 +129,12 @@ def create_ai_draft(
         title=payload.title.strip(),
         canvas_document_json=json.dumps(payload.canvas_document_json, ensure_ascii=False),
         export_text=payload.export_text,
+        keyword_plan=payload.keyword_plan,
+        serp_snapshot=payload.serp_snapshot,
+        content_brief=payload.content_brief,
+        on_page_recommendations=payload.on_page_recommendations,
+        quality_review=payload.quality_review,
+        publish_review_metadata=payload.publish_review_metadata,
         target_url=payload.target_url.strip() if payload.target_url else None,
         publication_status=payload.publication_status,
         version=1,
@@ -160,6 +190,12 @@ def update_ai_draft(
 
     base_canvas = payload.canvas_document_json
     base_text = payload.export_text
+    base_keyword_plan = payload.keyword_plan
+    base_serp_snapshot = payload.serp_snapshot
+    base_content_brief = payload.content_brief
+    base_on_page_recommendations = payload.on_page_recommendations
+    base_quality_review = payload.quality_review
+    base_publish_review_metadata = payload.publish_review_metadata
     base_title = payload.title.strip() if payload.title else current.title
 
     if payload.rollback_to_version is not None:
@@ -175,6 +211,12 @@ def update_ai_draft(
             raise HTTPException(status_code=404, detail="AI_DRAFT_VERSION_NOT_FOUND")
         base_canvas = json.loads(rollback_source.canvas_document_json)
         base_text = rollback_source.export_text
+        base_keyword_plan = rollback_source.keyword_plan
+        base_serp_snapshot = rollback_source.serp_snapshot
+        base_content_brief = rollback_source.content_brief
+        base_on_page_recommendations = rollback_source.on_page_recommendations
+        base_quality_review = rollback_source.quality_review
+        base_publish_review_metadata = rollback_source.publish_review_metadata
         base_title = rollback_source.title
 
     if payload.save_as_new_version or payload.rollback_to_version is not None:
@@ -185,6 +227,12 @@ def update_ai_draft(
             title=base_title,
             canvas_document_json=json.dumps(base_canvas if base_canvas is not None else json.loads(current.canvas_document_json), ensure_ascii=False),
             export_text=base_text if base_text is not None else current.export_text,
+            keyword_plan=base_keyword_plan if base_keyword_plan is not None else current.keyword_plan,
+            serp_snapshot=base_serp_snapshot if base_serp_snapshot is not None else current.serp_snapshot,
+            content_brief=base_content_brief if base_content_brief is not None else current.content_brief,
+            on_page_recommendations=base_on_page_recommendations if base_on_page_recommendations is not None else current.on_page_recommendations,
+            quality_review=base_quality_review if base_quality_review is not None else current.quality_review,
+            publish_review_metadata=base_publish_review_metadata if base_publish_review_metadata is not None else current.publish_review_metadata,
             target_url=payload.target_url.strip() if payload.target_url is not None else current.target_url,
             publication_status=payload.publication_status or current.publication_status,
             version=current.version + 1,
@@ -202,6 +250,18 @@ def update_ai_draft(
         current.canvas_document_json = json.dumps(payload.canvas_document_json, ensure_ascii=False)
     if payload.export_text is not None:
         current.export_text = payload.export_text
+    if payload.keyword_plan is not None:
+        current.keyword_plan = payload.keyword_plan
+    if payload.serp_snapshot is not None:
+        current.serp_snapshot = payload.serp_snapshot
+    if payload.content_brief is not None:
+        current.content_brief = payload.content_brief
+    if payload.on_page_recommendations is not None:
+        current.on_page_recommendations = payload.on_page_recommendations
+    if payload.quality_review is not None:
+        current.quality_review = payload.quality_review
+    if payload.publish_review_metadata is not None:
+        current.publish_review_metadata = payload.publish_review_metadata
     if payload.target_url is not None:
         current.target_url = payload.target_url.strip() or None
     if payload.publication_status is not None:

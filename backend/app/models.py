@@ -1,7 +1,8 @@
 from datetime import datetime, date
 from typing import Optional, List
 from sqlmodel import Field, SQLModel, Relationship
-from sqlalchemy import Index
+from sqlalchemy import Index, Column
+from sqlalchemy.types import JSON
 from enum import Enum
 
 class CrawlStatus(str, Enum):
@@ -182,6 +183,12 @@ class AiContentDraft(SQLModel, table=True):
     title: str
     canvas_document_json: str
     export_text: str
+    keyword_plan: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
+    serp_snapshot: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
+    content_brief: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
+    on_page_recommendations: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
+    quality_review: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
+    publish_review_metadata: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
     target_url: Optional[str] = Field(default=None, index=True)
     publication_status: AiDraftPublicationStatus = Field(default=AiDraftPublicationStatus.DRAFT, index=True)
     version: int = 1
