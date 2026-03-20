@@ -925,10 +925,134 @@ export interface AiGenerateArticleResponse {
   publish_review_plan: AiArticlePublishReviewPlanResult;
 }
 
+export interface AiBriefGenerationRequest {
+  project_id?: number;
+  topic: string;
+  tone?: string;
+  language?: string;
+  target_word_count?: number;
+  keyword_plan: AiArticleKeywordPlanInput;
+  serp_analysis: AiArticleSerpAnalysisInput;
+}
+
+export interface AiBriefGenerationResponse {
+  audience: string;
+  intent: string;
+  outline: string[];
+  entities: string[];
+  internal_links: string[];
+  cta: string;
+  metadata: {
+    seo_title: string;
+    meta_description: string;
+    slug: string;
+  };
+  execution: {
+    draft_generation: AiArticleWorkflowStageInput;
+    on_page_optimization: AiArticleWorkflowStageInput;
+    quality_review: AiArticleWorkflowStageInput;
+    retrospective_record: AiArticleWorkflowStageInput;
+  };
+}
+
+export interface AiKeywordSuggestionMetric {
+  keyword: string;
+  search_volume: number;
+  cpc: number;
+  difficulty: number;
+  intent: string;
+}
+
+export interface AiKeywordSuggestionResponse {
+  provider: string;
+  primary_keyword: string;
+  secondary_keywords: string[];
+  long_tail_questions: string[];
+  supporting_metrics: AiKeywordSuggestionMetric[];
+  intent_signals: string[];
+}
+
+export interface AiSerpResearchItem {
+  rank: number;
+  title: string;
+  url: string;
+  content_type: string;
+  title_angle: string;
+  structure: string;
+  structure_features: string[];
+  word_count: number;
+  word_count_range: string;
+  content_gap: string;
+}
+
+export interface AiSerpResearchResponse {
+  summary: string;
+  top_results: AiSerpResearchItem[];
+  patterns: string[];
+  title_angles: string[];
+  structure_features: string[];
+  content_gaps: string[];
+}
+
+export interface AiDraftRetrospectiveResponse {
+  target_url?: string | null;
+  publication_status: "draft" | "saved" | "published";
+  content_performance?: ContentPerformanceItem | null;
+  ranking?: {
+    tracked_keywords: number;
+    keywords_with_rank: number;
+    avg_rank?: number | null;
+    best_rank?: number | null;
+    top_3: number;
+    top_10: number;
+    latest_checked_at?: string | null;
+    keywords: Array<{ term: string; rank?: number | null; checked_at?: string | null }>;
+  } | null;
+  traffic?: {
+    latest_date?: string | null;
+    sessions_7d: number;
+    conversions_7d: number;
+    sessions_30d: number;
+    conversions_30d: number;
+    conversion_rate_30d: number;
+  } | null;
+  insights: string[];
+}
+
+export async function importAiKeywordSuggestions(
+  payload: { seed_term: string; locale?: string; market?: string; limit?: number },
+): Promise<AiKeywordSuggestionResponse> {
+  const res = await api.post<AiKeywordSuggestionResponse>("/ai/content-orchestration/keyword-suggestions", payload);
+  return res.data;
+}
+
+export async function fetchAiSerpAnalysis(
+  payload: { term: string; locale?: string; market?: string; limit?: number },
+): Promise<AiSerpResearchResponse> {
+  const res = await api.post<AiSerpResearchResponse>("/ai/content-orchestration/serp-analysis", payload);
+  return res.data;
+}
+
+export async function generateAiContentBrief(
+  payload: AiBriefGenerationRequest,
+): Promise<AiBriefGenerationResponse> {
+  const res = await api.post<AiBriefGenerationResponse>("/ai/content-orchestration/brief", payload);
+  return res.data;
+}
+
 export async function generateSeoArticle(
   payload: AiGenerateArticleRequest,
 ): Promise<AiGenerateArticleResponse> {
-  const res = await api.post<AiGenerateArticleResponse>("/ai/generate-article-v2", payload);
+  const res = await api.post<AiGenerateArticleResponse>("/ai/content-orchestration/draft", payload);
+  return res.data;
+}
+
+export async function getAiDraftRetrospective(
+  projectId: string | number,
+  draftId: number,
+  window: "7d" | "30d" | "90d" = "30d",
+): Promise<AiDraftRetrospectiveResponse> {
+  const res = await api.post<AiDraftRetrospectiveResponse>(`/ai/projects/${projectId}/ai-drafts/${draftId}/retrospective`, { window });
   return res.data;
 }
 
@@ -979,6 +1103,8 @@ export async function rewriteContent(
 
 export type AiDraftContentType = "article" | "social";
 
+export type AiDraftPublicationStatus = "draft" | "saved" | "published";
+
 export interface AiContentDraft {
   id: number;
   project_id: number;
@@ -987,6 +1113,8 @@ export interface AiContentDraft {
   title: string;
   canvas_document_json: Record<string, unknown>;
   export_text: string;
+  target_url?: string | null;
+  publication_status: AiDraftPublicationStatus;
   version: number;
   updated_by: number;
   updated_at: string;
@@ -997,12 +1125,16 @@ export interface CreateAiContentDraftPayload {
   title: string;
   canvas_document_json: Record<string, unknown>;
   export_text: string;
+  target_url?: string;
+  publication_status?: AiDraftPublicationStatus;
 }
 
 export interface UpdateAiContentDraftPayload {
   title?: string;
   canvas_document_json?: Record<string, unknown>;
   export_text?: string;
+  target_url?: string;
+  publication_status?: AiDraftPublicationStatus;
   expected_version: number;
   save_as_new_version?: boolean;
   rollback_to_version?: number;

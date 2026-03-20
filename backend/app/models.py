@@ -36,6 +36,12 @@ class AiDraftContentType(str, Enum):
     SOCIAL = "social"
 
 
+class AiDraftPublicationStatus(str, Enum):
+    DRAFT = "draft"
+    SAVED = "saved"
+    PUBLISHED = "published"
+
+
 class AuditActionType(str, Enum):
     LOGIN = "login"
     PROJECT_CREATE = "project_create"
@@ -176,6 +182,8 @@ class AiContentDraft(SQLModel, table=True):
     title: str
     canvas_document_json: str
     export_text: str
+    target_url: Optional[str] = Field(default=None, index=True)
+    publication_status: AiDraftPublicationStatus = Field(default=AiDraftPublicationStatus.DRAFT, index=True)
     version: int = 1
     updated_by: int = Field(foreign_key="user.id", index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
