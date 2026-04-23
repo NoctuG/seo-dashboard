@@ -11,6 +11,7 @@ from app.api.deps import get_current_user, require_project_role
 from app.content_orchestration_service import content_orchestration_service
 from app.core.error_codes import ErrorCode
 from app.db import get_session
+from app.marketing_skills_service import MarketingSkill, marketing_skills_service
 from app.models import Project, ProjectMember, ProjectRoleType, Role, User
 
 router = APIRouter()
@@ -149,6 +150,19 @@ class AgentRunResponse(BaseModel):
     result: dict[str, Any]
 
 
+class MarketingSkillsApplyRequest(BaseModel):
+    skill_id: str = Field(..., min_length=1)
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+class MarketingSkillsApplyResponse(BaseModel):
+    skill: MarketingSkill
+    context: dict[str, Any]
+    injected_prompt: str
+    output_format: list[str]
+    quality_checklist: list[str]
+
+
 @router.post("/content-orchestration/keyword-suggestions", response_model=KeywordSuggestionResponse)
 def get_keyword_suggestions(payload: KeywordSuggestionRequest):
     return content_orchestration_service.suggest_keywords(
@@ -233,6 +247,22 @@ async def run_agent(
         tools=[item.value for item in agent_cls.tools],
         result=result.model_dump(),
     )
+
+
+@router.get("/marketing-skills", response_model=list[MarketingSkill])
+def list_marketing_skills():
+    return marketing_skills_service.list_skills()
+
+
+@router.post("/marketing-skills/apply", response_model=MarketingSkillsApplyResponse)
+def apply_marketing_skill(payload: MarketingSkillsApplyRequest):
+    try:
+        result = marketing_skills_service.apply_skill(payload.skill_id, payload.context)
+    except ValueError as exc:
+        if str(exc) == "skill_not_found":
+            raise HTTPException(status_code=404, detail="MARKETING_SKILL_NOT_FOUND") from exc
+        raise
+    return result
 
 
 @router.post("/projects/{project_id}/ai-drafts/{draft_id}/retrospective", response_model=RetrospectiveResponse)

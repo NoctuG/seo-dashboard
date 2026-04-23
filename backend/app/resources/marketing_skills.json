@@ -1,0 +1,59 @@
+[
+  {
+    "id": "seo-brief-optimizer",
+    "name": "SEO Brief Optimizer",
+    "category": "seo_strategy",
+    "when_to_use": "当你已完成关键词和 SERP 调研，希望将 brief 结构化为可执行写作计划时。",
+    "prompt_template": "你是一名高级 SEO 策略顾问。请基于以下任务上下文输出优化建议：\n任务主题：{{topic}}\n关键词规划：{{keyword_plan}}\nSERP 洞察：{{serp_summary}}\n请补充内容差异化角度、信息增量和可执行提纲。",
+    "output_format": [
+      "strategy_summary",
+      "outline_refinement",
+      "entity_expansion",
+      "risk_flags"
+    ],
+    "quality_checklist": [
+      "是否覆盖搜索意图与用户旅程阶段",
+      "是否提供可执行的信息增量",
+      "是否包含品牌语气与转化目标",
+      "是否识别事实风险与合规风险"
+    ]
+  },
+  {
+    "id": "conversion-cta-crafter",
+    "name": "Conversion CTA Crafter",
+    "category": "conversion",
+    "when_to_use": "当文章已有主体内容，需要补强转化路径、CTA 设计与内链动作时。",
+    "prompt_template": "请以增长内容策略师身份，基于当前任务上下文为文章设计 CTA：\n目标受众：{{audience}}\n内容意图：{{intent}}\n产品价值：{{value_prop}}\n输出高点击但不过度营销的 CTA 方案。",
+    "output_format": [
+      "cta_variants",
+      "placement_plan",
+      "microcopy",
+      "measurement_plan"
+    ],
+    "quality_checklist": [
+      "CTA 是否与内容阶段匹配",
+      "是否提供至少 3 个 CTA 变体",
+      "是否包含可衡量指标",
+      "是否避免夸张或误导表述"
+    ]
+  },
+  {
+    "id": "social-repurpose-playbook",
+    "name": "Social Repurpose Playbook",
+    "category": "distribution",
+    "when_to_use": "当文章初稿完成后，需要拆分为多平台分发素材与复用脚本时。",
+    "prompt_template": "请将当前文章草稿转化为跨平台分发计划。\n文章标题：{{title}}\n核心观点：{{key_points}}\n目标平台：{{channels}}\n要求输出平台化 Hook、结构与互动机制。",
+    "output_format": [
+      "channel_matrix",
+      "hook_bank",
+      "repurpose_snippets",
+      "engagement_prompts"
+    ],
+    "quality_checklist": [
+      "是否针对不同平台做语气与长度适配",
+      "是否提供可直接发布的素材片段",
+      "是否包含互动问题设计",
+      "是否保留品牌一致性"
+    ]
+  }
+]
