@@ -25,6 +25,8 @@ import {
   createAiContentDraft,
   listAiContentDrafts,
   updateAiContentDraft,
+  executeAiCommand,
+  type ExecuteAiCommandResponse,
   api,
 } from '../api';
 import { runWithUiState } from '../utils/asyncAction';
@@ -368,12 +370,56 @@ function HeadingTreeList({ items }: { items: { level: number; text: string }[] }
 export default function AiContentGeneration() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabKey>('article');
+  const [quickProjectId, setQuickProjectId] = useState('');
+  const [quickCommand, setQuickCommand] = useState('/research');
+  const [quickPayload, setQuickPayload] = useState('{\n  "seed_term": ""\n}');
+  const [quickContext, setQuickContext] = useState('{}');
+  const [quickCommandLoading, setQuickCommandLoading] = useState(false);
+  const [quickCommandError, setQuickCommandError] = useState('');
+  const [quickCommandHistory, setQuickCommandHistory] = useState<ExecuteAiCommandResponse[]>([]);
 
   const tabs: { key: TabKey; icon: string; labelKey: string }[] = [
     { key: 'article', icon: 'fa-solid fa-file-lines', labelKey: 'aiContent.tabs.article' },
     { key: 'social', icon: 'fa-solid fa-share-nodes', labelKey: 'aiContent.tabs.social' },
     { key: 'analyze', icon: 'fa-solid fa-magnifying-glass-chart', labelKey: 'aiContent.tabs.analyze' },
   ];
+
+
+  const handleQuickCommandSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setQuickCommandError('');
+
+    const parsedProjectId = Number(quickProjectId);
+    if (!Number.isFinite(parsedProjectId) || parsedProjectId <= 0) {
+      setQuickCommandError('请输入有效的项目 ID。');
+      return;
+    }
+
+    let parsedPayload: Record<string, unknown> = {};
+    let parsedContext: Record<string, unknown> = {};
+    try {
+      parsedPayload = JSON.parse(quickPayload) as Record<string, unknown>;
+      parsedContext = JSON.parse(quickContext) as Record<string, unknown>;
+    } catch {
+      setQuickCommandError('payload/context 必须是合法 JSON。');
+      return;
+    }
+
+    await runWithUiState(async () => {
+      const res = await executeAiCommand({
+        project_id: parsedProjectId,
+        command: quickCommand.trim(),
+        payload: parsedPayload,
+        context: parsedContext,
+      });
+      setQuickCommandHistory((prev) => [res, ...prev].slice(0, 10));
+    }, {
+      setLoading: setQuickCommandLoading,
+      setError: setQuickCommandError,
+      clearErrorValue: '',
+      formatError: (err: unknown) => getErrorMessage(err, '执行命令失败。'),
+    });
+  };
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-6">
@@ -382,6 +428,43 @@ export default function AiContentGeneration() {
           {t('aiContent.title')}
         </h1>
         <p className="md-body-medium mt-1 opacity-60">{t('aiContent.subtitle')}</p>
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <form onSubmit={handleQuickCommandSubmit} className="shape-large border bg-[color:var(--md-sys-color-surface)] p-4 shadow-sm" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+          <h2 className="md-title-medium mb-3 flex items-center gap-2">
+            <i className="fa-solid fa-terminal" style={{ color: 'var(--md-sys-color-primary)' }} />
+            AI 命令输入
+          </h2>
+          <div className="space-y-3">
+            <input className="app-input w-full" placeholder="project_id" value={quickProjectId} onChange={(e) => setQuickProjectId(e.target.value)} />
+            <input className="app-input w-full" placeholder="command，如 /research" value={quickCommand} onChange={(e) => setQuickCommand(e.target.value)} />
+            <textarea className="app-textarea h-24 w-full" value={quickPayload} onChange={(e) => setQuickPayload(e.target.value)} />
+            <textarea className="app-textarea h-20 w-full" value={quickContext} onChange={(e) => setQuickContext(e.target.value)} />
+            {quickCommandError ? <p className="md-body-small text-red-500">{quickCommandError}</p> : null}
+            <button type="submit" className="app-btn app-btn-primary" disabled={quickCommandLoading}>
+              <i className={quickCommandLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-play'} />
+              执行命令
+            </button>
+          </div>
+        </form>
+
+        <div className="shape-large border bg-[color:var(--md-sys-color-surface)] p-4 shadow-sm" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
+          <h2 className="md-title-medium mb-3 flex items-center gap-2">
+            <i className="fa-solid fa-clock-rotate-left" style={{ color: 'var(--md-sys-color-primary)' }} />
+            命令历史
+          </h2>
+          <div className="max-h-72 space-y-2 overflow-y-auto">
+            {quickCommandHistory.length === 0 ? (
+              <p className="md-body-small opacity-70">暂无历史记录。</p>
+            ) : quickCommandHistory.map((item, index) => (
+              <div key={`${item.command}-${index}`} className="rounded-lg border p-2" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                <p className="md-label-large">{item.command} · {item.status}</p>
+                <p className="md-body-small opacity-70">next: {item.next_actions.join(', ') || '—'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Material Design Tabs */}
