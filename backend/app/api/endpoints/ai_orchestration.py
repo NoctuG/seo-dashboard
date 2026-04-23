@@ -4,13 +4,14 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlmodel import Session
+from sqlmodel import Session, select
 
-from app.api.deps import require_project_role
+from app.ai_agents import AgentType, agent_registry
+from app.api.deps import get_current_user, require_project_role
 from app.content_orchestration_service import content_orchestration_service
 from app.core.error_codes import ErrorCode
 from app.db import get_session
-from app.models import Project, ProjectRoleType, User
+from app.models import Project, ProjectMember, ProjectRoleType, Role, User
 
 router = APIRouter()
 
@@ -133,6 +134,21 @@ class RetrospectiveResponse(BaseModel):
     insights: list[str]
 
 
+class AgentRunRequest(BaseModel):
+    project_id: int | None = None
+    agent_type: AgentType
+    task: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentRunResponse(BaseModel):
+    agent_type: AgentType
+    input_schema: dict[str, Any]
+    output_schema: dict[str, Any]
+    system_prompt_template: str
+    tools: list[str]
+    result: dict[str, Any]
+
+
 @router.post("/content-orchestration/keyword-suggestions", response_model=KeywordSuggestionResponse)
 def get_keyword_suggestions(payload: KeywordSuggestionRequest):
     return content_orchestration_service.suggest_keywords(
@@ -176,6 +192,47 @@ async def generate_brief(payload: BriefGenerationRequest, session: Session = Dep
 @router.post("/content-orchestration/draft")
 async def generate_draft_package(payload: dict[str, Any]):
     return await content_orchestration_service.generate_draft_package(payload)
+
+
+@router.post("/content-orchestration/agent-run", response_model=AgentRunResponse)
+async def run_agent(
+    payload: AgentRunRequest,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    agent_cls = agent_registry.get(payload.agent_type)
+    if not agent_cls:
+        raise HTTPException(status_code=404, detail="AGENT_NOT_REGISTERED")
+
+    if agent_cls.required_role == ProjectRoleType.ADMIN and not payload.project_id and not user.is_superuser:
+        raise HTTPException(status_code=403, detail="project_id required for admin agent")
+
+    if payload.project_id:
+        project = session.get(Project, payload.project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
+
+        if not user.is_superuser:
+            membership = session.exec(
+                select(ProjectMember)
+                .join(Role, Role.id == ProjectMember.role_id)
+                .where(ProjectMember.project_id == payload.project_id, ProjectMember.user_id == user.id)
+            ).first()
+            if not membership:
+                raise HTTPException(status_code=403, detail="No project access")
+            role = session.get(Role, membership.role_id)
+            if role and agent_cls.required_role == ProjectRoleType.ADMIN and role.name != ProjectRoleType.ADMIN:
+                raise HTTPException(status_code=403, detail="Agent requires admin role")
+
+    result = await agent_cls.run(payload.task)
+    return AgentRunResponse(
+        agent_type=payload.agent_type,
+        input_schema=agent_cls.input_schema.model_json_schema(),
+        output_schema=agent_cls.output_schema.model_json_schema(),
+        system_prompt_template=agent_cls.system_prompt_template,
+        tools=[item.value for item in agent_cls.tools],
+        result=result.model_dump(),
+    )
 
 
 @router.post("/projects/{project_id}/ai-drafts/{draft_id}/retrospective", response_model=RetrospectiveResponse)
