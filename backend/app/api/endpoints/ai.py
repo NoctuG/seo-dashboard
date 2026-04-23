@@ -7,6 +7,7 @@ import logging
 
 from app.core.error_codes import ErrorCode
 from app.runtime_settings import get_runtime_settings
+from app.seo_scoring_service import SeoScoreContext, score_seo_content
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -214,6 +215,29 @@ class AiRewriteResponse(BaseModel):
     result: str
 
 
+class AiSeoScoreRequest(BaseModel):
+    content: str = Field(..., min_length=1, description="Article content in markdown/plain text")
+    primary_keyword: str = Field(default="", description="Primary target keyword")
+    secondary_keywords: List[str] = Field(default_factory=list, description="Secondary target keywords")
+    search_intent: str = Field(default="", description="Search intent statement")
+    keyword_clusters: List[List[str]] = Field(default_factory=list, description="Keyword cluster groups")
+    target_word_count: Optional[int] = Field(default=None, ge=1, description="Target content length")
+    competitor_word_counts: List[int] = Field(default_factory=list, description="Competitor word counts")
+
+
+class AiSeoScoreMetric(BaseModel):
+    metric: str
+    score: float = Field(..., ge=0, le=100)
+    detail: str
+
+
+class AiSeoScoreResponse(BaseModel):
+    score_total: float = Field(..., ge=0, le=100)
+    score_breakdown: List[AiSeoScoreMetric] = Field(default_factory=list)
+    issues: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+
+
 async def _call_ai(system_prompt: str, user_prompt: str) -> str:
     runtime = get_runtime_settings()
     if not runtime.ai_base_url or not runtime.ai_api_key:
@@ -310,6 +334,20 @@ def _normalize_blocks(blocks: object) -> List[AiContentBlock]:
         ))
 
     return normalized
+
+
+@router.post("/seo-score", response_model=AiSeoScoreResponse)
+async def score_seo_quality(payload: AiSeoScoreRequest):
+    result = score_seo_content(SeoScoreContext(
+        content=payload.content,
+        primary_keyword=payload.primary_keyword,
+        secondary_keywords=payload.secondary_keywords,
+        search_intent=payload.search_intent,
+        keyword_clusters=payload.keyword_clusters,
+        target_word_count=payload.target_word_count,
+        competitor_word_counts=payload.competitor_word_counts,
+    ))
+    return AiSeoScoreResponse(**result)
 
 
 @router.post("/analyze", response_model=AiAnalyzeResponse)
