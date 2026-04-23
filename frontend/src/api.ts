@@ -1019,6 +1019,26 @@ export interface AiDraftRetrospectiveResponse {
   insights: string[];
 }
 
+export type AiAgentType =
+  | "keyword_strategist"
+  | "serp_strategist"
+  | "draft_strategist"
+  | "retrospective_analyst";
+
+export interface AiAgentRunResponse {
+  agent_type: AiAgentType;
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown>;
+  system_prompt_template: string;
+  tools: string[];
+  result: {
+    suggestions: string[];
+    risks: string[];
+    action_items: string[];
+    raw_output?: Record<string, unknown> | null;
+  };
+}
+
 export async function importAiKeywordSuggestions(
   payload: { seed_term: string; locale?: string; market?: string; limit?: number },
 ): Promise<AiKeywordSuggestionResponse> {
@@ -1053,6 +1073,13 @@ export async function getAiDraftRetrospective(
   window: "7d" | "30d" | "90d" = "30d",
 ): Promise<AiDraftRetrospectiveResponse> {
   const res = await api.post<AiDraftRetrospectiveResponse>(`/ai/projects/${projectId}/ai-drafts/${draftId}/retrospective`, { window });
+  return res.data;
+}
+
+export async function runAiContentAgent(
+  payload: { project_id?: number; agent_type: AiAgentType; task: Record<string, unknown> },
+): Promise<AiAgentRunResponse> {
+  const res = await api.post<AiAgentRunResponse>("/ai/content-orchestration/agent-run", payload);
   return res.data;
 }
 

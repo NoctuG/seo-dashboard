@@ -19,6 +19,8 @@ import {
   type AiDraftPublicationStatus,
   type AiDraftRetrospectiveResponse,
   type AiGenerateArticleResponse,
+  type AiAgentType,
+  type AiAgentRunResponse,
   type AiKeywordSuggestionResponse,
   type AiSerpResearchResponse,
   type AiSocialPost,
@@ -26,6 +28,7 @@ import {
   listAiContentDrafts,
   updateAiContentDraft,
   executeAiCommand,
+  runAiContentAgent,
   type ExecuteAiCommandResponse,
   api,
 } from '../api';
@@ -66,6 +69,13 @@ const TONES_SOCIAL = [
   { value: 'professional', labelKey: 'aiContent.tones.professional' },
   { value: 'humorous', labelKey: 'aiContent.tones.humorous' },
   { value: 'inspirational', labelKey: 'aiContent.tones.inspirational' },
+];
+
+const AGENT_OPTIONS: { value: AiAgentType; label: string; description: string }[] = [
+  { value: 'keyword_strategist', label: 'Keyword Strategist', description: '关键词建议与意图规划' },
+  { value: 'serp_strategist', label: 'SERP Strategist', description: 'SERP 格局与内容机会分析' },
+  { value: 'draft_strategist', label: 'Draft Strategist', description: '草稿整合与执行建议' },
+  { value: 'retrospective_analyst', label: 'Retrospective Analyst', description: '复盘洞察与迭代动作' },
 ];
 
 
@@ -540,6 +550,9 @@ function ArticleGenerator() {
   const [serpLoading, setSerpLoading] = useState(false);
   const [briefLoading, setBriefLoading] = useState(false);
   const [retrospectiveLoading, setRetrospectiveLoading] = useState(false);
+  const [agentType, setAgentType] = useState<AiAgentType>('keyword_strategist');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentResult, setAgentResult] = useState<AiAgentRunResponse | null>(null);
 
   const activeDraft = useMemo(() => drafts.find((item) => item.id === activeDraftId) ?? null, [drafts, activeDraftId]);
   const activeStepIndex = ARTICLE_STEP_CONFIG.findIndex((step) => step.key === activeStep);
@@ -785,6 +798,67 @@ function ArticleGenerator() {
     });
   };
 
+  const handleRunAgent = async () => {
+    const task: Record<string, unknown> = (() => {
+      if (agentType === 'keyword_strategist') {
+        return {
+          seed_term: topic.trim() || keywordPlan.primary_keyword.trim(),
+          locale: language,
+          market: inferredMarket,
+          limit: 20,
+        };
+      }
+      if (agentType === 'serp_strategist') {
+        return {
+          term: keywordPlan.primary_keyword.trim() || topic.trim(),
+          locale: language,
+          market: inferredMarket,
+          limit: 10,
+        };
+      }
+      if (agentType === 'draft_strategist') {
+        return {
+          payload: {
+            strategy: {
+              topic,
+              tone,
+              language,
+              target_word_count: wordCount,
+              keyword_plan: {
+                primary_keyword: keywordPlan.primary_keyword.trim(),
+                secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 5),
+                long_tail_questions: filterNonEmpty(keywordPlan.long_tail_questions).slice(0, 5),
+              },
+            },
+            research: { serp_analysis: serpAnalysis },
+            brief: seoBrief,
+            execution: {
+              draft_generation: workflow.drafting,
+              on_page_optimization: workflow.on_page_optimization,
+              quality_review: workflow.quality_review,
+              retrospective_record: workflow.retrospective,
+            },
+          },
+        };
+      }
+      return { retrospective: retrospective ?? {} };
+    })();
+
+    await runWithUiState(async () => {
+      const response = await runAiContentAgent({
+        project_id: typeof projectId === 'number' ? projectId : undefined,
+        agent_type: agentType,
+        task,
+      });
+      setAgentResult(response);
+    }, {
+      setLoading: setAgentLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (err: unknown) => getErrorMessage(err, '运行 Agent 失败。'),
+    });
+  };
+
   const handleRewrite = async () => {
     if (!editableDocument) return;
     await runWithUiState(async () => {
@@ -993,6 +1067,56 @@ function ArticleGenerator() {
                   <option key={project.id} value={project.id}>{project.name}</option>
                 ))}
               </select>
+            </div>
+
+            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fa-solid fa-robot" style={{ color: 'var(--md-sys-color-primary)' }} />
+                <div>
+                  <p className="md-title-small">Agent Orchestration</p>
+                  <p className="md-body-small opacity-70">选择 Agent 并输出建议、风险和行动项。</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <select
+                  value={agentType}
+                  onChange={(event) => setAgentType(event.target.value as AiAgentType)}
+                  className="app-select w-full"
+                >
+                  {AGENT_OPTIONS.map((agent) => (
+                    <option key={agent.value} value={agent.value}>
+                      {agent.label} · {agent.description}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="app-btn app-btn-outline" onClick={() => void handleRunAgent()} disabled={agentLoading}>
+                  <i className={agentLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-play'} />
+                  运行 Agent
+                </button>
+              </div>
+
+              {agentResult && (
+                <div className="mt-4 grid grid-cols-1 gap-3">
+                  <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                    <p className="md-label-large mb-2">建议</p>
+                    <ul className="list-disc space-y-1 pl-5 md-body-small">
+                      {agentResult.result.suggestions.map((item, index) => <li key={`sg-${index}`}>{item}</li>)}
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-error)' }}>
+                    <p className="md-label-large mb-2">风险</p>
+                    <ul className="list-disc space-y-1 pl-5 md-body-small">
+                      {agentResult.result.risks.map((item, index) => <li key={`rk-${index}`}>{item}</li>)}
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border p-3" style={{ borderColor: 'var(--md-sys-color-tertiary)' }}>
+                    <p className="md-label-large mb-2">行动项</p>
+                    <ul className="list-disc space-y-1 pl-5 md-body-small">
+                      {agentResult.result.action_items.map((item, index) => <li key={`ac-${index}`}>{item}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
