@@ -787,6 +787,11 @@ export interface AiArticleStrategyInput {
   tone?: string;
   language?: string;
   target_word_count?: number;
+  marketing_skills?: Array<{
+    id: string;
+    name: string;
+    injected_prompt: string;
+  }>;
   keyword_plan: AiArticleKeywordPlanInput;
 }
 
@@ -1159,6 +1164,7 @@ export interface AiDraftKeywordPlanContext {
   tone?: string;
   language?: string;
   target_word_count?: number;
+  applied_skills?: MarketingSkillApplyResult[];
   plan?: AiArticleKeywordPlanInput;
   intent?: AiArticleIntentSummary;
   suggestions?: AiKeywordSuggestionResponse | null;
@@ -1254,6 +1260,37 @@ export async function updateAiContentDraft(
   payload: UpdateAiContentDraftPayload,
 ): Promise<AiContentDraft> {
   const res = await api.put<AiContentDraft>(`/ai-drafts/${draftId}`, payload);
+  return res.data;
+}
+
+export interface MarketingSkill {
+  id: string;
+  name: string;
+  category: string;
+  when_to_use: string;
+  prompt_template: string;
+  output_format: string[];
+  quality_checklist: string[];
+}
+
+export interface MarketingSkillApplyResult {
+  skill: MarketingSkill;
+  context: Record<string, unknown>;
+  injected_prompt: string;
+  output_format: string[];
+  quality_checklist: string[];
+}
+
+export async function listMarketingSkills(): Promise<MarketingSkill[]> {
+  const res = await api.get<MarketingSkill[]>('/ai/marketing-skills');
+  return res.data;
+}
+
+export async function applyMarketingSkill(
+  skill_id: string,
+  context: Record<string, unknown>,
+): Promise<MarketingSkillApplyResult> {
+  const res = await api.post<MarketingSkillApplyResult>('/ai/marketing-skills/apply', { skill_id, context });
   return res.data;
 }
 export interface AuthorityResponse {

@@ -27,6 +27,10 @@ import {
   createAiContentDraft,
   listAiContentDrafts,
   updateAiContentDraft,
+  listMarketingSkills,
+  applyMarketingSkill,
+  type MarketingSkill,
+  type MarketingSkillApplyResult,
   executeAiCommand,
   runAiContentAgent,
   type ExecuteAiCommandResponse,
@@ -553,10 +557,24 @@ function ArticleGenerator() {
   const [agentType, setAgentType] = useState<AiAgentType>('keyword_strategist');
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentResult, setAgentResult] = useState<AiAgentRunResponse | null>(null);
+  const [skillsDrawerOpen, setSkillsDrawerOpen] = useState(false);
+  const [skills, setSkills] = useState<MarketingSkill[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [skillCategory, setSkillCategory] = useState('all');
+  const [applyingSkillId, setApplyingSkillId] = useState<string | null>(null);
+  const [appliedSkills, setAppliedSkills] = useState<MarketingSkillApplyResult[]>([]);
 
   const activeDraft = useMemo(() => drafts.find((item) => item.id === activeDraftId) ?? null, [drafts, activeDraftId]);
   const activeStepIndex = ARTICLE_STEP_CONFIG.findIndex((step) => step.key === activeStep);
   const inferredMarket = useMemo(() => (language.toLowerCase().startsWith('zh') ? 'cn' : 'us'), [language]);
+  const skillCategories = useMemo(
+    () => ['all', ...Array.from(new Set(skills.map((item) => item.category)))],
+    [skills],
+  );
+  const visibleSkills = useMemo(
+    () => skills.filter((item) => skillCategory === 'all' || item.category === skillCategory),
+    [skillCategory, skills],
+  );
 
   const goToStep = (step: ArticleStepKey) => setActiveStep(step);
   const goToPreviousStep = () => {
@@ -744,6 +762,11 @@ function ArticleGenerator() {
           tone,
           language,
           target_word_count: wordCount,
+          marketing_skills: appliedSkills.map((item) => ({
+            id: item.skill.id,
+            name: item.skill.name,
+            injected_prompt: item.injected_prompt,
+          })),
           keyword_plan: {
             primary_keyword: keywordPlan.primary_keyword.trim(),
             secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 5),
@@ -890,6 +913,43 @@ function ArticleGenerator() {
     setDrafts(data);
   }, [projectId]);
 
+  useEffect(() => {
+    void runWithUiState(async () => {
+      const data = await listMarketingSkills();
+      setSkills(data);
+    }, {
+      setLoading: setSkillsLoading,
+      setError,
+      clearErrorValue: '',
+      formatError: (err: unknown) => getErrorMessage(err, '加载技能库失败。'),
+    });
+  }, []);
+
+  const handleApplySkill = async (skill: MarketingSkill) => {
+    const context: Record<string, unknown> = {
+      topic: topic.trim(),
+      keyword_plan: keywordPlan.primary_keyword.trim(),
+      serp_summary: serpAnalysis.summary.trim(),
+      audience: seoBrief.audience.trim(),
+      intent: seoBrief.intent.trim(),
+      title: result?.draft.title || topic.trim(),
+    };
+
+    await runWithUiState(async () => {
+      setApplyingSkillId(skill.id);
+      const applied = await applyMarketingSkill(skill.id, context);
+      setAppliedSkills((prev) => {
+        const deduped = prev.filter((item) => item.skill.id !== skill.id);
+        return [...deduped, applied];
+      });
+    }, {
+      setError,
+      clearErrorValue: '',
+      formatError: (err: unknown) => getErrorMessage(err, '注入技能失败。'),
+    });
+    setApplyingSkillId(null);
+  };
+
   const handleSaveDraft = async (saveAsNewVersion = false) => {
     const pid = typeof projectId === 'number' ? projectId : null;
     if (!pid || !editableDocument) return;
@@ -899,6 +959,7 @@ function ArticleGenerator() {
       tone,
       language,
       target_word_count: wordCount,
+      applied_skills: appliedSkills,
       plan: {
         primary_keyword: keywordPlan.primary_keyword.trim(),
         secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 5),
@@ -1004,6 +1065,7 @@ function ArticleGenerator() {
     setTone(draft.keyword_plan.tone ?? 'professional');
     setLanguage(draft.keyword_plan.language ?? 'zh-CN');
     setWordCount(draft.keyword_plan.target_word_count ?? 1500);
+    setAppliedSkills(draft.keyword_plan.applied_skills ?? []);
     setKeywordPlan(restoredKeywordPlan);
     setKeywordSuggestionData(draft.keyword_plan.suggestions ?? null);
     setSerpAnalysis(restoredSerpAnalysis);
@@ -1181,6 +1243,71 @@ function ArticleGenerator() {
                   <div className="mt-1 text-center md-label-medium opacity-60">{wordCount} {t('aiContent.article.words')}</div>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--md-sys-color-primary)' }} />
+                  <div>
+                    <p className="md-title-small">营销技能库</p>
+                    <p className="md-body-small opacity-70">按分类筛选技能，并注入到当前任务上下文。</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setSkillsDrawerOpen((prev) => !prev)} className="app-btn app-btn-outline">
+                  {skillsDrawerOpen ? '收起技能库' : '打开技能库'}
+                </button>
+              </div>
+              {appliedSkills.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {appliedSkills.map((item) => (
+                    <span
+                      key={item.skill.id}
+                      className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs"
+                      style={{ background: 'var(--md-sys-color-secondary-container)', color: 'var(--md-sys-color-on-secondary-container)' }}
+                    >
+                      <i className="fa-solid fa-check" />
+                      {item.skill.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {skillsDrawerOpen && (
+                <div className="rounded-xl border p-3 space-y-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                  <div className="flex items-center gap-2">
+                    <label className="md-label-large">分类筛选</label>
+                    <select value={skillCategory} onChange={(e) => setSkillCategory(e.target.value)} className="app-select w-full">
+                      {skillCategories.map((category) => (
+                        <option key={category} value={category}>
+                          {category === 'all' ? '全部分类' : category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {skillsLoading && <p className="md-body-small opacity-70">技能加载中...</p>}
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {visibleSkills.map((skill) => (
+                      <div key={skill.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="md-label-large">{skill.name}</p>
+                            <p className="md-body-small opacity-70 mt-1">{skill.when_to_use}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleApplySkill(skill)}
+                            disabled={applyingSkillId === skill.id}
+                            className="app-btn app-btn-outline"
+                          >
+                            <i className={applyingSkillId === skill.id ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plug'} />
+                            注入
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
