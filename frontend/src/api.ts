@@ -1056,6 +1056,28 @@ export async function getAiDraftRetrospective(
   return res.data;
 }
 
+
+export interface ExecuteAiCommandRequest {
+  project_id: number;
+  command: string;
+  payload: Record<string, unknown>;
+  context: Record<string, unknown>;
+}
+
+export interface ExecuteAiCommandResponse {
+  command: string;
+  status: string;
+  output: unknown;
+  next_actions: string[];
+}
+
+export async function executeAiCommand(
+  payload: ExecuteAiCommandRequest,
+): Promise<ExecuteAiCommandResponse> {
+  const res = await api.post<ExecuteAiCommandResponse>("/ai/commands/execute", payload);
+  return res.data;
+}
+
 export interface AiGenerateSocialRequest {
   topic: string;
   platform?: string;
