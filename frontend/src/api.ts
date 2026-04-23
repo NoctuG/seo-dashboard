@@ -920,6 +920,29 @@ export interface AiArticlePublishReviewPlanResult {
   iteration_ideas: string[];
 }
 
+export interface AiSeoScoreMetric {
+  metric: string;
+  score: number;
+  detail: string;
+}
+
+export interface AiSeoScoreRequest {
+  content: string;
+  primary_keyword?: string;
+  secondary_keywords?: string[];
+  search_intent?: string;
+  keyword_clusters?: string[][];
+  target_word_count?: number;
+  competitor_word_counts?: number[];
+}
+
+export interface AiSeoScoreResponse {
+  score_total: number;
+  score_breakdown: AiSeoScoreMetric[];
+  issues: string[];
+  recommendations: string[];
+}
+
 export interface AiGenerateArticleResponse {
   keyword_plan: AiArticleKeywordPlanResult;
   serp_summary: AiArticleSerpSummary;
@@ -1069,6 +1092,13 @@ export async function generateSeoArticle(
   payload: AiGenerateArticleRequest,
 ): Promise<AiGenerateArticleResponse> {
   const res = await api.post<AiGenerateArticleResponse>("/ai/content-orchestration/draft", payload);
+  return res.data;
+}
+
+export async function scoreSeoContent(
+  payload: AiSeoScoreRequest,
+): Promise<AiSeoScoreResponse> {
+  const res = await api.post<AiSeoScoreResponse>("/ai/seo-score", payload);
   return res.data;
 }
 

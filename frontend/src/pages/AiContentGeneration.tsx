@@ -33,6 +33,8 @@ import {
   type MarketingSkillApplyResult,
   executeAiCommand,
   runAiContentAgent,
+  scoreSeoContent,
+  type AiSeoScoreResponse,
   type ExecuteAiCommandResponse,
   api,
 } from '../api';
@@ -537,6 +539,7 @@ function ArticleGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AiGenerateArticleResponse | null>(null);
+  const [seoScore, setSeoScore] = useState<AiSeoScoreResponse | null>(null);
   const [editableDocument, setEditableDocument] = useState<CanvasDocument | null>(null);
   const [rewriting, setRewriting] = useState(false);
   const [rewriteInstruction, setRewriteInstruction] = useState('');
@@ -575,6 +578,33 @@ function ArticleGenerator() {
     () => skills.filter((item) => skillCategory === 'all' || item.category === skillCategory),
     [skillCategory, skills],
   );
+  const mergedQualityRisks = useMemo(
+    () => Array.from(new Set([...(result?.quality_review.risks ?? []), ...(seoScore?.issues ?? [])])),
+    [result, seoScore],
+  );
+  const mergedQualityFixes = useMemo(
+    () => Array.from(new Set([...(result?.quality_review.fixes ?? []), ...(seoScore?.recommendations ?? [])])),
+    [result, seoScore],
+  );
+
+  const runSeoScoring = useCallback(async (article: AiGenerateArticleResponse) => {
+    const data = await scoreSeoContent({
+      content: article.draft.content,
+      primary_keyword: keywordPlan.primary_keyword.trim(),
+      secondary_keywords: filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 5),
+      search_intent: seoBrief.intent.trim(),
+      keyword_clusters: [
+        [keywordPlan.primary_keyword.trim()],
+        filterNonEmpty(keywordPlan.secondary_keywords).slice(0, 3),
+        filterNonEmpty(keywordPlan.long_tail_questions).slice(0, 3),
+      ].filter((cluster) => cluster.length > 0),
+      target_word_count: wordCount,
+      competitor_word_counts: serpAnalysis.top_results
+        .map((entry) => entry.word_count)
+        .filter((count) => Number.isFinite(count) && count > 0),
+    });
+    setSeoScore(data);
+  }, [keywordPlan, seoBrief.intent, serpAnalysis.top_results, wordCount]);
 
   const goToStep = (step: ArticleStepKey) => setActiveStep(step);
   const goToPreviousStep = () => {
@@ -754,6 +784,7 @@ function ArticleGenerator() {
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setResult(null);
+    setSeoScore(null);
     await runWithUiState(async () => {
       const data = await generateSeoArticle({
         article_mode: 'workflow_v2',
@@ -807,6 +838,7 @@ function ArticleGenerator() {
         },
       });
       setResult(data);
+      await runSeoScoring(data);
       const structuredBlocks = data.draft.blocks ?? [];
       setEditableDocument(
         structuredBlocks.length > 0
@@ -891,14 +923,22 @@ function ArticleGenerator() {
         language,
       });
       setEditableDocument(articleMarkdownToCanvas(data.result, result?.draft.title));
-      setResult((prev) => prev ? {
-        ...prev,
-        draft: {
-          ...prev.draft,
-          content: data.result,
-          blocks: [],
-        },
-      } : prev);
+      let updatedResult: AiGenerateArticleResponse | null = null;
+      setResult((prev) => {
+        if (!prev) return prev;
+        updatedResult = {
+          ...prev,
+          draft: {
+            ...prev.draft,
+            content: data.result,
+            blocks: [],
+          },
+        };
+        return updatedResult;
+      });
+      if (updatedResult) {
+        await runSeoScoring(updatedResult);
+      }
     }, {
       setLoading: setRewriting,
       setError,
@@ -1076,7 +1116,14 @@ function ArticleGenerator() {
     setPublicationStatus(draft.publication_status);
     setRetrospective(draft.publish_review_metadata?.retrospective ?? null);
     setEditableDocument(draft.canvas_document_json as unknown as CanvasDocument);
-    setResult(buildResultFromDraft(draft, restoredSeoBrief));
+    const restoredResult = buildResultFromDraft(draft, restoredSeoBrief);
+    setResult(restoredResult);
+    void runWithUiState(async () => {
+      await runSeoScoring(restoredResult);
+    }, {
+      setError,
+      formatError: (err: unknown) => getErrorMessage(err, '加载 SEO 质量评分失败。'),
+    });
     setActiveStep('execution');
   };
 
@@ -1738,11 +1785,35 @@ function ArticleGenerator() {
                 </div>
                 <div className="mt-3">
                   <p className="mb-2 md-label-large">风险</p>
-                  <ResultList items={result.quality_review.risks} />
+                  <ResultList items={mergedQualityRisks} />
                 </div>
                 <div className="mt-3">
                   <p className="mb-2 md-label-large">修正建议</p>
-                  <ResultList items={result.quality_review.fixes} />
+                  <ResultList items={mergedQualityFixes} />
+                </div>
+              </ResultCard>
+
+              <ResultCard title="SEO 质量评级" icon="fa-solid fa-chart-line">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="md-label-large opacity-75">综合得分</p>
+                    <p className="text-3xl font-semibold">{Math.round(seoScore?.score_total ?? 0)} / 100</p>
+                  </div>
+                  <p className="md-body-small opacity-70">基于意图、密度、聚类、篇幅与可读性</p>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {(seoScore?.score_breakdown ?? []).map((item) => (
+                    <div key={item.metric}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span>{item.metric}</span>
+                        <span>{Math.round(item.score)}</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-black/10">
+                        <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(item.score, 100))}%`, background: 'var(--md-sys-color-primary)' }} />
+                      </div>
+                      <p className="mt-1 md-body-small opacity-70">{item.detail}</p>
+                    </div>
+                  ))}
                 </div>
               </ResultCard>
 
