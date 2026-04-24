@@ -326,6 +326,12 @@ const ARTICLE_STEP_CONFIG: { key: ArticleStepKey; title: string; description: st
 ];
 
 const filterNonEmpty = (values: string[]) => values.map((value) => value.trim()).filter(Boolean);
+const formatIsoDateTime = (value?: string | null) => {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+};
 
 function ResultCard({
   title,
@@ -551,6 +557,7 @@ function ArticleGenerator() {
   const [keywordSuggestionData, setKeywordSuggestionData] = useState<AiKeywordSuggestionResponse | null>(null);
   const [serpResearchData, setSerpResearchData] = useState<AiSerpResearchResponse | null>(null);
   const [retrospective, setRetrospective] = useState<AiDraftRetrospectiveResponse | null>(null);
+  const [liveContext, setLiveContext] = useState<Record<string, unknown> | null>(null);
   const [targetUrl, setTargetUrl] = useState('');
   const [publicationStatus, setPublicationStatus] = useState<AiDraftPublicationStatus>('draft');
   const [keywordLoading, setKeywordLoading] = useState(false);
@@ -755,6 +762,7 @@ function ArticleGenerator() {
         quality_review: { goal: data.execution.quality_review.goal, notes: data.execution.quality_review.notes ?? '' },
         retrospective: { goal: data.execution.retrospective_record.goal, notes: data.execution.retrospective_record.notes ?? '' },
       });
+      setLiveContext((data.live_context as Record<string, unknown> | null) ?? null);
       setActiveStep('seo_brief');
     }, {
       setLoading: setBriefLoading,
@@ -773,6 +781,7 @@ function ArticleGenerator() {
     await runWithUiState(async () => {
       const data = await getAiDraftRetrospective(pid, activeDraft.id, '30d');
       setRetrospective(data);
+      setLiveContext((data.live_context as Record<string, unknown> | null) ?? null);
     }, {
       setLoading: setRetrospectiveLoading,
       setError,
@@ -789,6 +798,7 @@ function ArticleGenerator() {
       const data = await generateSeoArticle({
         article_mode: 'workflow_v2',
         strategy: {
+          project_id: typeof projectId === 'number' ? projectId : undefined,
           topic,
           tone,
           language,
@@ -1115,6 +1125,7 @@ function ArticleGenerator() {
     setTargetUrl(draft.target_url ?? '');
     setPublicationStatus(draft.publication_status);
     setRetrospective(draft.publish_review_metadata?.retrospective ?? null);
+    setLiveContext((draft.publish_review_metadata?.retrospective?.live_context as Record<string, unknown> | null) ?? null);
     setEditableDocument(draft.canvas_document_json as unknown as CanvasDocument);
     const restoredResult = buildResultFromDraft(draft, restoredSeoBrief);
     setResult(restoredResult);
@@ -1922,10 +1933,42 @@ function ArticleGenerator() {
               </div>
             </div>
 
+            {liveContext && (
+              <ResultCard title="Live Data Context" icon="fa-solid fa-database">
+                <p className="md-body-small opacity-80">以下为最近同步状态，不代表严格实时；请参考来源时间戳。</p>
+                {Object.entries(((liveContext.sources as Record<string, unknown>) ?? {})).map(([name, raw]) => {
+                  const source = (raw as Record<string, unknown>) ?? {};
+                  return (
+                    <div key={name} className="mt-2 rounded-lg border p-2 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                      <p>{name} · 状态：{String(source.status ?? 'unknown')}</p>
+                      <p className="opacity-75">最新同步：{formatIsoDateTime(source.latest_sync_at as string | undefined)} · 置信度：{String(source.confidence ?? 'unknown')}</p>
+                    </div>
+                  );
+                })}
+                <p className="mt-2 md-body-small opacity-70">Context 生成时间：{formatIsoDateTime((liveContext.generated_at as string | undefined) ?? null)}</p>
+              </ResultCard>
+            )}
+
             {retrospective && (
               <ResultCard title="Retrospective" icon="fa-solid fa-chart-column">
                 <p className="md-body-small opacity-80">目标 URL：{retrospective.target_url || '—'}</p>
                 <p className="mt-1 md-body-small opacity-80">发布状态：{retrospective.publication_status}</p>
+                {liveContext && (
+                  <div className="mt-3 rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                    <p className="md-label-large">数据来源状态</p>
+                    <p className="mt-1 opacity-80">说明：页面展示的是“最新同步数据”，非严格实时。请以各来源时间戳为准。</p>
+                    {Object.entries(((liveContext.sources as Record<string, unknown>) ?? {})).map(([name, raw]) => {
+                      const source = (raw as Record<string, unknown>) ?? {};
+                      return (
+                        <div key={name} className="mt-2 rounded border px-2 py-1" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>
+                          <p>{name} · 状态：{String(source.status ?? 'unknown')}</p>
+                          <p className="opacity-80">最新同步：{formatIsoDateTime(source.latest_sync_at as string | undefined)} · 置信度：{String(source.confidence ?? 'unknown')}</p>
+                        </div>
+                      );
+                    })}
+                    <p className="mt-2 opacity-70">上下文生成时间：{formatIsoDateTime((liveContext.generated_at as string | undefined) ?? null)}</p>
+                  </div>
+                )}
                 {retrospective.content_performance && (
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                     <div className="rounded-lg border p-3 md-body-small" style={{ borderColor: 'var(--md-sys-color-outline-variant)' }}>30 天会话：{retrospective.content_performance.sessions}</div>

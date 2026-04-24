@@ -783,6 +783,7 @@ export interface AiArticleKeywordPlanInput {
 }
 
 export interface AiArticleStrategyInput {
+  project_id?: number;
   topic: string;
   tone?: string;
   language?: string;
@@ -981,6 +982,7 @@ export interface AiBriefGenerationResponse {
     quality_review: AiArticleWorkflowStageInput;
     retrospective_record: AiArticleWorkflowStageInput;
   };
+  live_context?: Record<string, unknown> | null;
 }
 
 export interface AiKeywordSuggestionMetric {
@@ -1045,6 +1047,7 @@ export interface AiDraftRetrospectiveResponse {
     conversion_rate_30d: number;
   } | null;
   insights: string[];
+  live_context?: Record<string, unknown> | null;
 }
 
 export type AiAgentType =
