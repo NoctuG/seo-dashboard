@@ -189,6 +189,7 @@ class AiContentDraft(SQLModel, table=True):
     on_page_recommendations: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
     quality_review: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
     publish_review_metadata: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
+    brand_context_version: Optional[str] = Field(default=None, index=True)
     target_url: Optional[str] = Field(default=None, index=True)
     publication_status: AiDraftPublicationStatus = Field(default=AiDraftPublicationStatus.DRAFT, index=True)
     version: int = 1

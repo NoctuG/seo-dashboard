@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from fastapi import Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import httpx
@@ -8,6 +9,11 @@ import logging
 from app.core.error_codes import ErrorCode
 from app.runtime_settings import get_runtime_settings
 from app.seo_scoring_service import SeoScoreContext, score_seo_content
+from app.brand_guardrail_validator import brand_guardrail_validator
+from app.content_orchestration_service import content_orchestration_service
+from app.db import get_session
+from app.models import Project
+from sqlmodel import Session
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -72,6 +78,7 @@ class AiArticleWorkflowStage(BaseModel):
 
 
 class AiArticleStrategy(BaseModel):
+    project_id: Optional[int] = Field(default=None, ge=1, description="Project ID for brand context")
     topic: str = Field(..., min_length=1, description="Article topic")
     tone: str = Field(default="professional", description="Writing tone: professional, casual, authoritative, friendly")
     language: str = Field(default="zh-CN", description="Output language")
@@ -183,6 +190,7 @@ class AiGenerateArticleResponse(BaseModel):
     on_page: AiArticleOnPage
     quality_review: AiArticleQualityReview
     publish_review_plan: AiArticlePublishReviewPlan
+    brand_guardrail: dict = Field(default_factory=dict)
 
 
 class AiGenerateSocialRequest(BaseModel):
@@ -401,18 +409,18 @@ async def analyze_with_ai(payload: AiAnalyzeRequest):
 
 
 def _default_article_response(payload: AiGenerateArticleRequest) -> AiGenerateArticleResponse:
-    fallback_keywords = [payload.keyword_plan.primary_keyword, *payload.keyword_plan.secondary_keywords]
-    heading_tree = [AiArticleHeadingNode(level=2, text=item) for item in payload.seo_brief.outline if item.strip()]
-    summary = payload.serp_analysis.summary or f"围绕 {payload.topic} 的结构化 SEO 草稿。"
+    fallback_keywords = [payload.strategy.keyword_plan.primary_keyword, *payload.strategy.keyword_plan.secondary_keywords]
+    heading_tree = [AiArticleHeadingNode(level=2, text=item) for item in payload.brief.outline if item.strip()]
+    summary = payload.research.serp_analysis.summary or f"围绕 {payload.strategy.topic} 的结构化 SEO 草稿。"
 
     return AiGenerateArticleResponse(
         keyword_plan=AiArticleKeywordPlanResult(
-            primary_keyword=payload.keyword_plan.primary_keyword,
-            secondary_keywords=payload.keyword_plan.secondary_keywords,
-            long_tail_questions=payload.keyword_plan.long_tail_questions,
+            primary_keyword=payload.strategy.keyword_plan.primary_keyword,
+            secondary_keywords=payload.strategy.keyword_plan.secondary_keywords,
+            long_tail_questions=payload.strategy.keyword_plan.long_tail_questions,
             intent=AiArticleIntentSummary(
-                summary=payload.seo_brief.intent,
-                target_audience=payload.seo_brief.audience,
+                summary=payload.brief.intent,
+                target_audience=payload.brief.audience,
             ),
         ),
         serp_summary=AiArticleSerpSummary(
@@ -422,27 +430,27 @@ def _default_article_response(payload: AiGenerateArticleRequest) -> AiGenerateAr
             differentiators=[],
         ),
         brief=AiArticleBrief(
-            title_tag=payload.seo_brief.metadata.seo_title,
-            meta_description=payload.seo_brief.metadata.meta_description,
-            url_slug=payload.seo_brief.metadata.slug,
+            title_tag=payload.brief.metadata.seo_title,
+            meta_description=payload.brief.metadata.meta_description,
+            url_slug=payload.brief.metadata.slug,
             heading_tree=heading_tree,
-            internal_links=payload.seo_brief.internal_links,
+            internal_links=payload.brief.internal_links,
             image_alt=[],
             schema_recommendations=[],
         ),
         draft=AiArticleDraft(
-            title=payload.seo_brief.metadata.seo_title or payload.topic,
+            title=payload.brief.metadata.seo_title or payload.strategy.topic,
             summary=summary,
-            content=f"# {payload.seo_brief.metadata.seo_title or payload.topic}\n",
+            content=f"# {payload.brief.metadata.seo_title or payload.strategy.topic}\n",
             keywords_used=[kw for kw in fallback_keywords if kw],
             blocks=[],
         ),
         on_page=AiArticleOnPage(
-            title_tag=payload.seo_brief.metadata.seo_title,
-            meta_description=payload.seo_brief.metadata.meta_description,
-            url_slug=payload.seo_brief.metadata.slug,
+            title_tag=payload.brief.metadata.seo_title,
+            meta_description=payload.brief.metadata.meta_description,
+            url_slug=payload.brief.metadata.slug,
             heading_tree=heading_tree,
-            internal_links=payload.seo_brief.internal_links,
+            internal_links=payload.brief.internal_links,
             image_alt=[],
             schema_recommendations=[],
             checklist=[],
@@ -462,6 +470,7 @@ def _default_article_response(payload: AiGenerateArticleRequest) -> AiGenerateAr
             post_publish_metrics=[],
             iteration_ideas=[],
         ),
+        brand_guardrail={},
     )
 
 
@@ -469,7 +478,7 @@ def _default_article_response(payload: AiGenerateArticleRequest) -> AiGenerateAr
 def _build_article_response(raw: str, payload: AiGenerateArticleRequest) -> AiGenerateArticleResponse:
     parsed = _extract_json(raw)
     if parsed is None:
-        logger.warning("ai.generate_article.structured_parse_failed", extra={"topic": payload.topic})
+        logger.warning("ai.generate_article.structured_parse_failed", extra={"topic": payload.strategy.topic})
         return _default_article_response(payload)
 
     keyword_plan_data = parsed.get("keyword_plan") if isinstance(parsed.get("keyword_plan"), dict) else {}
@@ -558,6 +567,7 @@ def _build_article_response(raw: str, payload: AiGenerateArticleRequest) -> AiGe
             post_publish_metrics=_string_list(publish_plan_data.get("post_publish_metrics")),
             iteration_ideas=_string_list(publish_plan_data.get("iteration_ideas")),
         ),
+        brand_guardrail={},
     )
 
 
@@ -598,17 +608,21 @@ async def generate_seo_article(payload: LegacyAiGenerateArticleRequest):
 
     raw = await _call_ai(system_prompt, user_prompt)
     workflow_payload = AiGenerateArticleRequest(
-        topic=payload.topic,
-        tone=payload.tone,
-        language=payload.language,
-        word_count=payload.word_count,
-        keyword_plan=AiArticleKeywordPlan(
-            primary_keyword=payload.topic,
-            secondary_keywords=payload.keywords[:5],
-            long_tail_questions=[],
+        strategy=AiArticleStrategy(
+            topic=payload.topic,
+            tone=payload.tone,
+            language=payload.language,
+            target_word_count=payload.word_count,
+            keyword_plan=AiArticleKeywordPlan(
+                primary_keyword=payload.topic,
+                secondary_keywords=payload.keywords[:5],
+                long_tail_questions=[],
+            ),
         ),
-        serp_analysis=AiArticleSerpAnalysis(summary=None, top_results=[]),
-        seo_brief=AiArticleSeoBrief(
+        research=AiArticleResearch(
+            serp_analysis=AiArticleSerpAnalysis(summary=None, top_results=[]),
+        ),
+        brief=AiArticleSeoBrief(
             audience="通用搜索用户",
             intent="获取与主题相关的完整信息",
             outline=[item.strip() for item in (payload.outline or "").splitlines() if item.strip()] or [payload.topic],
@@ -621,18 +635,18 @@ async def generate_seo_article(payload: LegacyAiGenerateArticleRequest):
                 slug=payload.topic.lower().replace(" ", "-"),
             ),
         ),
-        workflow=AiArticleWorkflow(
-            drafting=AiArticleWorkflowStage(goal="输出完整 SEO 初稿", notes=None),
+        execution=AiArticleExecution(
+            draft_generation=AiArticleWorkflowStage(goal="输出完整 SEO 初稿", notes=None),
             on_page_optimization=AiArticleWorkflowStage(goal="补齐基础 on-page 元素", notes=None),
             quality_review=AiArticleWorkflowStage(goal="完成基础质量审校", notes=None),
-            retrospective=AiArticleWorkflowStage(goal="给出发布后复盘建议", notes=None),
+            retrospective_record=AiArticleWorkflowStage(goal="给出发布后复盘建议", notes=None),
         ),
     )
     return _build_article_response(raw, workflow_payload)
 
 
 @router.post("/generate-article-v2", response_model=AiGenerateArticleResponse)
-async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
+async def generate_seo_article_v2(payload: AiGenerateArticleRequest, session: Session = Depends(get_session)):
     lang_hint = "请用中文回复。" if payload.strategy.language.startswith("zh") else f"Please respond in {payload.strategy.language}."
     keyword_plan = payload.strategy.keyword_plan
     seo_brief = payload.brief
@@ -651,15 +665,18 @@ async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
         f"{lang_hint}"
     )
 
+    project = session.get(Project, payload.strategy.project_id) if payload.strategy.project_id else None
+    brand_context = content_orchestration_service.build_brand_context(project)
+
     user_prompt = (
         f"请根据以下结构化工作流生成 SEO 文章方案与初稿。\n\n"
-        f"[文章主题]\n{payload.topic}\n\n"
+        f"[文章主题]\n{payload.strategy.topic}\n\n"
         f"[关键词规划]\n"
         f"主关键词: {keyword_plan.primary_keyword}\n"
         f"次关键词: {', '.join(keyword_plan.secondary_keywords)}\n"
         f"长尾问题:\n{long_tail_rows}\n\n"
         f"[SERP 分析]\n"
-        f"总结: {payload.serp_analysis.summary or '无'}\n"
+        f"总结: {payload.research.serp_analysis.summary or '无'}\n"
         f"前10名观察:\n{serp_rows or '- 无'}\n\n"
         f"[SEO Brief]\n"
         f"Audience: {seo_brief.audience}\n"
@@ -678,9 +695,10 @@ async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
         f"质量审校备注: {payload.execution.quality_review.notes or '无'}\n"
         f"复盘记录目标: {payload.execution.retrospective_record.goal}\n"
         f"复盘备注: {payload.execution.retrospective_record.notes or '无'}\n\n"
+        f"[品牌约束]\n{json.dumps(brand_context, ensure_ascii=False)}\n\n"
         f"[输出要求]\n"
-        f"- 文风: {payload.tone}\n"
-        f"- 目标字数: 约{payload.word_count}字\n"
+        f"- 文风: {payload.strategy.tone}\n"
+        f"- 目标字数: 约{payload.strategy.target_word_count}字\n"
         f"- draft.content 使用 Markdown，需包含清晰的 H2/H3、列表、示例、CTA。\n"
         f"- 你必须分别输出以下内容：\n"
         f"  1. 搜索意图摘要与目标读者。\n"
@@ -747,8 +765,17 @@ async def generate_seo_article_v2(payload: AiGenerateArticleRequest):
     )
 
     raw = await _call_ai(system_prompt, user_prompt)
-    fallback_keywords = [keyword_plan.primary_keyword, *keyword_plan.secondary_keywords, *keyword_plan.long_tail_questions]
-    return _build_article_response(raw, payload.strategy.topic, fallback_keywords)
+    response = _build_article_response(raw, payload)
+    guardrail = brand_guardrail_validator.validate(
+        content=response.draft.content,
+        brand_context=brand_context,
+        expected_tone=payload.strategy.tone,
+    )
+    if not guardrail.get("passed"):
+        response.quality_review.risks = list(dict.fromkeys([*response.quality_review.risks, *(item.get("message", "") for item in guardrail.get("violations", []))]))
+        response.quality_review.fixes = list(dict.fromkeys([*response.quality_review.fixes, "根据品牌约束修订后再发布。"]))
+    response.brand_guardrail = guardrail
+    return response
 
 
 @router.post("/generate-social", response_model=AiGenerateSocialResponse)

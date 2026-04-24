@@ -921,6 +921,20 @@ export interface AiArticlePublishReviewPlanResult {
   iteration_ideas: string[];
 }
 
+export interface AiBrandGuardrailViolation {
+  rule: string;
+  severity: string;
+  message: string;
+  matched_text?: string | null;
+}
+
+export interface AiBrandGuardrailReport {
+  passed: boolean;
+  brand_context_version?: string;
+  summary: string;
+  violations: AiBrandGuardrailViolation[];
+}
+
 export interface AiSeoScoreMetric {
   metric: string;
   score: number;
@@ -952,6 +966,7 @@ export interface AiGenerateArticleResponse {
   on_page: AiArticleOnPageResult;
   quality_review: AiArticleQualityReviewResult;
   publish_review_plan: AiArticlePublishReviewPlanResult;
+  brand_guardrail?: AiBrandGuardrailReport;
 }
 
 export interface AiBriefGenerationRequest {
@@ -1233,6 +1248,7 @@ export interface AiContentDraft {
   on_page_recommendations: AiArticleOnPageResult | Record<string, unknown>;
   quality_review: AiArticleQualityReviewResult | Record<string, unknown>;
   publish_review_metadata: AiDraftPublishReviewMetadata;
+  brand_context_version?: string | null;
   target_url?: string | null;
   publication_status: AiDraftPublicationStatus;
   version: number;
@@ -1251,6 +1267,7 @@ export interface CreateAiContentDraftPayload {
   on_page_recommendations?: AiArticleOnPageResult | Record<string, unknown>;
   quality_review?: AiArticleQualityReviewResult | Record<string, unknown>;
   publish_review_metadata?: AiDraftPublishReviewMetadata;
+  brand_context_version?: string;
   target_url?: string;
   publication_status?: AiDraftPublicationStatus;
 }
@@ -1265,6 +1282,7 @@ export interface UpdateAiContentDraftPayload {
   on_page_recommendations?: AiArticleOnPageResult | Record<string, unknown>;
   quality_review?: AiArticleQualityReviewResult | Record<string, unknown>;
   publish_review_metadata?: AiDraftPublishReviewMetadata;
+  brand_context_version?: string;
   target_url?: string;
   publication_status?: AiDraftPublicationStatus;
   expected_version: number;

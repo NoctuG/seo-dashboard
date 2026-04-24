@@ -35,6 +35,7 @@ import {
   runAiContentAgent,
   scoreSeoContent,
   type AiSeoScoreResponse,
+  type AiBrandGuardrailReport,
   type ExecuteAiCommandResponse,
   api,
 } from '../api';
@@ -557,6 +558,7 @@ function ArticleGenerator() {
   const [keywordSuggestionData, setKeywordSuggestionData] = useState<AiKeywordSuggestionResponse | null>(null);
   const [serpResearchData, setSerpResearchData] = useState<AiSerpResearchResponse | null>(null);
   const [retrospective, setRetrospective] = useState<AiDraftRetrospectiveResponse | null>(null);
+  const [brandGuardrail, setBrandGuardrail] = useState<AiBrandGuardrailReport | null>(null);
   const [liveContext, setLiveContext] = useState<Record<string, unknown> | null>(null);
   const [targetUrl, setTargetUrl] = useState('');
   const [publicationStatus, setPublicationStatus] = useState<AiDraftPublicationStatus>('draft');
@@ -848,6 +850,7 @@ function ArticleGenerator() {
         },
       });
       setResult(data);
+      setBrandGuardrail(data.brand_guardrail ?? null);
       await runSeoScoring(data);
       const structuredBlocks = data.draft.blocks ?? [];
       setEditableDocument(
@@ -1073,6 +1076,7 @@ function ArticleGenerator() {
           on_page_recommendations: onPagePayload,
           quality_review: qualityReviewPayload,
           publish_review_metadata: publishReviewMetadata,
+          brand_context_version: brandGuardrail?.brand_context_version,
           target_url: targetUrl.trim() || undefined,
           publication_status: publicationStatus,
           expected_version: activeDraft.version,
@@ -1091,6 +1095,7 @@ function ArticleGenerator() {
           on_page_recommendations: onPagePayload,
           quality_review: qualityReviewPayload,
           publish_review_metadata: publishReviewMetadata,
+          brand_context_version: brandGuardrail?.brand_context_version,
           target_url: targetUrl.trim() || undefined,
           publication_status: publicationStatus,
         });
@@ -1126,6 +1131,16 @@ function ArticleGenerator() {
     setPublicationStatus(draft.publication_status);
     setRetrospective(draft.publish_review_metadata?.retrospective ?? null);
     setLiveContext((draft.publish_review_metadata?.retrospective?.live_context as Record<string, unknown> | null) ?? null);
+    setBrandGuardrail(
+      draft.brand_context_version
+        ? {
+            passed: true,
+            brand_context_version: draft.brand_context_version,
+            summary: `已加载品牌约束版本 ${draft.brand_context_version}`,
+            violations: [],
+          }
+        : null,
+    );
     setEditableDocument(draft.canvas_document_json as unknown as CanvasDocument);
     const restoredResult = buildResultFromDraft(draft, restoredSeoBrief);
     setResult(restoredResult);
@@ -1854,6 +1869,30 @@ function ArticleGenerator() {
                   </div>
                 ))}
               </div>
+            </ResultCard>
+
+            <ResultCard title="品牌约束状态" icon="fa-solid fa-shield-halved">
+              {brandGuardrail ? (
+                <div className="space-y-2">
+                  <p className="md-body-small">
+                    <span className={brandGuardrail.passed ? 'text-green-600' : 'text-orange-600'}>
+                      {brandGuardrail.passed ? '品牌约束已应用（通过）' : '品牌约束已应用（存在违规）'}
+                    </span>
+                    {brandGuardrail.brand_context_version ? ` · 版本 ${brandGuardrail.brand_context_version}` : ''}
+                  </p>
+                  {!brandGuardrail.passed && (
+                    <ul className="space-y-1">
+                      {brandGuardrail.violations.map((violation, index) => (
+                        <li key={`${violation.rule}-${index}`} className="md-body-small text-orange-700">
+                          {violation.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <p className="md-body-small opacity-60">尚未应用品牌约束。</p>
+              )}
             </ResultCard>
 
             <div className="shape-medium border bg-[color:var(--md-sys-color-surface)] p-4" style={{ borderColor: 'var(--md-sys-color-outline)' }}>
