@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from sqlmodel import Session, select
 
 from app.content_performance_service import content_performance_service
 from app.analytics_service import analytics_service
+from app.brand_guardrail_validator import brand_guardrail_validator
 from app.integrations.provider import get_provider
 from app.keyword_research_service import keyword_research_service
 from app.models import AiContentDraft, Keyword, PageTrafficSnapshot, Project, RankHistory
@@ -32,6 +34,45 @@ class ArticleBriefResult:
 
 
 class ContentOrchestrationService:
+    def build_brand_context(self, project: Project | None) -> dict[str, Any]:
+        if not project:
+            base_context = {
+                "tone": "professional",
+                "banned_words": [],
+                "writing_guidelines": [],
+                "reference_examples": [],
+                "terminology": {},
+            }
+        else:
+            raw_brand_keywords = []
+            try:
+                parsed = json.loads(project.brand_keywords_json or "[]")
+                if isinstance(parsed, list):
+                    raw_brand_keywords = [str(item).strip() for item in parsed if str(item).strip()]
+                elif isinstance(parsed, dict):
+                    raw_brand_keywords = [str(item).strip() for item in parsed.get("keywords", []) if str(item).strip()]
+            except Exception:
+                raw_brand_keywords = []
+
+            base_context = {
+                "tone": "professional",
+                "banned_words": [],
+                "writing_guidelines": [
+                    "保持事实准确，避免夸大或无法验证的承诺。",
+                    "段落结构清晰，优先使用可执行建议与示例。",
+                ],
+                "reference_examples": [],
+                "terminology": {},
+            }
+            for keyword in raw_brand_keywords:
+                base_context["terminology"][keyword] = []
+            if project.brand_regex:
+                base_context["writing_guidelines"].append(f"品牌识别规则：{project.brand_regex}")
+
+        context_json = json.dumps(base_context, ensure_ascii=False, sort_keys=True)
+        base_context["version"] = hashlib.md5(context_json.encode("utf-8")).hexdigest()[:12]
+        return base_context
+
     def build_live_context(
         self,
         *,
@@ -233,6 +274,7 @@ class ContentOrchestrationService:
     ) -> ArticleBriefResult:
         fallback = self._default_brief(project=project, topic=topic, keyword_plan=keyword_plan, serp_analysis=serp_analysis)
         live_context: dict[str, Any] = {}
+        brand_context = self.build_brand_context(project)
         if project and project.id is not None:
             try:
                 live_context = self.build_live_context(
@@ -260,6 +302,7 @@ class ContentOrchestrationService:
             f"次关键词: {', '.join(keyword_plan.get('secondary_keywords', [])) or '无'}\n"
             f"长尾问题: {' | '.join(keyword_plan.get('long_tail_questions', [])) or '无'}\n\n"
             f"[SERP]\n总结: {serp_analysis.get('summary') or '无'}\n{serp_rows}\n\n"
+            f"[Brand Context]\n{json.dumps(brand_context, ensure_ascii=False)}\n\n"
             f"[Live Context]\n{json.dumps(live_context, ensure_ascii=False)}\n\n"
             f"请只输出 JSON，结构如下：\n"
             "{\n"
@@ -283,7 +326,7 @@ class ContentOrchestrationService:
         if not isinstance(parsed, dict):
             return fallback
 
-        return ArticleBriefResult(
+        result = ArticleBriefResult(
             audience=str(parsed.get("audience") or fallback.audience).strip(),
             intent=str(parsed.get("intent") or fallback.intent).strip(),
             outline=self._string_list(parsed.get("outline")) or fallback.outline,
@@ -297,6 +340,13 @@ class ContentOrchestrationService:
             },
             execution=self._normalize_execution(parsed.get("execution"), fallback.execution),
         )
+        brief_text = "\n".join([result.audience, result.intent, *result.outline, result.cta])
+        report = brand_guardrail_validator.validate(content=brief_text, brand_context=brand_context, expected_tone=tone)
+        if not report.get("passed"):
+            existing = result.execution.get("quality_review", {}).get("notes", "") or ""
+            issues = "；".join(item.get("message", "") for item in report.get("violations", []))
+            result.execution["quality_review"]["notes"] = f"{existing} 品牌规则提醒：{issues}".strip()
+        return result
 
     async def generate_draft_package(self, payload: dict[str, Any], session: Session | None = None) -> dict[str, Any]:
         strategy = payload.get("strategy", {})
@@ -305,6 +355,10 @@ class ContentOrchestrationService:
         execution = payload.get("execution", {})
         keyword_plan = strategy.get("keyword_plan", {})
         serp_analysis = research.get("serp_analysis", {})
+        project: Project | None = None
+        if session and isinstance(strategy.get("project_id"), int):
+            project = session.get(Project, strategy.get("project_id"))
+        brand_context = self.build_brand_context(project)
         live_context = {}
         strategy_project_id = strategy.get("project_id")
         if session and isinstance(strategy_project_id, int):
@@ -338,6 +392,7 @@ class ContentOrchestrationService:
             f"[SERP]\n总结: {serp_analysis.get('summary') or '无'}\n{serp_rows}\n\n"
             f"[Brief]\nAudience: {brief.get('audience')}\nIntent: {brief.get('intent')}\nOutline: {' | '.join(brief.get('outline', []))}\nEntities: {', '.join(brief.get('entities', []))}\nInternal links: {' | '.join(brief.get('internal_links', [])) or '无'}\nCTA: {brief.get('cta')}\nMetadata: SEO标题={((brief.get('metadata') or {}) if isinstance(brief.get('metadata'), dict) else {}).get('seo_title')}; Meta描述={((brief.get('metadata') or {}) if isinstance(brief.get('metadata'), dict) else {}).get('meta_description')}; Slug={((brief.get('metadata') or {}) if isinstance(brief.get('metadata'), dict) else {}).get('slug')}\n\n"
             f"[执行要求]\n初稿目标: {((execution.get('draft_generation') or {}) if isinstance(execution.get('draft_generation'), dict) else {}).get('goal')}\nOn-page目标: {((execution.get('on_page_optimization') or {}) if isinstance(execution.get('on_page_optimization'), dict) else {}).get('goal')}\n审校目标: {((execution.get('quality_review') or {}) if isinstance(execution.get('quality_review'), dict) else {}).get('goal')}\n复盘目标: {((execution.get('retrospective_record') or {}) if isinstance(execution.get('retrospective_record'), dict) else {}).get('goal')}\n\n"
+            f"[Brand Context]\n{json.dumps(brand_context, ensure_ascii=False)}\n\n"
             f"[Live Context]\n{json.dumps(live_context, ensure_ascii=False)}\n\n"
             "请只输出一个 JSON 对象，字段必须精确匹配：keyword_plan、serp_summary、brief、draft、on_page、quality_review、publish_review_plan。"
         )
@@ -345,7 +400,23 @@ class ContentOrchestrationService:
         parsed = await self._call_ai_json(system_prompt, user_prompt)
         if not isinstance(parsed, dict):
             return fallback
-        return self._merge_draft_package(fallback, parsed)
+        merged = self._merge_draft_package(fallback, parsed)
+        report = brand_guardrail_validator.validate(
+            content=str(((merged.get("draft") or {}) if isinstance(merged.get("draft"), dict) else {}).get("content") or ""),
+            brand_context=brand_context,
+            expected_tone=str(strategy.get("tone") or ""),
+        )
+        merged["brand_context"] = brand_context
+        merged["brand_guardrail"] = report
+        if not report.get("passed"):
+            quality_review = merged.setdefault("quality_review", {})
+            risks = quality_review.get("risks") if isinstance(quality_review.get("risks"), list) else []
+            fixes = quality_review.get("fixes") if isinstance(quality_review.get("fixes"), list) else []
+            risks.extend([item.get("message", "") for item in report.get("violations", []) if item.get("message")])
+            fixes.append("根据品牌约束修订术语、禁用词和语气后再发布。")
+            quality_review["risks"] = list(dict.fromkeys(risks))
+            quality_review["fixes"] = list(dict.fromkeys(fixes))
+        return merged
 
     def get_retrospective(self, session: Session, project_id: int, draft_id: int, window: str = "30d") -> dict[str, Any]:
         draft = session.get(AiContentDraft, draft_id)

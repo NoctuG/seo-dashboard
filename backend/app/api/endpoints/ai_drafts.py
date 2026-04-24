@@ -25,6 +25,7 @@ class AiDraftCreatePayload(BaseModel):
     on_page_recommendations: dict = Field(default_factory=dict)
     quality_review: dict = Field(default_factory=dict)
     publish_review_metadata: dict = Field(default_factory=dict)
+    brand_context_version: str | None = None
     target_url: str | None = Field(default=None, max_length=2048)
     publication_status: AiDraftPublicationStatus = AiDraftPublicationStatus.DRAFT
 
@@ -39,6 +40,7 @@ class AiDraftUpdatePayload(BaseModel):
     on_page_recommendations: dict | None = None
     quality_review: dict | None = None
     publish_review_metadata: dict | None = None
+    brand_context_version: str | None = None
     target_url: str | None = Field(default=None, max_length=2048)
     publication_status: AiDraftPublicationStatus | None = None
     expected_version: int = Field(ge=1)
@@ -60,6 +62,7 @@ class AiDraftRead(BaseModel):
     on_page_recommendations: dict
     quality_review: dict
     publish_review_metadata: dict
+    brand_context_version: str | None
     target_url: str | None
     publication_status: AiDraftPublicationStatus
     version: int
@@ -91,6 +94,7 @@ def _as_read(draft: AiContentDraft) -> AiDraftRead:
         on_page_recommendations=draft.on_page_recommendations or {},
         quality_review=draft.quality_review or {},
         publish_review_metadata=draft.publish_review_metadata or {},
+        brand_context_version=draft.brand_context_version,
         target_url=draft.target_url,
         publication_status=draft.publication_status,
         version=draft.version,
@@ -135,6 +139,7 @@ def create_ai_draft(
         on_page_recommendations=payload.on_page_recommendations,
         quality_review=payload.quality_review,
         publish_review_metadata=payload.publish_review_metadata,
+        brand_context_version=payload.brand_context_version,
         target_url=payload.target_url.strip() if payload.target_url else None,
         publication_status=payload.publication_status,
         version=1,
@@ -196,6 +201,7 @@ def update_ai_draft(
     base_on_page_recommendations = payload.on_page_recommendations
     base_quality_review = payload.quality_review
     base_publish_review_metadata = payload.publish_review_metadata
+    base_brand_context_version = payload.brand_context_version
     base_title = payload.title.strip() if payload.title else current.title
 
     if payload.rollback_to_version is not None:
@@ -217,6 +223,7 @@ def update_ai_draft(
         base_on_page_recommendations = rollback_source.on_page_recommendations
         base_quality_review = rollback_source.quality_review
         base_publish_review_metadata = rollback_source.publish_review_metadata
+        base_brand_context_version = rollback_source.brand_context_version
         base_title = rollback_source.title
 
     if payload.save_as_new_version or payload.rollback_to_version is not None:
@@ -233,6 +240,7 @@ def update_ai_draft(
             on_page_recommendations=base_on_page_recommendations if base_on_page_recommendations is not None else current.on_page_recommendations,
             quality_review=base_quality_review if base_quality_review is not None else current.quality_review,
             publish_review_metadata=base_publish_review_metadata if base_publish_review_metadata is not None else current.publish_review_metadata,
+            brand_context_version=base_brand_context_version if base_brand_context_version is not None else current.brand_context_version,
             target_url=payload.target_url.strip() if payload.target_url is not None else current.target_url,
             publication_status=payload.publication_status or current.publication_status,
             version=current.version + 1,
@@ -262,6 +270,8 @@ def update_ai_draft(
         current.quality_review = payload.quality_review
     if payload.publish_review_metadata is not None:
         current.publish_review_metadata = payload.publish_review_metadata
+    if payload.brand_context_version is not None:
+        current.brand_context_version = payload.brand_context_version
     if payload.target_url is not None:
         current.target_url = payload.target_url.strip() or None
     if payload.publication_status is not None:
