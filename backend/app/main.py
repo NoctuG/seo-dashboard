@@ -15,6 +15,7 @@ from app.logging_config import REQUEST_PATH_CONTEXT, TRACE_ID_CONTEXT, generate_
 from app.metrics import finish_timed_request, observe_http_request, timed_request
 from app.scheduler_service import scheduler_service
 from app.task_queue import task_queue
+import app.integrations  # noqa: F401
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from slowapi.errors import RateLimitExceeded
 

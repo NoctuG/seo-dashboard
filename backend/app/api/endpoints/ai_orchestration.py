@@ -120,6 +120,7 @@ class BriefGenerationResponse(BaseModel):
     cta: str
     metadata: BriefMetadata
     execution: dict[str, WorkflowStageOutput]
+    live_context: dict[str, Any] | None = None
 
 
 class RetrospectiveRequest(BaseModel):
@@ -133,6 +134,7 @@ class RetrospectiveResponse(BaseModel):
     ranking: dict[str, Any] | None
     traffic: dict[str, Any] | None
     insights: list[str]
+    live_context: dict[str, Any] | None = None
 
 
 class AgentRunRequest(BaseModel):
@@ -190,6 +192,7 @@ async def generate_brief(payload: BriefGenerationRequest, session: Session = Dep
         raise HTTPException(status_code=404, detail=ErrorCode.PROJECT_NOT_FOUND)
 
     result = await content_orchestration_service.generate_brief(
+        session=session,
         project=project,
         topic=payload.topic,
         tone=payload.tone,
@@ -198,14 +201,25 @@ async def generate_brief(payload: BriefGenerationRequest, session: Session = Dep
         keyword_plan=payload.keyword_plan.model_dump(),
         serp_analysis=payload.serp_analysis.model_dump(),
     )
-    return result.__dict__
+    response_payload = result.__dict__
+    if project and project.id is not None:
+        try:
+            response_payload["live_context"] = content_orchestration_service.build_live_context(
+                session=session,
+                project_id=project.id,
+                topic=payload.topic,
+                primary_keyword=payload.keyword_plan.primary_keyword,
+            )
+        except Exception:
+            response_payload["live_context"] = None
+    return response_payload
 
 
 
 
 @router.post("/content-orchestration/draft")
-async def generate_draft_package(payload: dict[str, Any]):
-    return await content_orchestration_service.generate_draft_package(payload)
+async def generate_draft_package(payload: dict[str, Any], session: Session = Depends(get_session)):
+    return await content_orchestration_service.generate_draft_package(payload, session=session)
 
 
 @router.post("/content-orchestration/agent-run", response_model=AgentRunResponse)

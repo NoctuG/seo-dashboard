@@ -11,6 +11,8 @@ import httpx
 from sqlmodel import Session, select
 
 from app.content_performance_service import content_performance_service
+from app.analytics_service import analytics_service
+from app.integrations.provider import get_provider
 from app.keyword_research_service import keyword_research_service
 from app.models import AiContentDraft, Keyword, PageTrafficSnapshot, Project, RankHistory
 from app.runtime_settings import get_runtime_settings
@@ -30,6 +32,133 @@ class ArticleBriefResult:
 
 
 class ContentOrchestrationService:
+    def build_live_context(
+        self,
+        *,
+        session: Session,
+        project_id: int,
+        topic: str | None = None,
+        primary_keyword: str | None = None,
+    ) -> dict[str, Any]:
+        project = session.get(Project, project_id)
+        if not project:
+            raise ValueError("project_not_found")
+
+        now = datetime.utcnow().isoformat() + "Z"
+        context: dict[str, Any] = {
+            "generated_at": now,
+            "project_id": project_id,
+            "data_freshness": "near_real_time",
+            "disclaimer": "数据可能存在同步延迟，请以来源平台时间戳为准，不代表严格实时。",
+            "sources": {},
+            "highlights": [],
+        }
+
+        # GA4
+        ga4_entry: dict[str, Any] = {
+            "source": "ga4",
+            "configured": False,
+            "status": "not_configured",
+            "latest_sync_at": None,
+            "confidence": "low",
+            "metrics": {},
+        }
+        try:
+            ga_data = analytics_service.get_project_analytics(
+                project_id=project_id,
+                domain=project.domain,
+                brand_keywords_json=project.brand_keywords_json,
+                brand_regex=project.brand_regex,
+            )
+            ga4_entry["configured"] = True
+            ga4_entry["status"] = "ok" if ga_data.get("source") == "live" else "fallback"
+            ga4_entry["latest_sync_at"] = now
+            ga4_entry["confidence"] = "high" if ga_data.get("source") == "live" else "medium"
+            totals = (ga_data.get("totals") or {}) if isinstance(ga_data.get("totals"), dict) else {}
+            ga4_entry["metrics"] = {
+                "sessions_30d": totals.get("sessions"),
+                "conversions_30d": totals.get("conversions"),
+                "bounce_rate": totals.get("bounce_rate"),
+            }
+            if totals.get("sessions") is not None:
+                context["highlights"].append(f"GA4 近30天会话数 {totals.get('sessions')}。")
+        except Exception as exc:
+            ga4_entry["status"] = "error"
+            ga4_entry["error"] = str(exc)
+        context["sources"]["ga4"] = ga4_entry
+
+        # GSC
+        gsc_entry: dict[str, Any] = {
+            "source": "google_search_console",
+            "configured": False,
+            "status": "not_configured",
+            "latest_sync_at": None,
+            "confidence": "low",
+            "metrics": {},
+            "top_queries": [],
+        }
+        gsc_provider = get_provider("google_search_console")
+        if gsc_provider and gsc_provider.is_configured():
+            gsc_entry["configured"] = True
+            site_url = f"https://{project.domain.rstrip('/')}"
+            gsc_result = gsc_provider.fetch_data({"site_url": site_url, "row_limit": 10})
+            if gsc_result.success and isinstance(gsc_result.data, dict):
+                summary = gsc_result.data.get("summary", {}) if isinstance(gsc_result.data.get("summary"), dict) else {}
+                rows = gsc_result.data.get("rows", []) if isinstance(gsc_result.data.get("rows"), list) else []
+                gsc_entry["status"] = "ok"
+                gsc_entry["latest_sync_at"] = (gsc_result.metadata or {}).get("retrieved_at") or now
+                gsc_entry["confidence"] = "high"
+                gsc_entry["metrics"] = {
+                    "avg_ctr_percent": summary.get("avg_ctr_percent"),
+                    "avg_position": summary.get("avg_position"),
+                    "total_clicks": summary.get("total_clicks"),
+                    "total_impressions": summary.get("total_impressions"),
+                }
+                gsc_entry["top_queries"] = rows[:5]
+                if summary.get("avg_ctr_percent") is not None:
+                    context["highlights"].append(f"GSC 平均 CTR {summary.get('avg_ctr_percent')}%，平均排名 {summary.get('avg_position')}。")
+            else:
+                gsc_entry["status"] = "error"
+                gsc_entry["error"] = gsc_result.error or "failed_to_fetch"
+        context["sources"]["google_search_console"] = gsc_entry
+
+        # DataForSEO / keyword provider
+        keyword_provider = keyword_research_service.current_provider()
+        dataforseo_entry: dict[str, Any] = {
+            "source": keyword_provider,
+            "configured": keyword_provider == "dataforseo",
+            "status": "ok" if keyword_provider == "dataforseo" else "fallback",
+            "latest_sync_at": now,
+            "confidence": "medium" if keyword_provider == "dataforseo" else "low",
+            "metrics": {},
+            "top_terms": [],
+        }
+        seed = (primary_keyword or topic or "").strip() or project.name
+        try:
+            kw_items = keyword_research_service.get_keywords(seed_term=seed, locale=project.default_hl, market=project.default_gl, limit=10)
+            dataforseo_entry["top_terms"] = [
+                {
+                    "keyword": item.keyword,
+                    "search_volume": item.search_volume,
+                    "difficulty": item.difficulty,
+                    "intent": item.intent,
+                }
+                for item in kw_items[:5]
+            ]
+            if kw_items:
+                avg_volume = round(sum(item.search_volume for item in kw_items) / len(kw_items))
+                dataforseo_entry["metrics"] = {"avg_search_volume": avg_volume}
+                context["highlights"].append(f"{keyword_provider} 提供的关键词均值搜索量约 {avg_volume}。")
+        except Exception as exc:
+            dataforseo_entry["status"] = "error"
+            dataforseo_entry["error"] = str(exc)
+        context["sources"]["dataforseo"] = dataforseo_entry
+        context["source_attribution"] = [
+            {"source": key, "status": value.get("status"), "latest_sync_at": value.get("latest_sync_at")}
+            for key, value in context["sources"].items()
+        ]
+        return context
+
     def suggest_keywords(self, seed_term: str, locale: str, market: str, limit: int = 20) -> dict[str, Any]:
         results = keyword_research_service.get_keywords(seed_term=seed_term, locale=locale, market=market, limit=limit)
         seed_clean = seed_term.strip()
@@ -93,6 +222,7 @@ class ContentOrchestrationService:
     async def generate_brief(
         self,
         *,
+        session: Session,
         project: Project | None,
         topic: str,
         tone: str,
@@ -102,6 +232,17 @@ class ContentOrchestrationService:
         serp_analysis: dict[str, Any],
     ) -> ArticleBriefResult:
         fallback = self._default_brief(project=project, topic=topic, keyword_plan=keyword_plan, serp_analysis=serp_analysis)
+        live_context: dict[str, Any] = {}
+        if project and project.id is not None:
+            try:
+                live_context = self.build_live_context(
+                    session=session,
+                    project_id=project.id,
+                    topic=topic,
+                    primary_keyword=str(keyword_plan.get("primary_keyword") or ""),
+                )
+            except Exception:
+                live_context = {}
         system_prompt = (
             "你是一名资深 SEO 内容策略总监。请根据关键词规划与 SERP 洞察，输出适合内容创作的 brief。"
             f"{'请使用中文。' if language.startswith('zh') else f'Please respond in {language}.'}"
@@ -119,6 +260,7 @@ class ContentOrchestrationService:
             f"次关键词: {', '.join(keyword_plan.get('secondary_keywords', [])) or '无'}\n"
             f"长尾问题: {' | '.join(keyword_plan.get('long_tail_questions', [])) or '无'}\n\n"
             f"[SERP]\n总结: {serp_analysis.get('summary') or '无'}\n{serp_rows}\n\n"
+            f"[Live Context]\n{json.dumps(live_context, ensure_ascii=False)}\n\n"
             f"请只输出 JSON，结构如下：\n"
             "{\n"
             '  "audience": string,\n'
@@ -156,13 +298,25 @@ class ContentOrchestrationService:
             execution=self._normalize_execution(parsed.get("execution"), fallback.execution),
         )
 
-    async def generate_draft_package(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def generate_draft_package(self, payload: dict[str, Any], session: Session | None = None) -> dict[str, Any]:
         strategy = payload.get("strategy", {})
         brief = payload.get("brief", {})
         research = payload.get("research", {})
         execution = payload.get("execution", {})
         keyword_plan = strategy.get("keyword_plan", {})
         serp_analysis = research.get("serp_analysis", {})
+        live_context = {}
+        strategy_project_id = strategy.get("project_id")
+        if session and isinstance(strategy_project_id, int):
+            try:
+                live_context = self.build_live_context(
+                    session=session,
+                    project_id=strategy_project_id,
+                    topic=str(strategy.get("topic") or ""),
+                    primary_keyword=str(keyword_plan.get("primary_keyword") or ""),
+                )
+            except Exception:
+                live_context = {}
 
         fallback = self._default_draft_package(payload)
         language = str(strategy.get('language', 'zh-CN'))
@@ -184,6 +338,7 @@ class ContentOrchestrationService:
             f"[SERP]\n总结: {serp_analysis.get('summary') or '无'}\n{serp_rows}\n\n"
             f"[Brief]\nAudience: {brief.get('audience')}\nIntent: {brief.get('intent')}\nOutline: {' | '.join(brief.get('outline', []))}\nEntities: {', '.join(brief.get('entities', []))}\nInternal links: {' | '.join(brief.get('internal_links', [])) or '无'}\nCTA: {brief.get('cta')}\nMetadata: SEO标题={((brief.get('metadata') or {}) if isinstance(brief.get('metadata'), dict) else {}).get('seo_title')}; Meta描述={((brief.get('metadata') or {}) if isinstance(brief.get('metadata'), dict) else {}).get('meta_description')}; Slug={((brief.get('metadata') or {}) if isinstance(brief.get('metadata'), dict) else {}).get('slug')}\n\n"
             f"[执行要求]\n初稿目标: {((execution.get('draft_generation') or {}) if isinstance(execution.get('draft_generation'), dict) else {}).get('goal')}\nOn-page目标: {((execution.get('on_page_optimization') or {}) if isinstance(execution.get('on_page_optimization'), dict) else {}).get('goal')}\n审校目标: {((execution.get('quality_review') or {}) if isinstance(execution.get('quality_review'), dict) else {}).get('goal')}\n复盘目标: {((execution.get('retrospective_record') or {}) if isinstance(execution.get('retrospective_record'), dict) else {}).get('goal')}\n\n"
+            f"[Live Context]\n{json.dumps(live_context, ensure_ascii=False)}\n\n"
             "请只输出一个 JSON 对象，字段必须精确匹配：keyword_plan、serp_summary、brief、draft、on_page、quality_review、publish_review_plan。"
         )
 
@@ -206,7 +361,10 @@ class ContentOrchestrationService:
                 "ranking": None,
                 "traffic": None,
                 "insights": ["请先为草稿绑定目标 URL，才能读取复盘指标。"],
+                "live_context": None,
             }
+
+        live_context = self.build_live_context(session=session, project_id=project_id)
 
         content_perf = content_performance_service.get_project_content_performance(session=session, project_id=project_id, window=window, sort="traffic")
         matched_perf = next((item for item in content_perf["items"] if item["url"] == target_url), None)
@@ -272,6 +430,11 @@ class ContentOrchestrationService:
             insights.append(f"最近一次流量快照日期为 {traffic['latest_date']}，近 7 天会话数 {traffic['sessions_7d']}。")
         else:
             insights.append("当前没有可用于该 URL 的流量快照。")
+        if live_context.get("sources", {}).get("google_search_console", {}).get("metrics", {}).get("avg_ctr_percent") is not None:
+            insights.append(
+                f"GSC 实测 CTR 为 {live_context['sources']['google_search_console']['metrics']['avg_ctr_percent']}%，"
+                f"数据时间 {live_context['sources']['google_search_console'].get('latest_sync_at') or '未知'}。"
+            )
 
         return {
             "target_url": target_url,
@@ -280,6 +443,7 @@ class ContentOrchestrationService:
             "ranking": ranking,
             "traffic": traffic,
             "insights": insights,
+            "live_context": live_context,
         }
 
     def _serialize_serp_item(self, item: SerpOverviewItem) -> dict[str, Any]:
