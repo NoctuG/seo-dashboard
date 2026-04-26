@@ -29,6 +29,7 @@ class ArticleBriefResult:
     cta: str
     metadata: dict[str, str]
     execution: dict[str, dict[str, str]]
+    live_context: dict[str, Any] | None = None
 
 
 class ContentOrchestrationService:
@@ -54,7 +55,6 @@ class ContentOrchestrationService:
             "highlights": [],
         }
 
-        # GA4
         ga4_entry: dict[str, Any] = {
             "source": "ga4",
             "configured": False,
@@ -87,7 +87,6 @@ class ContentOrchestrationService:
             ga4_entry["error"] = str(exc)
         context["sources"]["ga4"] = ga4_entry
 
-        # GSC
         gsc_entry: dict[str, Any] = {
             "source": "google_search_console",
             "configured": False,
@@ -122,7 +121,6 @@ class ContentOrchestrationService:
                 gsc_entry["error"] = gsc_result.error or "failed_to_fetch"
         context["sources"]["google_search_console"] = gsc_entry
 
-        # DataForSEO / keyword provider
         keyword_provider = keyword_research_service.current_provider()
         dataforseo_entry: dict[str, Any] = {
             "source": keyword_provider,
@@ -145,8 +143,9 @@ class ContentOrchestrationService:
                 }
                 for item in kw_items[:5]
             ]
-            if kw_items:
-                avg_volume = round(sum(item.search_volume for item in kw_items) / len(kw_items))
+            top = kw_items[:5]
+            if top:
+                avg_volume = round(sum(item.search_volume for item in top) / len(top))
                 dataforseo_entry["metrics"] = {"avg_search_volume": avg_volume}
                 context["highlights"].append(f"{keyword_provider} 提供的关键词均值搜索量约 {avg_volume}。")
         except Exception as exc:
@@ -296,6 +295,7 @@ class ContentOrchestrationService:
                 "slug": str(((parsed.get("metadata") or {}) if isinstance(parsed.get("metadata"), dict) else {}).get("slug") or fallback.metadata["slug"]).strip(),
             },
             execution=self._normalize_execution(parsed.get("execution"), fallback.execution),
+            live_context=live_context or None,
         )
 
     async def generate_draft_package(self, payload: dict[str, Any], session: Session | None = None) -> dict[str, Any]:

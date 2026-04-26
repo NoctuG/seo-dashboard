@@ -201,20 +201,7 @@ async def generate_brief(payload: BriefGenerationRequest, session: Session = Dep
         keyword_plan=payload.keyword_plan.model_dump(),
         serp_analysis=payload.serp_analysis.model_dump(),
     )
-    response_payload = result.__dict__
-    if project and project.id is not None:
-        try:
-            response_payload["live_context"] = content_orchestration_service.build_live_context(
-                session=session,
-                project_id=project.id,
-                topic=payload.topic,
-                primary_keyword=payload.keyword_plan.primary_keyword,
-            )
-        except Exception:
-            response_payload["live_context"] = None
-    return response_payload
-
-
+    return result.__dict__
 
 
 @router.post("/content-orchestration/draft")
